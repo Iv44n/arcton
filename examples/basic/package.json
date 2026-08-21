@@ -1,0 +1,14 @@
+{
+  "name": "example-basic",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot src/index.ts"
+  },
+  "dependencies": {
+    "@lior/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

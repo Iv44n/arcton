@@ -1,0 +1,14 @@
+{
+  "name": "my-lior-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot src/index.ts"
+  },
+  "dependencies": {
+    "@lior/core": "latest"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

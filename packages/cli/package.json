@@ -1,0 +1,20 @@
+{
+  "name": "@lior/cli",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "lior": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lior/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^7"
+  }
+}

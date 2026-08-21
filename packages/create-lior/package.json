@@ -1,0 +1,17 @@
+{
+  "name": "create-lior",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "create-lior": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^7"
+  }
+}
