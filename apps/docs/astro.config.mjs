@@ -7,7 +7,7 @@ import { defineConfig } from 'astro/config'
 export default defineConfig({
   integrations: [
     starlight({
-      title: 'Lior',
+      title: 'Arcton',
       sidebar: [
         {
           label: 'Guides',

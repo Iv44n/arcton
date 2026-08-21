@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { createApp } from '@lior/core'
+import { createApp } from '@arcton/core'
 
 const [command] = Bun.argv.slice(2)
 
@@ -8,9 +8,9 @@ switch (command) {
   case 'start': {
     const app = createApp()
     const server = app.listen()
-    console.log(`Lior listening on ${server.url}`)
+    console.log(`Arcton listening on ${server.url}`)
     break
   }
   default:
-    console.log('Usage: lior <dev|start>')
+    console.log('Usage: arcton <dev|start>')
 }

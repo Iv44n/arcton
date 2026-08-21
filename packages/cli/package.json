@@ -1,15 +1,21 @@
 {
-  "name": "@lior/cli",
+  "name": "@arcton/cli",
   "version": "0.0.1",
   "type": "module",
   "bin": {
-    "lior": "./src/index.ts"
+    "arcton": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc --noEmit"
   },
   "dependencies": {
-    "@lior/core": "workspace:*"
+    "@arcton/core": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest"

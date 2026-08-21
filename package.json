@@ -1,5 +1,5 @@
 {
-  "name": "lior",
+  "name": "arcton",
   "private": true,
   "packageManager": "bun@1.4.0",
   "workspaces": [

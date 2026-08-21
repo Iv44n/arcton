@@ -1,5 +1,5 @@
 {
-  "name": "@lior/adapter-bun",
+  "name": "@arcton/adapter-bun",
   "version": "0.0.1",
   "type": "module",
   "module": "src/index.ts",
@@ -7,12 +7,18 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc --noEmit",
     "test": "bun test"
   },
   "dependencies": {
-    "@lior/contracts": "workspace:*"
+    "@arcton/contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest"

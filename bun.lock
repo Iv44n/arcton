@@ -25,17 +25,17 @@
     "examples/basic": {
       "name": "example-basic",
       "dependencies": {
-        "@lior/core": "workspace:*",
+        "@arcton/core": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "latest",
       },
     },
     "packages/adapters/bun": {
-      "name": "@lior/adapter-bun",
+      "name": "@arcton/adapter-bun",
       "version": "0.0.1",
       "dependencies": {
-        "@lior/contracts": "workspace:*",
+        "@arcton/contracts": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -45,13 +45,13 @@
       },
     },
     "packages/cli": {
-      "name": "@lior/cli",
+      "name": "@arcton/cli",
       "version": "0.0.1",
       "bin": {
-        "lior": "./src/index.ts",
+        "arcton": "./src/index.ts",
       },
       "dependencies": {
-        "@lior/core": "workspace:*",
+        "@arcton/core": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -61,7 +61,7 @@
       },
     },
     "packages/contracts": {
-      "name": "@lior/contracts",
+      "name": "@arcton/contracts",
       "version": "0.0.1",
       "devDependencies": {
         "@types/bun": "latest",
@@ -71,11 +71,11 @@
       },
     },
     "packages/core": {
-      "name": "@lior/core",
+      "name": "@arcton/core",
       "version": "0.0.1",
       "dependencies": {
-        "@lior/adapter-bun": "workspace:*",
-        "@lior/contracts": "workspace:*",
+        "@arcton/adapter-bun": "workspace:*",
+        "@arcton/contracts": "workspace:*",
         "figlet": "^1.11.4",
       },
       "devDependencies": {
@@ -86,11 +86,11 @@
         "typescript": "^7",
       },
     },
-    "packages/create-lior": {
-      "name": "create-lior",
+    "packages/create-arcton": {
+      "name": "create-arcton",
       "version": "0.0.1",
       "bin": {
-        "create-lior": "./src/index.ts",
+        "create-arcton": "./src/index.ts",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -101,6 +101,14 @@
     },
   },
   "packages": {
+    "@arcton/adapter-bun": ["@arcton/adapter-bun@workspace:packages/adapters/bun"],
+
+    "@arcton/cli": ["@arcton/cli@workspace:packages/cli"],
+
+    "@arcton/contracts": ["@arcton/contracts@workspace:packages/contracts"],
+
+    "@arcton/core": ["@arcton/core@workspace:packages/core"],
+
     "@astrojs/compiler-binding": ["@astrojs/compiler-binding@0.3.2", "", { "optionalDependencies": { "@astrojs/compiler-binding-darwin-arm64": "0.3.2", "@astrojs/compiler-binding-darwin-x64": "0.3.2", "@astrojs/compiler-binding-linux-arm64-gnu": "0.3.2", "@astrojs/compiler-binding-linux-arm64-musl": "0.3.2", "@astrojs/compiler-binding-linux-x64-gnu": "0.3.2", "@astrojs/compiler-binding-linux-x64-musl": "0.3.2", "@astrojs/compiler-binding-wasm32-wasi": "0.3.2", "@astrojs/compiler-binding-win32-arm64-msvc": "0.3.2", "@astrojs/compiler-binding-win32-x64-msvc": "0.3.2" } }, "sha512-8w/9CWmYrAJJ8N0SY3O43ws2BgxoW6u3QsD8u2mE140lMYAlwh+tlNoUeSBq22wVheFuiBbR212l6ixZ2IIgCQ=="],
 
     "@astrojs/compiler-binding-darwin-arm64": ["@astrojs/compiler-binding-darwin-arm64@0.3.2", "", { "os": "darwin", "cpu": "arm64" }, "sha512-MM8tn8CSimcfytaOla4b6acN8mKWiL/rlAA1fpT3/Wl7dNGSE4y8FjTN/zJVNnb63CsLWG5zZwCt01TXtDKh9g=="],
@@ -312,14 +320,6 @@
     "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.35.3", "", { "os": "win32", "cpu": "x64" }, "sha512-D4y1vNeZrIIJCN+uHaWVtH86B+aCrdMYYjicy9pXHvbGZeGYLLSd3wdVuC37FxVXlU1ARsk84eKWfWMXGYEqvA=="],
 
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
-
-    "@lior/adapter-bun": ["@lior/adapter-bun@workspace:packages/adapters/bun"],
-
-    "@lior/cli": ["@lior/cli@workspace:packages/cli"],
-
-    "@lior/contracts": ["@lior/contracts@workspace:packages/contracts"],
-
-    "@lior/core": ["@lior/core@workspace:packages/core"],
 
     "@mdx-js/mdx": ["@mdx-js/mdx@3.1.1", "", { "dependencies": { "@types/estree": "^1.0.0", "@types/estree-jsx": "^1.0.0", "@types/hast": "^3.0.0", "@types/mdx": "^2.0.0", "acorn": "^8.0.0", "collapse-white-space": "^2.0.0", "devlop": "^1.0.0", "estree-util-is-identifier-name": "^3.0.0", "estree-util-scope": "^1.0.0", "estree-walker": "^3.0.0", "hast-util-to-jsx-runtime": "^2.0.0", "markdown-extensions": "^2.0.0", "recma-build-jsx": "^1.0.0", "recma-jsx": "^1.0.0", "recma-stringify": "^1.0.0", "rehype-recma": "^1.0.0", "remark-mdx": "^3.0.0", "remark-parse": "^11.0.0", "remark-rehype": "^11.0.0", "source-map": "^0.7.0", "unified": "^11.0.0", "unist-util-position-from-estree": "^2.0.0", "unist-util-stringify-position": "^4.0.0", "unist-util-visit": "^5.0.0", "vfile": "^6.0.0" } }, "sha512-f6ZO2ifpwAQIpzGWaBQT2TXxPv6z3RBzQKpVftEWN78Vl/YweF1uwussDx8ECAXVtr3Rs89fKyG9YlzUs9DyGQ=="],
 
@@ -547,7 +547,7 @@
 
     "cookie-es": ["cookie-es@1.2.3", "", {}, "sha512-lXVyvUvrNXblMqzIRrxHb57UUVmqsSWlxqt3XIjCkUP0wDAf6uicO6KMbEgYrMNtEvWgWHwe42CKxPu9MYAnWw=="],
 
-    "create-lior": ["create-lior@workspace:packages/create-lior"],
+    "create-arcton": ["create-arcton@workspace:packages/create-arcton"],
 
     "crossws": ["crossws@0.3.5", "", { "dependencies": { "uncrypto": "^0.1.3" } }, "sha512-ojKiDvcmByhwa8YYqbQI/hg7MEU0NC03+pSdEq4ZUnZR9xXpwk7E43SMNGkn+JxJGPFtNvQ48+vV2p+P1ml5PA=="],
 

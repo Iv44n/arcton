@@ -2,7 +2,7 @@ import type {
   RuntimeAdapter,
   RuntimeServeOptions,
   RuntimeServer
-} from '@lior/contracts'
+} from '@arcton/contracts'
 
 export const bunAdapter: RuntimeAdapter = {
   name: 'bun',

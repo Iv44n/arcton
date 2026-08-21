@@ -1,10 +1,14 @@
 {
-  "name": "create-lior",
+  "name": "create-arcton",
   "version": "0.0.1",
   "type": "module",
   "bin": {
-    "create-lior": "./src/index.ts"
+    "create-arcton": "./src/index.ts"
   },
+  "files": [
+    "src",
+    "template"
+  ],
   "scripts": {
     "build": "tsc --noEmit"
   },

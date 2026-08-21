@@ -1,12 +1,12 @@
 {
-  "name": "my-lior-app",
+  "name": "my-arcton-app",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "bun --hot src/index.ts"
   },
   "dependencies": {
-    "@lior/core": "latest"
+    "@arcton/core": "latest"
   },
   "devDependencies": {
     "@types/bun": "latest"

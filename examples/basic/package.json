@@ -6,7 +6,7 @@
     "dev": "bun --hot src/index.ts"
   },
   "dependencies": {
-    "@lior/core": "workspace:*"
+    "@arcton/core": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest"

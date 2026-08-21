@@ -1,14 +1,14 @@
-# lior
+# arcton
 
-Monorepo del framework Lior, gestionado con Bun workspaces + Turborepo.
+Monorepo del framework Arcton, gestionado con Bun workspaces + Turborepo.
 
 ## Estructura
 
-- `packages/core` — `@lior/core`, el runtime del framework
-- `packages/cli` — `@lior/cli`, CLI (`lior dev|start`)
-- `packages/create-lior` — scaffolding tool (`bunx create-lior <dir>`)
+- `packages/core` — `@arcton/core`, el runtime del framework
+- `packages/cli` — `@arcton/cli`, CLI (`arcton dev|start`)
+- `packages/create-arcton` — scaffolding tool (`bunx create-arcton <dir>`)
 - `apps/docs` — sitio de documentación
-- `examples/basic` — app de ejemplo que consume `@lior/core`
+- `examples/basic` — app de ejemplo que consume `@arcton/core`
 
 ## Uso
 

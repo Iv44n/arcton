@@ -1,30 +1,30 @@
-import { bunAdapter } from '@lior/adapter-bun'
+import { bunAdapter } from '@arcton/adapter-bun'
 import type {
   RuntimeAdapter,
   RuntimeHandler,
   RuntimeServer
-} from '@lior/contracts'
+} from '@arcton/contracts'
 import figlet from 'figlet'
 
-export interface LiorConfig {
+export interface ArctonConfig {
   port?: number
   adapter?: RuntimeAdapter
 }
 
-export interface LiorApp {
-  config: LiorConfig
+export interface ArctonApp {
+  config: ArctonConfig
   listen(port?: number): RuntimeServer
 }
 
-const defaultHandler: RuntimeHandler = () => new Response('Hello from Lior!')
+const defaultHandler: RuntimeHandler = () => new Response('Hello from Arcton!')
 
-export function createApp(config: LiorConfig = {}): LiorApp {
+export function createApp(config: ArctonConfig = {}): ArctonApp {
   const adapter = config.adapter ?? bunAdapter
 
   return {
     config,
     listen(port = config.port ?? 3000) {
-      console.log(figlet.textSync('Lior'))
+      console.log(figlet.textSync('Arcton'))
       return adapter.serve({ port, fetch: defaultHandler })
     }
   }

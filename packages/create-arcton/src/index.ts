@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-const targetDir = Bun.argv[2] ?? 'my-lior-app'
+const targetDir = Bun.argv[2] ?? 'my-arcton-app'
 const templateDir = new URL('../template', import.meta.url).pathname
 
 await Bun.$`mkdir -p ${targetDir}`

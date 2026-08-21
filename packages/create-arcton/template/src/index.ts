@@ -1,4 +1,4 @@
-import { createApp } from '@lior/core'
+import { createApp } from '@arcton/core'
 
 const app = createApp()
 const server = app.listen()

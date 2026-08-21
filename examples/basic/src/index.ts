@@ -1,4 +1,4 @@
-import { createApp } from '@lior/core'
+import { createApp } from '@arcton/core'
 
 const app = createApp({ port: 3001 })
 const server = app.listen()

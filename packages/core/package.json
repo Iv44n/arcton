@@ -1,5 +1,5 @@
 {
-  "name": "@lior/core",
+  "name": "@arcton/core",
   "version": "0.0.1",
   "type": "module",
   "module": "src/index.ts",
@@ -7,13 +7,19 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc --noEmit",
     "test": "bun test"
   },
   "dependencies": {
-    "@lior/adapter-bun": "workspace:*",
-    "@lior/contracts": "workspace:*",
+    "@arcton/adapter-bun": "workspace:*",
+    "@arcton/contracts": "workspace:*",
     "figlet": "^1.11.4"
   },
   "devDependencies": {
