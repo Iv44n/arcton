@@ -1,18 +1,18 @@
 import { expect, test } from 'bun:test'
-import { createApp } from './index'
+import { Arcton } from './index'
 
-test('createApp returns an app with listen()', () => {
-  const app = createApp()
+test('Arcton returns an app with listen()', () => {
+  const app = Arcton()
   expect(typeof app.listen).toBe('function')
 })
 
-test('createApp stores the given config', () => {
-  const app = createApp({ port: 4000 })
+test('Arcton stores the given config', () => {
+  const app = Arcton({ port: 4000 })
   expect(app.config.port).toBe(4000)
 })
 
 test('app.get/app.ws register routes served by listen()', async () => {
-  const app = createApp()
+  const app = Arcton()
 
   app.get('/health', () => ({ status: 'ok' }))
 
@@ -48,7 +48,7 @@ test('app.get/app.ws register routes served by listen()', async () => {
 })
 
 test('a handler returning a plain value is auto-mapped to JSON, a Response is passed through', async () => {
-  const app = createApp()
+  const app = Arcton()
 
   app.get('/users', () => [{ id: 1 }])
   app.get(

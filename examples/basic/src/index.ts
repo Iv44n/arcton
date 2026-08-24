@@ -1,6 +1,6 @@
-import { createApp } from '@arcton/core'
+import { Arcton } from '@arcton/core'
 
-const app = createApp({ port: 3001 })
+const app = Arcton({ port: 3001 })
 
 app.get('/', () => ({ message: 'Welcome to Arcton' }))
 

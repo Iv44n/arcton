@@ -51,7 +51,7 @@ function toRouteHandler(handler: Handler): RuntimeRouteHandler {
   }
 }
 
-export function createApp(config: ArctonConfig = {}): ArctonApp {
+export function Arcton(config: ArctonConfig = {}): ArctonApp {
   const adapter = config.adapter ?? bunAdapter
   const routes: RuntimeHttpRoute[] = []
   const websocketRoutes: RuntimeWebSocketRoute[] = []
