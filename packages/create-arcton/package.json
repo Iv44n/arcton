@@ -1,6 +1,6 @@
 {
   "name": "create-arcton",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "bin": {
     "create-arcton": "./src/index.ts"
