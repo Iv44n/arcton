@@ -1,14 +1,17 @@
 import { bunAdapter } from '@arcton/adapter-bun'
 import type {
+  Context,
+  HttpMethod,
+  RouteHandler,
   RuntimeAdapter,
-  RuntimeHttpMethod,
-  RuntimeHttpRoute,
-  RuntimeRouteHandler,
   RuntimeServer,
   RuntimeWebSocketHandler,
   RuntimeWebSocketRoute
 } from '@arcton/contracts'
 import figlet from 'figlet'
+import { createRouter } from './router/router'
+import { mapResponse } from './router/serialize'
+import type { ExtractParams } from './router/types'
 
 export interface ArctonConfig {
   port?: number
@@ -21,53 +24,118 @@ export interface ArctonListenOptions {
   hostname?: string
 }
 
-/**
- * A route handler returns a plain value — the framework maps it to a JSON
- * response. To send something else (HTML, plain text, a custom status or
- * headers), return a `Response` directly and it's used as-is.
- */
-export type Handler = (request: Request) => unknown | Promise<unknown>
-
+// One generic signature per method: `Route` infers as the
+// literal passed for `path`, and `ctx.params` comes back typed via
+// `ExtractParams<Route>` (e.g. `{ id: string }`). A non-literal `path`
+// (built at runtime, held in a `string` variable) makes `Route` infer as
+// the wide `string` type itself — `ExtractParams` special-cases that back
+// to plain `Record<string, string>` (see types.ts), so there's no need for
+// a second, non-generic overload here: TS's overload resolution always
+// picks the first matching signature, and a second `(path: string, ...)`
+// overload would in fact never be reached (the generic one above already
+// matches every `string` argument), so it'd be dead code, not a fallback.
 export interface ArctonApp {
   config: ArctonConfig
-  get(path: string, handler: Handler): ArctonApp
-  post(path: string, handler: Handler): ArctonApp
-  put(path: string, handler: Handler): ArctonApp
-  delete(path: string, handler: Handler): ArctonApp
-  patch(path: string, handler: Handler): ArctonApp
+  get<Route extends string>(
+    path: Route,
+    handler: RouteHandler<ExtractParams<Route>>
+  ): ArctonApp
+  post<Route extends string>(
+    path: Route,
+    handler: RouteHandler<ExtractParams<Route>>
+  ): ArctonApp
+  put<Route extends string>(
+    path: Route,
+    handler: RouteHandler<ExtractParams<Route>>
+  ): ArctonApp
+  delete<Route extends string>(
+    path: Route,
+    handler: RouteHandler<ExtractParams<Route>>
+  ): ArctonApp
+  patch<Route extends string>(
+    path: Route,
+    handler: RouteHandler<ExtractParams<Route>>
+  ): ArctonApp
+  head<Route extends string>(
+    path: Route,
+    handler: RouteHandler<ExtractParams<Route>>
+  ): ArctonApp
+  options<Route extends string>(
+    path: Route,
+    handler: RouteHandler<ExtractParams<Route>>
+  ): ArctonApp
   ws(path: string, handler: RuntimeWebSocketHandler): ArctonApp
   listen(options?: ArctonListenOptions): RuntimeServer
 }
 
-const notFound: RuntimeRouteHandler = () =>
-  new Response('Not Found', { status: 404 })
-
-function toRouteHandler(handler: Handler): RuntimeRouteHandler {
-  return async request => {
-    const result = await handler(request)
-    if (result instanceof Response) return result
-    if (result === undefined) return new Response(null, { status: 204 })
-    return Response.json(result)
-  }
-}
-
 export function Arcton(config: ArctonConfig = {}): ArctonApp {
   const adapter = config.adapter ?? bunAdapter
-  const routes: RuntimeHttpRoute[] = []
+  const router = createRouter()
   const websocketRoutes: RuntimeWebSocketRoute[] = []
 
-  function route(method: RuntimeHttpMethod, path: string, handler: Handler) {
-    routes.push({ method, path, handler: toRouteHandler(handler) })
+  // `handler` typechecks as `RouteHandler<ExtractParams<Route>>` (specific
+  // to whatever literal each call site passed), but the tree stores plain
+  // `RouteHandler`s — it matches by string, oblivious to which literal
+  // route a handler came from. The cast is the seam between the two: sound
+  // because `router.insert`'s own `path` (unwidened, same `Route`) is what
+  // makes `match()` hand that handler back `params` shaped exactly like
+  // `ExtractParams<Route>`, just erased to `Record<string, string>` on the
+  // way through the tree. TS can't see that coupling through the generic
+  // `Route`, so it can't verify it — verified instead by the type tests in
+  // router/types.test-d.ts.
+  function route<Route extends string>(
+    method: HttpMethod,
+    path: Route,
+    handler: RouteHandler<ExtractParams<Route>>
+  ): ArctonApp {
+    router.insert(method, path, handler as RouteHandler)
     return app
   }
 
   const app: ArctonApp = {
     config,
-    get: (path, handler) => route('GET', path, handler),
-    post: (path, handler) => route('POST', path, handler),
-    put: (path, handler) => route('PUT', path, handler),
-    delete: (path, handler) => route('DELETE', path, handler),
-    patch: (path, handler) => route('PATCH', path, handler),
+    get<Route extends string>(
+      path: Route,
+      handler: RouteHandler<ExtractParams<Route>>
+    ) {
+      return route('GET', path, handler)
+    },
+    post<Route extends string>(
+      path: Route,
+      handler: RouteHandler<ExtractParams<Route>>
+    ) {
+      return route('POST', path, handler)
+    },
+    put<Route extends string>(
+      path: Route,
+      handler: RouteHandler<ExtractParams<Route>>
+    ) {
+      return route('PUT', path, handler)
+    },
+    delete<Route extends string>(
+      path: Route,
+      handler: RouteHandler<ExtractParams<Route>>
+    ) {
+      return route('DELETE', path, handler)
+    },
+    patch<Route extends string>(
+      path: Route,
+      handler: RouteHandler<ExtractParams<Route>>
+    ) {
+      return route('PATCH', path, handler)
+    },
+    head<Route extends string>(
+      path: Route,
+      handler: RouteHandler<ExtractParams<Route>>
+    ) {
+      return route('HEAD', path, handler)
+    },
+    options<Route extends string>(
+      path: Route,
+      handler: RouteHandler<ExtractParams<Route>>
+    ) {
+      return route('OPTIONS', path, handler)
+    },
     ws(path: string, handler: RuntimeWebSocketHandler) {
       if (!adapter.capabilities.websocket) {
         throw new Error(
@@ -83,9 +151,36 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp {
       return adapter.serve({
         port: options.port ?? config.port ?? 3000,
         hostname: options.hostname ?? config.hostname,
-        routes,
         websocket: websocketRoutes,
-        fetch: notFound
+        async fetch(request) {
+          const method = request.method as HttpMethod
+          // Parsed once and reused for both matching (pathname) and query
+          // (searchParams) — router.matchPathname skips the URL parse
+          // router.match does internally, since we already have one here.
+          const url = new URL(request.url, 'http://localhost')
+          const result = router.matchPathname(method, url.pathname)
+
+          if ('notFound' in result) {
+            return new Response(null, { status: 404 })
+          }
+
+          if ('methodNotAllowed' in result) {
+            return new Response(null, {
+              status: 405,
+              headers: { Allow: result.allowed.join(', ') }
+            })
+          }
+
+          const ctx: Context = {
+            request,
+            params: result.params,
+            query: Object.fromEntries(url.searchParams),
+            response: { headers: new Headers() }
+          }
+
+          const body = await result.handler(ctx)
+          return mapResponse(body, ctx.response)
+        }
       })
     }
   }

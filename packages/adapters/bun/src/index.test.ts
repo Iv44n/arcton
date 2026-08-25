@@ -14,20 +14,28 @@ test('bunAdapter serves the fetch handler and exposes url/port', async () => {
   server.stop()
 })
 
-test('bunAdapter dispatches to a matching route and falls back to fetch otherwise', async () => {
+test('bunAdapter has no HTTP routing of its own — every request goes straight to fetch', async () => {
   const server = bunAdapter.serve({
     port: 0,
-    routes: [
-      { method: 'GET', path: '/hello', handler: () => new Response('hi') }
-    ],
-    fetch: () => new Response('not found', { status: 404 })
+    fetch: request => new Response(`handled ${new URL(request.url).pathname}`)
   })
 
-  const routed = await fetch(new URL('/hello', server.url))
-  expect(await routed.text()).toBe('hi')
+  const res = await fetch(new URL('/anything', server.url))
+  expect(await res.text()).toBe('handled /anything')
 
-  const fallback = await fetch(new URL('/missing', server.url))
-  expect(fallback.status).toBe(404)
+  server.stop()
+})
+
+test('bunAdapter (adapter-specific) turns an uncaught fetch error into a 500', async () => {
+  const server = bunAdapter.serve({
+    port: 0,
+    fetch: () => {
+      throw new Error('boom')
+    }
+  })
+
+  const res = await fetch(server.url)
+  expect(res.status).toBe(500)
 
   server.stop()
 })

@@ -1,8 +1,6 @@
 import type {
   RuntimeAdapter,
-  RuntimeHttpMethod,
   RuntimeRequestContext,
-  RuntimeRouteHandler,
   RuntimeServeOptions,
   RuntimeServer,
   RuntimeWebSocket,
@@ -47,16 +45,6 @@ export const bunAdapter: RuntimeAdapter = {
   name: 'bun',
   capabilities: { websocket: true },
   serve(options: RuntimeServeOptions): RuntimeServer {
-    const httpRoutes = new Map<
-      string,
-      Partial<Record<RuntimeHttpMethod, RuntimeRouteHandler>>
-    >()
-    for (const route of options.routes ?? []) {
-      const methods = httpRoutes.get(route.path) ?? {}
-      methods[route.method] = route.handler
-      httpRoutes.set(route.path, methods)
-    }
-
     const wsRoutes = new Map<string, RuntimeWebSocketHandler>()
     for (const route of options.websocket ?? []) {
       wsRoutes.set(route.path, route.handler)
@@ -66,11 +54,16 @@ export const bunAdapter: RuntimeAdapter = {
       request: Request,
       bunServer: Bun.Server<WsConnectionData>
     ) => {
-      const pathname = new URL(request.url).pathname
+      // A fixed base guards against a relative request.url — Bun's own
+      // requests are always absolute, but this keeps the adapter as
+      // defensive about it as the router's own URL parsing.
+      const pathname = new URL(request.url, 'http://localhost').pathname
 
       const context: RuntimeRequestContext = {
         upgrade: (req, upgradeOptions) => {
-          const handler = wsRoutes.get(new URL(req.url).pathname)
+          const handler = wsRoutes.get(
+            new URL(req.url, 'http://localhost').pathname
+          )
           if (!handler) return false
 
           return bunServer.upgrade(req, {
@@ -87,10 +80,6 @@ export const bunAdapter: RuntimeAdapter = {
           : new Response('Upgrade failed', { status: 400 })
       }
 
-      const routeHandler =
-        httpRoutes.get(pathname)?.[request.method as RuntimeHttpMethod]
-      if (routeHandler) return routeHandler(request)
-
       return options.fetch(request, context)
     }
 
@@ -100,14 +89,22 @@ export const bunAdapter: RuntimeAdapter = {
             port: options.port,
             hostname: options.hostname,
             fetch: handleRequest,
-            websocket: bunWebSocketHandler
+            websocket: bunWebSocketHandler,
+            error(error) {
+              console.error(error)
+              return new Response('Internal Server Error', { status: 500 })
+            }
           })
         : Bun.serve({
             port: options.port,
             hostname: options.hostname,
             fetch: handleRequest as (
               request: Request
-            ) => Response | Promise<Response>
+            ) => Response | Promise<Response>,
+            error(error) {
+              console.error(error)
+              return new Response('Internal Server Error', { status: 500 })
+            }
           })
 
     return {

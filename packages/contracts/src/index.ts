@@ -1,4 +1,6 @@
-export type RuntimeHttpMethod =
+// ── Router v1 types ─────────────────────────────────────────────────────────
+
+export type HttpMethod =
   | 'GET'
   | 'POST'
   | 'PUT'
@@ -7,15 +9,43 @@ export type RuntimeHttpMethod =
   | 'HEAD'
   | 'OPTIONS'
 
-/** A single HTTP route handler. Always answers — it never upgrades the connection. */
-export type RuntimeRouteHandler = (
-  request: Request
-) => Response | Promise<Response>
+export type RouteParams = Record<string, string>
+export type QueryParams = Record<string, string>
 
-export interface RuntimeHttpRoute {
-  method: RuntimeHttpMethod
-  path: string
-  handler: RuntimeRouteHandler
+export interface ResponseContext {
+  status?: number
+  headers: Headers
+}
+
+export interface Context<P extends RouteParams = RouteParams> {
+  request: Request
+  params: P
+  query: QueryParams
+  response: ResponseContext
+}
+
+export type Body =
+  | object
+  | string
+  | ArrayBufferView // Uint8Array, TypedArrays, DataView, Buffer (Node)
+  | ArrayBuffer
+  | Blob
+  | FormData
+  | URLSearchParams
+  | ReadableStream
+  | Response // escape hatch
+
+export type RouteHandler<P extends RouteParams = RouteParams> = (
+  ctx: Context<P>
+) => (Body | void) | Promise<Body | void>
+
+export type MatchResult =
+  | { matched: true; handler: RouteHandler; params: RouteParams }
+  | { notFound: true }
+  | { methodNotAllowed: true; allowed: HttpMethod[] }
+
+export interface Router {
+  match(method: HttpMethod, url: string): MatchResult
 }
 
 export interface RuntimeWebSocket {
@@ -70,12 +100,10 @@ export type RuntimeHandler = (
 ) => Response | undefined | Promise<Response | undefined>
 
 export interface RuntimeServeOptions {
-  /** Fallback handler for requests that don't match a route in {@link routes}. */
+  /** HTTP request handler. */
   fetch: RuntimeHandler
   port: number
   hostname?: string
-  /** Static HTTP routes, matched before falling back to {@link fetch}. */
-  routes?: RuntimeHttpRoute[]
   /**
    * WebSocket routes.
    *
