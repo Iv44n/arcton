@@ -14,6 +14,7 @@ function createTestAdapter(): {
   let captured: RuntimeHandler | undefined
   const adapter: RuntimeAdapter = {
     name: 'test',
+    version: '0.0.0',
     capabilities: { websocket: true },
     serve(options) {
       captured = options.fetch

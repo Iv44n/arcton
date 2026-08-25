@@ -43,6 +43,7 @@ const bunWebSocketHandler: Bun.WebSocketHandler<WsConnectionData> = {
 
 export const bunAdapter: RuntimeAdapter = {
   name: 'bun',
+  version: Bun.version,
   capabilities: { websocket: true },
   serve(options: RuntimeServeOptions): RuntimeServer {
     const wsRoutes = new Map<string, RuntimeWebSocketHandler>()

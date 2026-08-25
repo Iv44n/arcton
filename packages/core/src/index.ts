@@ -9,6 +9,7 @@ import type {
   RuntimeWebSocketRoute
 } from '@arcton/contracts'
 import figlet from 'figlet'
+import pkg from '../package.json' with { type: 'json' }
 import { createRouter } from './router/router'
 import { mapResponse } from './router/serialize'
 import type { ExtractParams } from './router/types'
@@ -17,12 +18,16 @@ export interface ArctonConfig {
   port?: number
   hostname?: string
   adapter?: RuntimeAdapter
+  /** Defaults to `process.env.NODE_ENV`, falling back to `'development'`. */
+  env?: string
 }
 
 export interface ArctonListenOptions {
   port?: number
   hostname?: string
 }
+
+const banner = figlet.textSync('Arcton')
 
 // One generic signature per method: `Route` infers as the
 // literal passed for `path`, and `ctx.params` comes back typed via
@@ -70,6 +75,7 @@ export interface ArctonApp {
 
 export function Arcton(config: ArctonConfig = {}): ArctonApp {
   const adapter = config.adapter ?? bunAdapter
+  const environment = config.env ?? process.env.NODE_ENV ?? 'development'
   const router = createRouter()
   const websocketRoutes: RuntimeWebSocketRoute[] = []
 
@@ -147,8 +153,7 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp {
       return app
     },
     listen(options = {}) {
-      console.log(figlet.textSync('Arcton'))
-      return adapter.serve({
+      const server = adapter.serve({
         port: options.port ?? config.port ?? 3000,
         hostname: options.hostname ?? config.hostname,
         websocket: websocketRoutes,
@@ -182,6 +187,15 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp {
           return mapResponse(body, ctx.response)
         }
       })
+
+      console.log(banner)
+      console.log(`  Arcton       v${pkg.version}`)
+      console.log(`  Runtime      ${adapter.name} v${adapter.version}`)
+      console.log(`  Environment  ${environment}`)
+      console.log(`  Listening    ${server.url}`)
+      console.log()
+
+      return server
     }
   }
 

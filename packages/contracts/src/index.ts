@@ -127,6 +127,8 @@ export interface RuntimeCapabilities {
 
 export interface RuntimeAdapter {
   readonly name: string
+  /** Version of the underlying runtime (e.g. Bun's `Bun.version`). */
+  readonly version: string
   readonly capabilities: RuntimeCapabilities
   serve(options: RuntimeServeOptions): RuntimeServer
 }

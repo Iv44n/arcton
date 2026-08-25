@@ -1,6 +1,6 @@
 import { Arcton } from '@arcton/core'
 
-const app = Arcton({ port: 3001 })
+const app = Arcton({ port: 3001, env: 'development' })
 
 app.get('/', () => ({ message: 'Welcome to Arcton' }))
 
@@ -54,6 +54,4 @@ app.ws('/chat', {
   }
 })
 
-const server = app.listen()
-
-console.log(`Example app running at ${server.url}`)
+app.listen()
