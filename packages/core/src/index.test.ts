@@ -458,3 +458,52 @@ test('error path: mapResponse throwing propagates uncaught, unnormalized', async
     /Cannot serialize handler result/
   )
 })
+
+test('app.use: a global middleware setting a header on the way out reaches the Response', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+
+  app.use(async (ctx, next) => {
+    await next()
+    ctx.response.headers.set('X-Powered-By', 'arcton')
+  })
+  app.get('/', () => ({ ok: true }))
+  app.listen({ port: 0 })
+
+  const res = await call(handler, new Request('http://localhost/'))
+  expect(res.headers.get('X-Powered-By')).toBe('arcton')
+})
+
+test('app.use: short-circuit middleware returning an object skips the handler', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+  let handlerCalled = false
+
+  app.use(() => ({ blocked: true }))
+  app.get('/', () => {
+    handlerCalled = true
+    return { ok: true }
+  })
+  app.listen({ port: 0 })
+
+  const res = await call(handler, new Request('http://localhost/'))
+  expect(handlerCalled).toBe(false)
+  expect(await res.json()).toEqual({ blocked: true })
+})
+
+test('app.use: 404 does not run middleware', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+  let middlewareCalled = false
+
+  app.use((_ctx, next) => {
+    middlewareCalled = true
+    return next()
+  })
+  app.get('/exists', () => ({ ok: true }))
+  app.listen({ port: 0 })
+
+  const res = await call(handler, new Request('http://localhost/missing'))
+  expect(res.status).toBe(404)
+  expect(middlewareCalled).toBe(false)
+})

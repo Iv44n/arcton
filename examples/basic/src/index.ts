@@ -1,6 +1,20 @@
 import { Arcton } from '@arcton/core'
 
-const app = Arcton({ port: 3001, env: 'development' })
+const app = Arcton({ port: 3002, env: 'development' })
+
+app.use(async (ctx, next) => {
+  console.log(`→ ${ctx.request.method} ${new URL(ctx.request.url).pathname}`)
+  await next()
+})
+
+app.use(async (ctx, next) => {
+  const start = performance.now()
+  await next()
+  ctx.response.headers.set(
+    'X-Response-Time',
+    `${(performance.now() - start).toFixed(2)}ms`
+  )
+})
 
 app.get('/', () => ({ message: 'Welcome to Arcton' }))
 

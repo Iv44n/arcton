@@ -2,6 +2,7 @@ import { bunAdapter } from '@arcton/adapter-bun'
 import type {
   Context,
   HttpMethod,
+  Middleware,
   RouteHandler,
   RuntimeAdapter,
   RuntimeServer,
@@ -10,6 +11,7 @@ import type {
 } from '@arcton/contracts'
 import figlet from 'figlet'
 import pkg from '../package.json' with { type: 'json' }
+import { compose } from './middleware/compose'
 import { createRouter } from './router/router'
 import { mapResponse } from './router/serialize'
 import type { ExtractParams } from './router/types'
@@ -70,6 +72,7 @@ export interface ArctonApp {
     handler: RouteHandler<ExtractParams<Route>>
   ): ArctonApp
   ws(path: string, handler: RuntimeWebSocketHandler): ArctonApp
+  use(middleware: Middleware): ArctonApp
   listen(options?: ArctonListenOptions): RuntimeServer
 }
 
@@ -78,6 +81,7 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp {
   const environment = config.env ?? process.env.NODE_ENV ?? 'development'
   const router = createRouter()
   const websocketRoutes: RuntimeWebSocketRoute[] = []
+  const middleware: Middleware[] = []
 
   // `handler` typechecks as `RouteHandler<ExtractParams<Route>>` (specific
   // to whatever literal each call site passed), but the tree stores plain
@@ -152,6 +156,10 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp {
       websocketRoutes.push({ path, handler })
       return app
     },
+    use(mw: Middleware) {
+      middleware.push(mw)
+      return app
+    },
     listen(options = {}) {
       const server = adapter.serve({
         port: options.port ?? config.port ?? 3000,
@@ -180,10 +188,11 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp {
             request,
             params: result.params,
             query: Object.fromEntries(url.searchParams),
-            response: { headers: new Headers() }
+            response: { headers: new Headers() },
+            state: {}
           }
 
-          const body = await result.handler(ctx)
+          const body = await compose(middleware, result.handler, ctx)
           return mapResponse(body, ctx.response)
         }
       })

@@ -22,6 +22,7 @@ export interface Context<P extends RouteParams = RouteParams> {
   params: P
   query: QueryParams
   response: ResponseContext
+  state: Record<string, unknown>
 }
 
 export type Body =
@@ -47,6 +48,15 @@ export type MatchResult =
 export interface Router {
   match(method: HttpMethod, url: string): MatchResult
 }
+
+// ── Middleware types ─────────────────────────────────────────────────────
+
+export type NextFunction = () => Promise<void>
+
+export type Middleware = (
+  ctx: Context,
+  next: NextFunction
+) => Promise<Body | void> | Body | void
 
 export interface RuntimeWebSocket {
   readonly data: unknown
