@@ -45,10 +45,16 @@ test('pre/post order: mw1-pre → mw2-pre → handler → mw2-post → mw1-post'
 
   await compose([mw1, mw2], handler, makeCtx())
 
-  expect(order).toEqual(['mw1-pre', 'mw2-pre', 'handler', 'mw2-post', 'mw1-post'])
+  expect(order).toEqual([
+    'mw1-pre',
+    'mw2-pre',
+    'handler',
+    'mw2-post',
+    'mw1-post'
+  ])
 })
 
-test('short-circuit: mw returns a Body without calling next → handler does not run, body = mw\'s', async () => {
+test("short-circuit: mw returns a Body without calling next → handler does not run, body = mw's", async () => {
   let handlerCalled = false
   const mw: Middleware = () => ({ shortCircuited: true })
   const handler: RouteHandler = () => {
@@ -72,7 +78,7 @@ test('short-circuit with a Response: body is the exact Response instance (identi
   expect(body).toBe(response)
 })
 
-test('passthrough: mw calls next() and returns void → body = handler\'s', async () => {
+test("passthrough: mw calls next() and returns void → body = handler's", async () => {
   const mw: Middleware = async (_ctx, next) => {
     await next()
   }
@@ -83,7 +89,7 @@ test('passthrough: mw calls next() and returns void → body = handler\'s', asyn
   expect(body).toEqual({ fromHandler: true })
 })
 
-test('replace: mw calls next() and returns a Body → body = mw\'s (the return wins)', async () => {
+test("replace: mw calls next() and returns a Body → body = mw's (the return wins)", async () => {
   const mw: Middleware = async (_ctx, next) => {
     await next()
     return { fromMw: true }
@@ -168,7 +174,7 @@ test('throw in post-code: downstream already ran, mw2 throws after next() → st
   expect(body).toEqual({ caught: 'mw2 post-code boom' })
 })
 
-test('nested short-circuit: outer mw1 returns void, inner mw2 short-circuits → body is mw2\'s', async () => {
+test("nested short-circuit: outer mw1 returns void, inner mw2 short-circuits → body is mw2's", async () => {
   let handlerCalled = false
   const mw1: Middleware = async (_ctx, next) => {
     await next()

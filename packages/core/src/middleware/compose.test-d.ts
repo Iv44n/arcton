@@ -51,7 +51,7 @@ state.anyKey satisfies unknown
 
 // A Context literal without `state` fails to construct — state is required.
 // @ts-expect-error - state is required
-const missingState: Context = {
+const _missingState: Context = {
   request: new Request('http://localhost/'),
   params: {},
   query: {},
