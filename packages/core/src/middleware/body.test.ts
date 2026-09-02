@@ -116,7 +116,10 @@ test('application/x-www-form-urlencoded is parsed as FormData', async () => {
 test('multipart/form-data is parsed as FormData', async () => {
   const form = new FormData()
   form.set('name', 'Ivan')
-  const request = new Request('http://localhost/', { method: 'POST', body: form })
+  const request = new Request('http://localhost/', {
+    method: 'POST',
+    body: form
+  })
 
   const result = await parseBody(request)
 
@@ -163,7 +166,10 @@ test('a registered custom parser handles its exact media type', async () => {
     body: 'FOO:42'
   })
   const parsers = new Map<string, BodyParser>([
-    ['application/vnd.foo', async r => ({ n: Number((await r.text()).split(':')[1]) })]
+    [
+      'application/vnd.foo',
+      async r => ({ n: Number((await r.text()).split(':')[1]) })
+    ]
   ])
 
   const result = await parseBody(request, parsers)
@@ -207,18 +213,23 @@ test.each([
   ['empty string', ''],
   ['null', null],
   ['empty object', {}]
-])('a custom parser returning falsy-but-not-undefined (%s) counts as handled', async (_label, value) => {
-  const request = new Request('http://localhost/', {
-    method: 'POST',
-    headers: { 'content-type': 'application/vnd.foo' },
-    body: 'irrelevant'
-  })
-  const parsers = new Map<string, BodyParser>([['application/vnd.foo', () => value]])
+])(
+  'a custom parser returning falsy-but-not-undefined (%s) counts as handled',
+  async (_label, value) => {
+    const request = new Request('http://localhost/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/vnd.foo' },
+      body: 'irrelevant'
+    })
+    const parsers = new Map<string, BodyParser>([
+      ['application/vnd.foo', () => value]
+    ])
 
-  const result = await parseBody(request, parsers)
+    const result = await parseBody(request, parsers)
 
-  expect(result).toEqual({ ok: true, value })
-})
+    expect(result).toEqual({ ok: true, value })
+  }
+)
 
 test('a throwing custom parser propagates uncaught, unlike a built-in', async () => {
   const request = new Request('http://localhost/', {
@@ -235,5 +246,7 @@ test('a throwing custom parser propagates uncaught, unlike a built-in', async ()
     ]
   ])
 
-  await expect(parseBody(request, parsers)).rejects.toThrow('custom parser boom')
+  await expect(parseBody(request, parsers)).rejects.toThrow(
+    'custom parser boom'
+  )
 })

@@ -584,7 +584,7 @@ test('app.use: global middleware runs on 405, alongside the Allow header', async
   expect(res.headers.get('X-Powered-By')).toBe('arcton')
 })
 
-test('app.use: applies to 404/405 regardless of registration order relative to routes (unlike a route\'s own snapshot)', async () => {
+test("app.use: applies to 404/405 regardless of registration order relative to routes (unlike a route's own snapshot)", async () => {
   const { adapter, fetch: handler } = createTestAdapter()
   const app = Arcton({ adapter })
 

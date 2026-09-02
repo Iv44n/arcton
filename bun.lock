@@ -104,6 +104,19 @@
         "typescript": "^7",
       },
     },
+    "packages/cors": {
+      "name": "@arcton/cors",
+      "version": "0.0.1",
+      "dependencies": {
+        "@arcton/contracts": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+      "peerDependencies": {
+        "typescript": "^7",
+      },
+    },
     "packages/create-arcton": {
       "name": "create-arcton",
       "version": "0.0.2",
@@ -136,6 +149,8 @@
     "@arcton/contracts": ["@arcton/contracts@workspace:packages/contracts"],
 
     "@arcton/core": ["@arcton/core@workspace:packages/core"],
+
+    "@arcton/cors": ["@arcton/cors@workspace:packages/cors"],
 
     "@arcton/docs": ["@arcton/docs@workspace:apps/docs"],
 

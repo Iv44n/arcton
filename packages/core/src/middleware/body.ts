@@ -41,7 +41,9 @@ export async function parseBody(
   request: Request,
   customParsers: ReadonlyMap<string, BodyParser> = new Map()
 ): Promise<ParsedBody> {
-  const mediaType = normalizeMediaType(request.headers.get('content-type') ?? '')
+  const mediaType = normalizeMediaType(
+    request.headers.get('content-type') ?? ''
+  )
 
   const customParser = customParsers.get(mediaType)
   if (customParser) {

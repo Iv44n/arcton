@@ -1,5 +1,5 @@
-import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared'
 import { uiTranslations } from 'fumadocs-ui/i18n'
+import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared'
 import { Logo } from '@/components/logo'
 import { i18n } from './i18n'
 import { docsRoute, gitConfig } from './shared'
