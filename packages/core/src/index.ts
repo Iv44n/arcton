@@ -1,5 +1,6 @@
 import { bunAdapter } from '@arcton/adapter-bun'
 import type {
+  BodyParser,
   Context,
   HttpMethod,
   Middleware,
@@ -16,6 +17,7 @@ import type {
 } from '@arcton/contracts'
 import figlet from 'figlet'
 import pkg from '../package.json' with { type: 'json' }
+import { normalizeMediaType } from './middleware/body'
 import { runPipeline, type Step } from './middleware/pipeline'
 import { parse } from './router/parse'
 import { createRouter } from './router/router'
@@ -105,6 +107,15 @@ export interface ArctonApp<TProvided = {}> {
     R extends Partial<Record<ReservedKeys<TProvided>, never>> &
       Record<string, unknown>
   >(fn: ProvideFn<TProvided, R>): ArctonApp<TProvided & R>
+  /**
+   * Registers a body parser for an exact Content-Type (parameters like
+   * "; charset=..." are ignored), overriding a built-in for the same type
+   * if there is one. Not a pipeline step — a flat `mediaType → parser`
+   * table with no ordering/snapshot semantics; registering the same
+   * mediaType again just replaces the previous parser. Only consulted for
+   * a route with a `body` schema (see `route()`'s `body` option).
+   */
+  parser(mediaType: string, parser: BodyParser): ArctonApp<TProvided>
   listen(options?: ArctonListenOptions): RuntimeServer
 }
 
@@ -181,6 +192,9 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
   const router = createRouter()
   const websocketRoutes: RuntimeWebSocketRoute[] = []
   const steps: Step[] = []
+  // Not a pipeline step, so no snapshot semantics — see parser()'s doc
+  // comment on ArctonApp. Read live at parse time, not per-route.
+  const parsers = new Map<string, BodyParser>()
 
   // `handler` typechecks per call site as `RouteHandler<ExtractParams<Route>,
   // TProvided>`, but the tree stores plain `RouteHandler`s and matches by
@@ -234,7 +248,7 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     const composed: RouteHandler =
       routeSteps.length === 0
         ? handler
-        : ctx => runPipeline(routeSteps, handler, ctx)
+        : ctx => runPipeline(routeSteps, handler, ctx, parsers)
 
     router.insert(method, path, composed)
     return app as unknown as ArctonApp<never>
@@ -319,6 +333,10 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     provide(fn) {
       steps.push({ kind: 'provide', fn: fn as (ctx: Context) => unknown })
       return app as unknown as ArctonApp<never>
+    },
+    parser(mediaType, parser) {
+      parsers.set(normalizeMediaType(mediaType), parser)
+      return app
     },
     listen(options = {}) {
       // 404/405 has no matched route, so no per-route snapshot to attach

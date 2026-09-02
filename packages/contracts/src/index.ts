@@ -118,6 +118,13 @@ export type ProvideFn<TProvided, R extends Record<string, unknown>> = (
   ctx: Context<RouteParams, QueryParams, {}, TProvided>
 ) => R | Promise<R>
 
+// Registered per exact Content-Type via ArctonApp.parser() — only sees the
+// raw Request, not ctx, since parsing has nothing to do with route context.
+// `undefined` means "not handled" (keeps looking, ultimately 415) — chosen
+// over a truthy check so a legitimately parsed `false`/`0`/`''`/`null`
+// still counts as handled.
+export type BodyParser = (request: Request) => unknown | Promise<unknown>
+
 // ── Schema validation ─────────────────────────────────────────────────────
 
 // Standard Schema (https://standardschema.dev/) — a vendor-neutral interface

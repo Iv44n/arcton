@@ -18,6 +18,13 @@ app.use(async (ctx, next) => {
   )
 })
 
+// Global use() also runs on 404/405 (not just matched routes) — this header
+// reaches a "route doesn't exist" response too, which is what CORS needs.
+app.use(async (ctx, next) => {
+  await next()
+  ctx.response.headers.set('Access-Control-Allow-Origin', '*')
+})
+
 app.get('/', () => ({ message: 'Welcome to Arcton' }))
 
 const withRequestId: Middleware = async (ctx, next) => {
@@ -71,6 +78,36 @@ app.post('/users/:id/orders', {
       order: ctx.body
     }
   }
+})
+
+// Path-scoped: only routes under /api see this, not e.g. /health.
+app.use('/api', async (ctx, next) => {
+  if (ctx.request.headers.get('x-api-key') !== 'secret') {
+    return new Response('Unauthorized', { status: 401 })
+  }
+  await next()
+})
+
+app.get('/api/status', () => ({ api: 'ok' }))
+
+// Built-in body parser beyond JSON — multipart/form-data → FormData.
+app.post('/upload', {
+  body: v.instance(FormData),
+  handler: ctx => ({ received: ctx.body.get('name') })
+})
+
+// Custom parser for a media type with no built-in support.
+app.parser('text/csv', async request => {
+  const [header = '', ...rows] = (await request.text()).trim().split('\n')
+  const keys = header.split(',')
+  return rows.map(row =>
+    Object.fromEntries(keys.map((key, i) => [key, row.split(',')[i]]))
+  )
+})
+
+app.post('/import', {
+  body: v.array(v.record(v.string(), v.string())),
+  handler: ctx => ({ imported: ctx.body.length, rows: ctx.body })
 })
 
 const files: Record<string, string> = {

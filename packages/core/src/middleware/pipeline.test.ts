@@ -727,7 +727,7 @@ test('validate: an unsupported body content-type short-circuits with 415, before
   const ctx = makeCtx({
     request: new Request('http://localhost/', {
       method: 'POST',
-      headers: { 'content-type': 'text/plain' },
+      headers: { 'content-type': 'application/xml' },
       body: 'irrelevant'
     })
   })
@@ -764,7 +764,7 @@ test('validate: malformed JSON with a JSON content-type short-circuits with 400 
   expect(body).toBeInstanceOf(Response)
   expect((body as Response).status).toBe(400)
   expect(await (body as Response).json()).toEqual({
-    issues: [{ message: 'Invalid JSON body' }]
+    issues: [{ message: 'Invalid request body' }]
   })
 })
 

@@ -1,5 +1,6 @@
 import type {
   Body,
+  BodyParser,
   Context,
   Middleware,
   RouteHandler,
@@ -49,7 +50,8 @@ export type Step =
 export function runPipeline(
   steps: Step[],
   handler: RouteHandler,
-  ctx: Context
+  ctx: Context,
+  customParsers: ReadonlyMap<string, BodyParser> = new Map()
 ): Promise<Body | void> {
   // Fast path: no provide()/use()/validate registered — same shape and
   // cost as calling the handler directly. ctx.response is never touched
@@ -78,7 +80,7 @@ export function runPipeline(
       })
     }
     if (step.kind === 'validate') {
-      return runValidation(step, ctx).then(failure => {
+      return runValidation(step, ctx, customParsers).then(failure => {
         if (failure !== undefined) {
           body = failure // short-circuit: no next() call, mapResponse passes it through as-is
           materialize(failure)
@@ -103,7 +105,8 @@ export function runPipeline(
 // the validated params/query/body — the caller just continues the chain).
 async function runValidation(
   step: Extract<Step, { kind: 'validate' }>,
-  ctx: Context
+  ctx: Context,
+  customParsers: ReadonlyMap<string, BodyParser>
 ): Promise<Response | undefined> {
   const mutableCtx = ctx as unknown as Record<string, unknown>
 
@@ -120,10 +123,10 @@ async function runValidation(
   }
 
   if (step.body) {
-    const parsed = await parseBody(ctx.request)
+    const parsed = await parseBody(ctx.request, customParsers)
     if (!parsed.ok) {
-      return parsed.reason === 'invalid-json'
-        ? issuesResponse([{ message: 'Invalid JSON body' }])
+      return parsed.reason === 'invalid-body'
+        ? issuesResponse([{ message: 'Invalid request body' }])
         : new Response(null, { status: 415 })
     }
 

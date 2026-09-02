@@ -1064,7 +1064,7 @@ test('post(path, options): an unsupported body content-type returns 415', async 
     handler,
     new Request('http://localhost/users', {
       method: 'POST',
-      headers: { 'content-type': 'text/plain' },
+      headers: { 'content-type': 'application/xml' },
       body: 'not json'
     })
   )
@@ -1124,4 +1124,99 @@ test('get(path, handler): plain-handler shape is unaffected — no validate step
 
   const res = await call(handler, new Request('http://localhost/users/42'))
   expect(await res.json()).toEqual({ id: '42', type: 'string' })
+})
+
+// ── app.parser() — body parsers ─────────────────────────────────────────────
+
+test('a body schema against multipart/form-data validates the parsed FormData', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+
+  app.post('/upload', {
+    body: fakeSchema((f: FormData) => ({ name: f.get('name') })),
+    handler: ctx => ctx.body
+  })
+  app.listen({ port: 0 })
+
+  const form = new FormData()
+  form.set('name', 'Ivan')
+  const res = await call(
+    handler,
+    new Request('http://localhost/upload', { method: 'POST', body: form })
+  )
+  expect(await res.json()).toEqual({ name: 'Ivan' })
+})
+
+test('app.parser(): a custom parser handles its registered media type', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+
+  app.parser('application/vnd.foo', async request => {
+    const text = await request.text()
+    return { n: Number(text.split(':')[1]) }
+  })
+  app.post('/foo', {
+    body: fakeSchema((v: { n: number }) => v),
+    handler: ctx => ctx.body
+  })
+  app.listen({ port: 0 })
+
+  const res = await call(
+    handler,
+    new Request('http://localhost/foo', {
+      method: 'POST',
+      headers: { 'content-type': 'application/vnd.foo' },
+      body: 'FOO:42'
+    })
+  )
+  expect(await res.json()).toEqual({ n: 42 })
+})
+
+test('app.parser(): registering the same media type again replaces the previous parser', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+
+  app.parser('application/json', async () => ({ from: 'first' }))
+  app.parser('application/json', async () => ({ from: 'second' }))
+  app.post('/echo', {
+    body: fakeSchema((v: { from: string }) => v),
+    handler: ctx => ctx.body
+  })
+  app.listen({ port: 0 })
+
+  const res = await call(
+    handler,
+    new Request('http://localhost/echo', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}'
+    })
+  )
+  expect(await res.json()).toEqual({ from: 'second' })
+})
+
+test('app.parser(): a throwing custom parser propagates uncaught', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+  const err = new Error('custom parser boom')
+
+  app.parser('application/vnd.foo', () => {
+    throw err
+  })
+  app.post('/foo', {
+    body: fakeSchema((v: unknown) => ({ v })),
+    handler: ctx => ctx.body
+  })
+  app.listen({ port: 0 })
+
+  await expect(
+    call(
+      handler,
+      new Request('http://localhost/foo', {
+        method: 'POST',
+        headers: { 'content-type': 'application/vnd.foo' },
+        body: 'irrelevant'
+      })
+    )
+  ).rejects.toBe(err)
 })
