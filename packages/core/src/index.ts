@@ -37,8 +37,6 @@ export interface ArctonListenOptions {
   hostname?: string
 }
 
-const banner = figlet.textSync('Arcton')
-
 // `Route` infers as the literal passed for `path`, so `ctx.params` comes
 // back typed via `ExtractParams<Route>` (e.g. `{ id: string }`). `TProvided`
 // flows through so route-level middleware and the handler see whatever's
@@ -184,6 +182,24 @@ function assertStaticScope(scope: string): void {
 
 function matchesScope(path: string, scope: string): boolean {
   return path === scope || path.startsWith(`${scope}/`)
+}
+
+// Defers Object.fromEntries(url.searchParams) until something actually
+// reads ctx.query — most requests (every 404/405, plus any handler that
+// never touches it) skip it entirely. A get/set pair (not a getter alone)
+// so a 'validate' step's `ctx.query = result.value` (see
+// middleware/pipeline.ts) still works as a plain assignment.
+function lazyQuery(url: URL): {
+  get(): QueryParams
+  set(next: QueryParams): void
+} {
+  let value: QueryParams | undefined
+  return {
+    get: () => (value ??= Object.fromEntries(url.searchParams)),
+    set: next => {
+      value = next
+    }
+  }
 }
 
 export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
@@ -373,10 +389,16 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
                       headers: { Allow: result.allowed.join(', ') }
                     })
 
+            const query = lazyQuery(url)
             const ctx: Context = {
               request,
               params: {},
-              query: Object.fromEntries(url.searchParams),
+              get query() {
+                return query.get()
+              },
+              set query(next) {
+                query.set(next)
+              },
               response: { headers: new Headers() }
             }
 
@@ -390,10 +412,16 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
               : mapResponse(body, ctx.response)
           }
 
+          const query = lazyQuery(url)
           const ctx: Context = {
             request,
             params: result.params,
-            query: Object.fromEntries(url.searchParams),
+            get query() {
+              return query.get()
+            },
+            set query(next) {
+              query.set(next)
+            },
             response: { headers: new Headers() }
           }
 
@@ -410,7 +438,7 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
         }
       })
 
-      console.log(banner)
+      console.log(figlet.textSync('Arcton'))
       console.log(`  Arcton       v${pkg.version}`)
       console.log(`  Runtime      ${adapter.name} v${adapter.version}`)
       console.log(`  Environment  ${environment}`)

@@ -55,11 +55,6 @@ export const bunAdapter: RuntimeAdapter = {
       request: Request,
       bunServer: Bun.Server<WsConnectionData>
     ) => {
-      // A fixed base guards against a relative request.url — Bun's own
-      // requests are always absolute, but this keeps the adapter as
-      // defensive about it as the router's own URL parsing.
-      const pathname = new URL(request.url, 'http://localhost').pathname
-
       const context: RuntimeRequestContext = {
         upgrade: (req, upgradeOptions) => {
           const handler = wsRoutes.get(
@@ -74,9 +69,19 @@ export const bunAdapter: RuntimeAdapter = {
         }
       }
 
+      if (wsRoutes.size === 0) {
+        return options.fetch(request, context)
+      }
+
+      // A fixed base guards against a relative request.url — Bun's own
+      // requests are always absolute, but this keeps the adapter as
+      // defensive about it as the router's own URL parsing.
+      const pathname = new URL(request.url, 'http://localhost').pathname
       const wsHandler = wsRoutes.get(pathname)
       if (wsHandler) {
-        return context.upgrade(request)
+        return bunServer.upgrade(request, {
+          data: { handler: wsHandler, data: undefined }
+        })
           ? undefined
           : new Response('Upgrade failed', { status: 400 })
       }
