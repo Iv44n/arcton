@@ -215,9 +215,9 @@ Arcton().get('/users/:id', ctx => {
 })
 
 // A RouteOptions with the wrong handler param type is rejected, not widened.
+// @ts-expect-error - handler's ctx.params.id must be number (schema output), not string
 Arcton().post('/users/:id', {
   params: idParams,
-  // @ts-expect-error - handler's ctx.params.id must be number (schema output), not string
   handler: (_ctx: { params: { id: string } }) => {}
 })
 
