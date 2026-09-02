@@ -6,7 +6,9 @@
     "dev": "bun --hot src/index.ts"
   },
   "dependencies": {
-    "@arcton/core": "workspace:*"
+    "@arcton/contracts": "workspace:*",
+    "@arcton/core": "workspace:*",
+    "valibot": "^1.4.2"
   },
   "devDependencies": {
     "@types/bun": "latest"

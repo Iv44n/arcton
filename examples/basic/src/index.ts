@@ -1,4 +1,6 @@
+import type { Middleware } from '@arcton/contracts'
 import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
 
 const app = Arcton({ port: 3002, env: 'development' })
 
@@ -18,7 +20,12 @@ app.use(async (ctx, next) => {
 
 app.get('/', () => ({ message: 'Welcome to Arcton' }))
 
-app.get('/health', () => ({ status: 'ok' }))
+const withRequestId: Middleware = async (ctx, next) => {
+  ctx.response.headers.set('X-Request-Id', crypto.randomUUID())
+  await next()
+}
+
+app.get('/health', withRequestId, () => ({ status: 'ok' }))
 
 app.get(
   '/text',
@@ -33,6 +40,38 @@ app.post('/echo', async ctx => ({
 }))
 
 app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.post('/users/:id/orders', {
+  params: v.object({ id: v.pipe(v.string(), v.transform(Number), v.number()) }),
+  query: v.object({
+    notify: v.optional(
+      v.pipe(
+        v.string(),
+        v.transform(s => s === 'true'),
+        v.boolean()
+      )
+    )
+  }),
+  body: v.object({
+    item: v.pipe(v.string(), v.minLength(1)),
+    quantity: v.pipe(v.number(), v.integer(), v.minValue(1))
+  }),
+  middleware: [
+    async (ctx, next) => {
+      console.log(
+        `order: user=${ctx.params.id} item=${ctx.body.item} qty=${ctx.body.quantity}`
+      )
+      await next()
+    }
+  ],
+  handler: ctx => {
+    return {
+      userId: ctx.params.id,
+      notify: ctx.query.notify ?? false,
+      order: ctx.body
+    }
+  }
+})
 
 const files: Record<string, string> = {
   'a/b.txt': 'contents of a/b.txt',
@@ -55,6 +94,31 @@ app.get('/files/*path', ctx => {
     headers: { 'content-type': 'text/plain' }
   })
 })
+
+app
+  .use(async (_ctx, next) => {
+    console.log('auth middlewareeeeee')
+    await next()
+  })
+  .provide(ctx => {
+    const authToken = ctx.request.headers.get('authorization')
+
+    return {
+      user: authToken === 'secret' ? { id: 1, name: 'Alice' } : null,
+      permissions: authToken === 'secret' ? ['read', 'write'] : null
+    }
+  })
+  .get(
+    '/profile',
+    async (ctx, next) => {
+      if (!ctx.user) return new Response('Unauthorized', { status: 401 })
+      await next()
+    },
+    ctx => ({
+      user: ctx.user,
+      permissions: ctx.permissions
+    })
+  )
 
 app.ws('/chat', {
   open(ws) {
