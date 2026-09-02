@@ -12,8 +12,16 @@
   "scripts": {
     "build": "tsc --noEmit"
   },
+  "dependencies": {
+    "@clack/prompts": "^1.7.0",
+    "figlet": "^1.11.4",
+    "gradient-string": "^3.0.0",
+    "picocolors": "^1.1.1"
+  },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/figlet": "^1.7.0",
+    "@types/gradient-string": "^1.1.6"
   },
   "peerDependencies": {
     "typescript": "^7"
