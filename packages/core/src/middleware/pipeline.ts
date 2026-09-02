@@ -10,7 +10,7 @@ import { parseBody } from './body'
 
 export type Step =
   | { kind: 'provide'; fn: (ctx: Context) => unknown | Promise<unknown> }
-  | { kind: 'use'; fn: Middleware }
+  | { kind: 'use'; fn: Middleware; scope?: string }
   | {
       kind: 'validate'
       params?: StandardSchemaV1

@@ -794,6 +794,123 @@ test('registration order: interleaving use()/get() runs each route only against 
   expect(order).toEqual(['A', 'B', 'handler-two'])
 })
 
+// ── use(scope, mw) — path-scoped middleware ─────────────────────────────────
+
+test('use(scope, mw): only runs for routes under that scope', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+  let authRan = false
+
+  app.use('/api', () => {
+    authRan = true
+  })
+  app.get('/api/users', () => ({ ok: true }))
+  app.get('/health', () => ({ ok: true }))
+  app.listen({ port: 0 })
+
+  await call(handler, new Request('http://localhost/health'))
+  expect(authRan).toBe(false)
+
+  await call(handler, new Request('http://localhost/api/users'))
+  expect(authRan).toBe(true)
+})
+
+test('use(scope, mw): matches the scope itself and nested paths, not a mere string prefix', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+  const ran: string[] = []
+
+  app.use('/api', () => {
+    ran.push('auth')
+  })
+  app.get('/api', () => ({ ok: true }))
+  app.get('/api/users/:id', () => ({ ok: true }))
+  app.get('/apiary', () => ({ ok: true }))
+  app.listen({ port: 0 })
+
+  await call(handler, new Request('http://localhost/api'))
+  await call(handler, new Request('http://localhost/api/users/1'))
+  await call(handler, new Request('http://localhost/apiary'))
+
+  expect(ran).toEqual(['auth', 'auth']) // /apiary did not trigger it
+})
+
+test('use(scope, mw): registration-order semantics — only applies to routes registered after it', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+  let authRan = false
+
+  app.get('/api/users', () => {
+    authRan = false
+    return { ok: true }
+  })
+  app.use('/api', () => {
+    authRan = true
+  })
+  app.get('/api/orders', () => {
+    return { ok: true }
+  })
+  app.listen({ port: 0 })
+
+  await call(handler, new Request('http://localhost/api/users'))
+  expect(authRan).toBe(false)
+
+  await call(handler, new Request('http://localhost/api/orders'))
+  expect(authRan).toBe(true)
+})
+
+test('use(scope, mw): 404 does not run it', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+  let authRan = false
+
+  app.use('/api', () => {
+    authRan = true
+  })
+  app.get('/api/users', () => ({ ok: true }))
+  app.listen({ port: 0 })
+
+  const res = await call(handler, new Request('http://localhost/api/missing'))
+  expect(res.status).toBe(404)
+  expect(authRan).toBe(false)
+})
+
+test('use(scope, mw): composes with global and route-level middleware in registration order', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+  const order: string[] = []
+
+  app.use(async (_ctx, next) => {
+    order.push('global')
+    await next()
+  })
+  app.use('/api', async (_ctx, next) => {
+    order.push('scoped')
+    await next()
+  })
+  app.get(
+    '/api/users',
+    async (_ctx, next) => {
+      order.push('route')
+      await next()
+    },
+    () => {
+      order.push('handler')
+      return { ok: true }
+    }
+  )
+  app.listen({ port: 0 })
+
+  await call(handler, new Request('http://localhost/api/users'))
+  expect(order).toEqual(['global', 'scoped', 'route', 'handler'])
+})
+
+test('use(scope, mw): rejects a scope with a dynamic or wildcard segment', () => {
+  const app = Arcton()
+  expect(() => app.use('/api/:id', () => {})).toThrow(/must be a static path/)
+  expect(() => app.use('/api/*rest', () => {})).toThrow(/must be a static path/)
+})
+
 // ── get/post(path, options) — validation ──────────────────────────────────
 
 test('get(path, options): a params schema coerces params for the handler', async () => {

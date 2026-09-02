@@ -17,6 +17,7 @@ import type {
 import figlet from 'figlet'
 import pkg from '../package.json' with { type: 'json' }
 import { runPipeline, type Step } from './middleware/pipeline'
+import { parse } from './router/parse'
 import { createRouter } from './router/router'
 import { mapResponse } from './router/serialize'
 import type { ExtractParams } from './router/types'
@@ -79,8 +80,19 @@ export interface ArctonApp<TProvided = {}> {
   head: RouteMethod<TProvided>
   options: RouteMethod<TProvided>
   ws(path: string, handler: RuntimeWebSocketHandler): ArctonApp<TProvided>
-  /** Global middleware — composes behavior. Doesn't grow `TProvided`; see `provide()`. */
+  /**
+   * Global middleware — composes behavior. Doesn't grow `TProvided`; see
+   * `provide()`. With a leading `scope` path (must be static — no `:param`/
+   * `*wildcard` segments), only selected into routes whose own path is under
+   * that scope (`scope` itself, or `${scope}/...`) at the time each route is
+   * registered — same snapshot-at-registration-time semantics as unscoped
+   * `use()`, just filtered by path first.
+   */
   use(
+    middleware: Middleware<RouteParams, QueryParams, {}, TProvided>
+  ): ArctonApp<TProvided>
+  use(
+    scope: string,
     middleware: Middleware<RouteParams, QueryParams, {}, TProvided>
   ): ArctonApp<TProvided>
   /**
@@ -145,6 +157,24 @@ export interface RouteOptions<
   >
 }
 
+// A scope is required to be a static path (reusing parse()'s own leading-
+// slash/no-"//" validation) — ":param"/"*wildcard" segments would turn
+// matchesScope into a second matching system instead of a plain string
+// relation between two paths.
+function assertStaticScope(scope: string): void {
+  const { segments } = parse(scope)
+  if (segments.some(segment => segment.type !== 'static')) {
+    throw new Error(
+      `Scope "${scope}" must be a static path — dynamic/wildcard segments ` +
+        `aren't supported (e.g. app.use('/api', mw), not app.use('/api/:id', mw))`
+    )
+  }
+}
+
+function matchesScope(path: string, scope: string): boolean {
+  return path === scope || path.startsWith(`${scope}/`)
+}
+
 export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
   const adapter = config.adapter ?? bunAdapter
   const environment = config.env ?? process.env.NODE_ENV ?? 'development'
@@ -168,6 +198,10 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
   // it. Route-level middleware (if any) is appended after the snapshot, so
   // it always runs innermost, closest to the handler.
   //
+  // A scoped 'use' step (see matchesScope) is selected into the snapshot
+  // right here, based on this route's own path — not resolved later at
+  // match/request time. The router never learns a step had a scope at all.
+  //
   // `validation` is undefined for the plain-handler call shape, so no
   // 'validate' step gets added.
   function insertRoute<Route extends string>(
@@ -187,7 +221,12 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
         : []
 
     const routeSteps: Step[] = [
-      ...steps,
+      ...steps.filter(
+        step =>
+          step.kind !== 'use' ||
+          step.scope === undefined ||
+          matchesScope(path, step.scope)
+      ),
       ...validateStep,
       ...routeMiddleware.map((fn): Step => ({ kind: 'use', fn }))
     ]
@@ -267,8 +306,14 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
       websocketRoutes.push({ path, handler })
       return app
     },
-    use(mw) {
-      steps.push({ kind: 'use', fn: mw as Middleware })
+    use(...args: unknown[]) {
+      if (args.length >= 2) {
+        const [scope, mw] = args as [string, Middleware]
+        assertStaticScope(scope)
+        steps.push({ kind: 'use', fn: mw, scope })
+      } else {
+        steps.push({ kind: 'use', fn: args[0] as Middleware })
+      }
       return app
     },
     provide(fn) {
