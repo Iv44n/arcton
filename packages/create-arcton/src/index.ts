@@ -1,9 +1,11 @@
 #!/usr/bin/env bun
-const targetDir = Bun.argv[2] ?? 'my-arcton-app'
-const templateDir = new URL('../template', import.meta.url).pathname
+import { cpSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
-await Bun.$`mkdir -p ${targetDir}`
-await Bun.$`cp -r ${templateDir}/. ${targetDir}`
+const targetDir = Bun.argv[2] ?? 'my-arcton-app'
+const templateDir = fileURLToPath(new URL('../template', import.meta.url))
+
+cpSync(templateDir, targetDir, { recursive: true })
 
 console.log(`Created ${targetDir}`)
 console.log(`Next steps:`)
