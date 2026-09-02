@@ -308,8 +308,14 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
 
           // result.handler already has its global-steps snapshot (as of
           // its own registration) and any route-level middleware baked in.
+          // It materializes ctx.response into a real Response internally
+          // (see runPipeline) whenever it has middleware/provide/validate
+          // steps; the fast path (no steps at all) never touches it, so
+          // it's built here instead.
           const body = await result.handler(ctx)
-          return mapResponse(body, ctx.response)
+          return ctx.response instanceof Response
+            ? ctx.response
+            : mapResponse(body, ctx.response)
         }
       })
 

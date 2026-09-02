@@ -5,6 +5,7 @@ import type {
   RouteHandler,
   StandardSchemaV1
 } from '@arcton/contracts'
+import { mapResponse } from '../router/serialize'
 import { parseBody } from './body'
 
 export type Step =
@@ -33,23 +34,41 @@ export type Step =
 // type level exactly, not just conservatively: order of registration
 // determines both what each step's type sees and what it actually gets at
 // request time, because they're the same array walked in the same order.
+//
+// Every time a body finalizes at some layer (the handler resolving, a step
+// short-circuiting, or a step replacing the body after next()), ctx.response
+// is immediately materialized into the real Response via mapResponse — using
+// whatever ctx.response already holds as the base, so headers an inner layer
+// already set survive a later replace. A raw Response always wins outright
+// (mapResponse's own escape-hatch rule), at any layer, not just the
+// outermost. Materializing before unwinding to the next layer out is what
+// lets post-next() middleware mutate ctx.response.headers and have it stick
+// — but status/statusText have no setter on a real Response, so they can
+// only be set before this point (by the handler or by pre-next() code),
+// never overridden by a post-next() layer once materialized.
 export function runPipeline(
   steps: Step[],
   handler: RouteHandler,
   ctx: Context
 ): Promise<Body | void> {
   // Fast path: no provide()/use()/validate registered — same shape and
-  // cost as calling the handler directly.
+  // cost as calling the handler directly. ctx.response is never touched
+  // here; the caller (Arcton's fetch handler) materializes it instead.
   if (steps.length === 0) return Promise.resolve(handler(ctx))
 
   let i = 0
   let body: Body | void
+
+  function materialize(result: Body | void): void {
+    ctx.response = mapResponse(result, ctx.response)
+  }
 
   function next(): Promise<void> {
     const step = steps[i++]
     if (step === undefined) {
       return Promise.resolve(handler(ctx)).then(result => {
         body = result
+        materialize(result)
       })
     }
     if (step.kind === 'provide') {
@@ -62,13 +81,17 @@ export function runPipeline(
       return runValidation(step, ctx).then(failure => {
         if (failure !== undefined) {
           body = failure // short-circuit: no next() call, mapResponse passes it through as-is
+          materialize(failure)
           return
         }
         return next()
       })
     }
     return Promise.resolve(step.fn(ctx, next)).then(result => {
-      if (result !== undefined) body = result
+      if (result !== undefined) {
+        body = result
+        materialize(result)
+      }
     })
   }
 

@@ -1,6 +1,5 @@
 import { expect, test } from 'bun:test'
 import type { Context, StandardSchemaV1 } from '@arcton/contracts'
-import { mapResponse } from '../router/serialize'
 import { runPipeline, type Step } from './pipeline'
 
 function makeCtx(overrides: Partial<Context> = {}): Context {
@@ -125,24 +124,82 @@ test('use-only: short-circuit with a Response — body is the exact Response ins
   expect(body).toBe(response)
 })
 
-test('use-only: ctx.response.status set after next() is honored by mapResponse', async () => {
+// ── ctx.response materialization ────────────────────────────────────────────
+//
+// ctx.response holds the pipeline's mutable response-in-progress. It becomes
+// the real Response the moment a body finalizes at some layer (handler
+// resolving, a short-circuit, or a replace after next()) — before any
+// enclosing middleware's post-next() code runs, so that code always sees
+// the real thing, never the pre-materialization placeholder.
+
+test('ctx.response is the real Response once the handler resolves, headers stay mutable, status does not', async () => {
+  const ctx = makeCtx()
+  let sawResponseInstance = false
+  let statusAssignmentThrew = false
+  const steps: Step[] = [
+    {
+      kind: 'use',
+      fn: async (c, next) => {
+        await next()
+        sawResponseInstance = c.response instanceof Response
+        try {
+          c.response.status = 204
+        } catch {
+          statusAssignmentThrew = true
+        }
+        c.response.headers.set('X-Request-Id', 'abc')
+      }
+    }
+  ]
+
+  await runPipeline(steps, () => ({ ok: true }), ctx)
+
+  expect(sawResponseInstance).toBe(true)
+  expect(statusAssignmentThrew).toBe(true)
+  expect(ctx.response.status).toBe(200) // unchanged — the throw above didn't apply
+  expect(ctx.response.headers.get('X-Request-Id')).toBe('abc') // headers still mutable
+  expect(await (ctx.response as Response).json()).toEqual({ ok: true })
+})
+
+test('use-only: replacing the body after next() inherits headers already set on ctx.response', async () => {
   const ctx = makeCtx()
   const steps: Step[] = [
     {
       kind: 'use',
       fn: async (c, next) => {
         await next()
-        c.response.status = 204
+        c.response.headers.set('X-Trace', 'inner')
+        return { replaced: true }
       }
     }
   ]
-  const handler = () => undefined
 
-  const body = await runPipeline(steps, handler, ctx)
-  // mapResponse is synchronous (returns Response, not Promise<Response>) — no await.
-  const response = mapResponse(body, ctx.response)
+  await runPipeline(steps, () => ({ original: true }), ctx)
 
-  expect(response.status).toBe(204)
+  expect(ctx.response).toBeInstanceOf(Response)
+  expect(ctx.response.headers.get('X-Trace')).toBe('inner')
+  expect(await (ctx.response as Response).json()).toEqual({ replaced: true })
+})
+
+test('use-only: replacing with a raw Response after next() overrides completely, no header inheritance', async () => {
+  const ctx = makeCtx()
+  const rawReplacement = new Response('replaced', { status: 201 })
+  const steps: Step[] = [
+    {
+      kind: 'use',
+      fn: async (c, next) => {
+        await next()
+        c.response.headers.set('X-Trace', 'inner')
+        return rawReplacement
+      }
+    }
+  ]
+
+  await runPipeline(steps, () => ({ original: true }), ctx)
+
+  expect(ctx.response).toBe(rawReplacement)
+  expect(ctx.response.headers.get('X-Trace')).toBeNull()
+  expect(ctx.response.status).toBe(201)
 })
 
 test('use-only: a throwing handler propagates, an outer mw with try/catch catches it', async () => {

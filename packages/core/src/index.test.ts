@@ -493,6 +493,41 @@ test('app.use: a global middleware setting a header on the way out reaches the R
   expect(res.headers.get('X-Powered-By')).toBe('arcton')
 })
 
+test('app.use: replacing the body after next() inherits headers already set on ctx.response', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+
+  app.use(async (ctx, next) => {
+    await next()
+    ctx.response.headers.set('X-Trace', 'outer')
+    return { replaced: true }
+  })
+  app.get('/', () => ({ original: true }))
+  app.listen({ port: 0 })
+
+  const res = await call(handler, new Request('http://localhost/'))
+  expect(res.headers.get('X-Trace')).toBe('outer')
+  expect(await res.json()).toEqual({ replaced: true })
+})
+
+test('app.use: replacing with a raw Response after next() overrides completely, no header inheritance', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+
+  app.use(async (ctx, next) => {
+    await next()
+    ctx.response.headers.set('X-Trace', 'outer')
+    return new Response('replaced', { status: 201 })
+  })
+  app.get('/', () => ({ original: true }))
+  app.listen({ port: 0 })
+
+  const res = await call(handler, new Request('http://localhost/'))
+  expect(res.status).toBe(201)
+  expect(res.headers.get('X-Trace')).toBeNull()
+  expect(await res.text()).toBe('replaced')
+})
+
 test('app.use: short-circuit middleware returning an object skips the handler', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
   const app = Arcton({ adapter })
