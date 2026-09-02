@@ -321,6 +321,18 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
       return app as unknown as ArctonApp<never>
     },
     listen(options = {}) {
+      // 404/405 has no matched route, so no per-route snapshot to attach
+      // to — there's nothing for scoped use()/route middleware to be
+      // "before or after". Only unscoped use() steps apply, and they apply
+      // regardless of their order relative to any route registration
+      // (unlike a route's own snapshot). Computed once here, not re-read
+      // from `steps` per request — `.listen()` is the one point after which
+      // nothing else is expected to register more global middleware.
+      const notFoundSteps = steps.filter(
+        (step): step is Step & { kind: 'use' } =>
+          step.kind === 'use' && step.scope === undefined
+      )
+
       const server = adapter.serve({
         port: options.port ?? config.port ?? 3000,
         hostname: options.hostname ?? config.hostname,
@@ -333,15 +345,31 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
           const url = new URL(request.url, 'http://localhost')
           const result = router.matchPathname(method, url.pathname)
 
-          if ('notFound' in result) {
-            return new Response(null, { status: 404 })
-          }
+          if ('notFound' in result || 'methodNotAllowed' in result) {
+            const fallback: RouteHandler =
+              'notFound' in result
+                ? () => new Response(null, { status: 404 })
+                : () =>
+                    new Response(null, {
+                      status: 405,
+                      headers: { Allow: result.allowed.join(', ') }
+                    })
 
-          if ('methodNotAllowed' in result) {
-            return new Response(null, {
-              status: 405,
-              headers: { Allow: result.allowed.join(', ') }
-            })
+            const ctx: Context = {
+              request,
+              params: {},
+              query: Object.fromEntries(url.searchParams),
+              response: { headers: new Headers() }
+            }
+
+            const body =
+              notFoundSteps.length === 0
+                ? await fallback(ctx)
+                : await runPipeline(notFoundSteps, fallback, ctx)
+
+            return ctx.response instanceof Response
+              ? ctx.response
+              : mapResponse(body, ctx.response)
           }
 
           const ctx: Context = {

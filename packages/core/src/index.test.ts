@@ -545,21 +545,98 @@ test('app.use: short-circuit middleware returning an object skips the handler', 
   expect(await res.json()).toEqual({ blocked: true })
 })
 
-test('app.use: 404 does not run middleware', async () => {
+test('app.use: global middleware runs on 404, e.g. to set CORS headers on it', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
   const app = Arcton({ adapter })
   let middlewareCalled = false
 
-  app.use((_ctx, next) => {
+  app.use(async (ctx, next) => {
     middlewareCalled = true
-    return next()
+    await next()
+    ctx.response.headers.set('Access-Control-Allow-Origin', '*')
   })
   app.get('/exists', () => ({ ok: true }))
   app.listen({ port: 0 })
 
   const res = await call(handler, new Request('http://localhost/missing'))
   expect(res.status).toBe(404)
-  expect(middlewareCalled).toBe(false)
+  expect(middlewareCalled).toBe(true)
+  expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*')
+})
+
+test('app.use: global middleware runs on 405, alongside the Allow header', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+
+  app.use(async (ctx, next) => {
+    await next()
+    ctx.response.headers.set('X-Powered-By', 'arcton')
+  })
+  app.get('/users', () => ({ ok: true }))
+  app.listen({ port: 0 })
+
+  const res = await call(
+    handler,
+    new Request('http://localhost/users', { method: 'POST' })
+  )
+  expect(res.status).toBe(405)
+  expect(res.headers.get('Allow')).toBe('GET')
+  expect(res.headers.get('X-Powered-By')).toBe('arcton')
+})
+
+test('app.use: applies to 404/405 regardless of registration order relative to routes (unlike a route\'s own snapshot)', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+
+  app.get('/exists', () => ({ ok: true })) // registered BEFORE the use() below
+  app.use(async (ctx, next) => {
+    await next()
+    ctx.response.headers.set('X-Trace', 'yes')
+  })
+  app.listen({ port: 0 })
+
+  const res = await call(handler, new Request('http://localhost/missing'))
+  expect(res.status).toBe(404)
+  expect(res.headers.get('X-Trace')).toBe('yes')
+})
+
+test("use(scope, mw): does NOT run on 404/405 — there's no matched route to belong to", async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+  let scopedCalled = false
+
+  app.use('/api', () => {
+    scopedCalled = true
+  })
+  app.get('/api/users', () => ({ ok: true }))
+  app.listen({ port: 0 })
+
+  const res = await call(handler, new Request('http://localhost/api/missing'))
+  expect(res.status).toBe(404)
+  expect(scopedCalled).toBe(false)
+})
+
+test('route-level middleware does NOT run on 404/405', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter })
+  let routeMwCalled = false
+
+  app.get(
+    '/users',
+    async (_ctx, next) => {
+      routeMwCalled = true
+      await next()
+    },
+    () => ({ ok: true })
+  )
+  app.listen({ port: 0 })
+
+  const res = await call(
+    handler,
+    new Request('http://localhost/users', { method: 'POST' })
+  )
+  expect(res.status).toBe(405)
+  expect(routeMwCalled).toBe(false)
 })
 
 test('app.provide: a provided value is flat on ctx for handlers registered after it', async () => {
