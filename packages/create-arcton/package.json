@@ -1,27 +1,23 @@
 {
   "name": "create-arcton",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "type": "module",
   "bin": {
-    "create-arcton": "./src/index.ts"
+    "create-arcton": "./dist/index.js"
   },
   "files": [
     "src",
-    "template"
+    "dist"
   ],
   "scripts": {
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit && bun build ./src/index.ts --target=node --outdir=dist --packages=external",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@clack/prompts": "^1.7.0",
-    "figlet": "^1.11.4",
-    "gradient-string": "^3.0.0",
-    "picocolors": "^1.1.1"
+    "arcton": "workspace:*"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "@types/figlet": "^1.7.0",
-    "@types/gradient-string": "^1.1.6"
+    "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^7"

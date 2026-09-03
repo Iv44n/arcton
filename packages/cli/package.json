@@ -1,24 +1,40 @@
 {
-  "name": "@arcton/cli",
-  "version": "0.0.3",
+  "name": "arcton",
+  "version": "0.0.5",
   "type": "module",
   "bin": {
-    "arcton": "./src/index.ts"
+    "arcton": "./dist/index.js"
+  },
+  "exports": {
+    "./create": {
+      "bun": "./src/commands/create.ts",
+      "node": "./dist/commands/create.js",
+      "default": "./dist/commands/create.js"
+    }
   },
   "files": [
-    "src"
+    "src",
+    "dist",
+    "template"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit && bun build ./src/index.ts ./src/commands/create.ts --target=node --outdir=dist --packages=external",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@arcton/core": "workspace:*"
+    "@arcton/adapter-bun": "workspace:*",
+    "@arcton/adapter-node": "workspace:*",
+    "@arcton/contracts": "workspace:*",
+    "@arcton/core": "workspace:*",
+    "@clack/prompts": "^1.7.0",
+    "figlet": "^1.11.4",
+    "gradient-string": "^3.0.0",
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/figlet": "^1.7.0",
+    "@types/gradient-string": "^1.1.6"
   },
   "peerDependencies": {
     "typescript": "^7"

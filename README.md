@@ -5,8 +5,8 @@ Monorepo del framework Arcton, gestionado con Bun workspaces + Turborepo.
 ## Estructura
 
 - `packages/core` — `@arcton/core`, el runtime del framework
-- `packages/cli` — `@arcton/cli`, CLI (`arcton dev|start`)
-- `packages/create-arcton` — scaffolding tool (`bunx create-arcton <dir>`)
+- `packages/cli` — `arcton`, CLI unificado (`arcton create|dev|start`); el scaffolding vive acá, en `src/commands/create.ts` + `template/`
+- `packages/create-arcton` — wrapper delgado sobre `arcton create`, solo para satisfacer la convención `npm create arcton` / `pnpm create arcton` / `bun create arcton`
 - `apps/docs` — sitio de documentación
 - `examples/basic` — app de ejemplo que consume `@arcton/core`
 

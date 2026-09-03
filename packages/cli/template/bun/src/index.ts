@@ -6,6 +6,4 @@ app.get('/', () => {
   return 'Hello, Arcton!'
 })
 
-const server = app.listen()
-
-console.log(`Running at ${server.url}`)
+app.listen()
