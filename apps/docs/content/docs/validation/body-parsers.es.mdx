@@ -1,0 +1,63 @@
+---
+title: Parsers de Body
+description: Cómo Arcton parsea el body de una request según el Content-Type antes de validarlo, y cómo agregar tu propio parser.
+---
+
+El parseo de body solo pasa para una ruta que declaró un esquema de `body` — ver
+[Body](./body.mdx). Arcton elige un parser según el `Content-Type` de la request
+(los parámetros como `; charset=` se ignoran, y la comparación no distingue mayúsculas
+de minúsculas), lo ejecuta, y le entrega el resultado a tu esquema.
+
+## Parsers integrados
+
+| Content-Type | Valor parseado |
+|---|---|
+| `application/json` y cualquier `application/*+json` | `await request.json()` |
+| `text/plain` | `string` |
+| `application/x-www-form-urlencoded` | `FormData` |
+| `multipart/form-data` | `FormData` |
+| `application/octet-stream` | `ArrayBuffer` |
+
+Una request cuyo `Content-Type` no es ninguno de estos — y tampoco tiene un parser
+personalizado registrado — recibe `415` con un body vacío. Un parser integrado que
+lanza un error con un input malformado (JSON inválido, por ejemplo) responde `400`
+con `{"issues":[{"message":"Invalid request body"}]}`.
+
+## Registrando tu propio parser
+
+`app.parser(mediaType, parser)` registra un parser para un media type exacto,
+sobrescribiendo uno integrado para el mismo tipo si existe. Registrar el mismo media
+type de nuevo reemplaza el parser anterior — es una tabla plana, no un pipeline
+ordenado, así que no importa en qué momento lo llames respecto a tus rutas.
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.parser('text/csv', async request => {
+  const [header = '', ...rows] = (await request.text()).trim().split('\n')
+  const keys = header.split(',')
+  return rows.map(row =>
+    Object.fromEntries(keys.map((key, i) => [key, row.split(',')[i]]))
+  )
+})
+
+app.post('/import', {
+  body: v.array(v.record(v.string(), v.string())),
+  handler: ctx => ({ imported: ctx.body.length, rows: ctx.body })
+})
+
+app.listen()
+```
+
+Un `BodyParser` recibe el `Request` crudo, no `ctx` — el parseo no tiene nada que ver
+con el context de la ruta.
+
+Devolver `undefined` desde un parser personalizado significa "no manejo esta
+request" y cae en `415`, igual que si no hubiera ningún parser registrado. Cualquier
+otro valor cuenta como manejado, incluyendo `false`, `0` y `''`. Un parser
+personalizado que lanza un error se propaga sin capturar, igual que si lo lanzara un
+handler o `provide()` — no se atrapa en un `400` como sí pasa con el error de un
+parser integrado.

@@ -1,0 +1,190 @@
+---
+title: CORS
+description: Agregar headers cross-origin con @arcton/cors, incluyendo el manejo de preflight y requests con credenciales.
+---
+
+Instala `@arcton/cors` y regístralo como middleware global:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { cors } from '@arcton/cors'
+
+const app = Arcton()
+
+app.use(cors())
+
+app.get('/users', () => [{ id: '1' }])
+
+app.listen()
+```
+
+Sin opciones, el middleware permite cualquier origen. Regístralo antes
+de tus rutas, para que cada ruta debajo quede cubierta — mira
+[Execution order](./execution-order.mdx).
+
+## Permitir orígenes específicos
+
+`origin` acepta un string, un array, o una función:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { cors } from '@arcton/cors'
+
+const app = Arcton()
+
+app.use(cors({ origin: 'https://app.example.com' }))
+
+app.get('/users', () => [{ id: '1' }])
+
+app.listen()
+```
+
+```ts
+import { Arcton } from '@arcton/core'
+import { cors } from '@arcton/cors'
+
+const app = Arcton()
+
+app.use(
+  cors({
+    origin: ['https://app.example.com', 'https://admin.example.com']
+  })
+)
+
+app.get('/users', () => [{ id: '1' }])
+
+app.listen()
+```
+
+```ts
+import { Arcton } from '@arcton/core'
+import { cors } from '@arcton/cors'
+
+const app = Arcton()
+
+app.use(
+  cors({
+    origin: origin => origin.endsWith('.example.com')
+  })
+)
+
+app.get('/users', () => [{ id: '1' }])
+
+app.listen()
+```
+
+La función recibe el origin del request y el propio `Request`, así que
+una decisión puede depender del path o de un header.
+
+Cuando el origin permitido es cualquier cosa distinta de `'*'`, el
+origin que matcheó se devuelve tal cual y se agrega `Vary: Origin`,
+así que las cachés distinguen la respuesta por origin. Un request cuyo
+origin no está permitido sigue hacia tu ruta sin ningún header de CORS
+agregado, y el navegador bloquea el resultado del lado del cliente.
+
+## Opciones
+
+| Opción | Default | Efecto |
+|---|---|---|
+| `origin` | `'*'` | qué orígenes están permitidos |
+| `methods` | repite lo que pidió el request | `Access-Control-Allow-Methods` en el preflight |
+| `allowedHeaders` | repite lo que pidió el request | `Access-Control-Allow-Headers` en el preflight |
+| `exposedHeaders` | — | `Access-Control-Expose-Headers` en la respuesta |
+| `credentials` | `false` | agrega `Access-Control-Allow-Credentials` |
+| `maxAge` | — | `Access-Control-Max-Age` en el preflight, en segundos |
+| `preflight` | `true` | si responde o no los requests de preflight |
+
+## Requests con credenciales
+
+Los navegadores rechazan una respuesta con credenciales que permite
+cualquier origen, así que nombra los orígenes en los que confías:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { cors } from '@arcton/cors'
+
+const app = Arcton()
+
+app.use(
+  cors({
+    origin: 'https://app.example.com',
+    credentials: true,
+    exposedHeaders: ['X-Total-Count']
+  })
+)
+
+app.get('/users', ctx => {
+  ctx.response.headers.set('X-Total-Count', '1')
+  return [{ id: '1' }]
+})
+
+app.listen()
+```
+
+Combinar `origin: '*'` con `credentials: true` tira un `TypeError`
+cuando se llama a `cors()`, al arrancar en vez de en el primer
+request.
+
+## Preflight
+
+Un navegador envía `OPTIONS` con `Access-Control-Request-Method` antes
+de ciertos requests cross-origin. `cors()` responde esos por su cuenta
+con `204` y los headers ya calculados:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { cors } from '@arcton/cors'
+
+const app = Arcton()
+
+app.use(
+  cors({
+    origin: 'https://app.example.com',
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 600
+  })
+)
+
+app.post('/users', () => ({ created: true }))
+
+app.listen()
+```
+
+Con `methods` o `allowedHeaders` omitidos, la respuesta de preflight
+repite lo que pidió el request.
+
+Solo se intercepta un preflight real — un request `OPTIONS` sin
+`Access-Control-Request-Method` pasa directo hacia
+[tu propia ruta `app.options()`](../routing/http-methods.mdx).
+
+## Cubrir cada respuesta
+
+Como `cors()` es middleware global, sus headers también llegan a las
+respuestas `404` y `405` que genera Arcton, que es lo que un navegador
+necesita para reportar el status real en vez de una falla de CORS. Mira
+[Global middleware](./global.mdx).
+
+## Darle scope
+
+Para aplicar CORS a una sola sección, dale un scope:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { cors } from '@arcton/cors'
+
+const app = Arcton()
+
+app.use('/public', cors({ origin: '*' }))
+
+app.get('/public/status', () => ({ ok: true }))
+app.get('/internal/status', () => ({ ok: true }))
+
+app.listen()
+```
+
+Un registro [con scope](./scoped.mdx) cubre las rutas matcheadas bajo
+ese path.
+
+Mira [`cors()` en la referencia de la API](../api/cors.mdx) para la
+firma completa.

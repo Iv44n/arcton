@@ -1,0 +1,258 @@
+---
+title: Execution Order
+description: Cómo decide Arcton qué middleware corre una ruta, por qué importa el orden de registro, y el único caso en el que no importa.
+---
+
+Dos reglas explican cada pregunta de orden en Arcton:
+
+1. **Una ruta corre el middleware y los providers registrados antes que
+   ella.**
+2. **Dentro de ese conjunto, el orden es** global → validation → route
+   middleware → handler.
+
+## El snapshot de registro
+
+Cuando registras una ruta, Arcton toma el middleware y los providers
+que existen en ese momento y guarda la cadena ya terminada junto con la
+ruta. Las llamadas hechas después no la alcanzan.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/before', () => ({ timed: false }))
+
+app.use(async (ctx, next) => {
+  const start = performance.now()
+  await next()
+  ctx.response.headers.set('X-Time', `${performance.now() - start}ms`)
+})
+
+app.get('/after', () => ({ timed: true }))
+
+app.listen()
+```
+
+`/after` recibe el header `X-Time`. `/before` no — se registró cuando
+ese middleware todavía no existía.
+
+Por eso el archivo se lee tal como se comporta: mover una llamada a
+`use()` hacia arriba o hacia abajo cambia exactamente las rutas debajo
+de ella.
+
+<Callout>
+  La regla práctica: registra el middleware global y los providers al
+  principio del archivo, antes de cualquier ruta. Así cada ruta los ve
+  a todos.
+</Callout>
+
+## El orden adentro de un request
+
+Para una ruta matcheada:
+
+```text
+       request
+          │
+          ▼
+   ┌─ match path + method ───────────────┐
+   │                                     │
+   ▼                                     │
+global middleware      (en orden de registro, la más exterior primero)
+   │                                     │
+   ▼                                     │
+validation             (params → query → body)
+   │                                     │
+   ▼                                     │
+route middleware       (en el orden escrito, la más interior)
+   │                                     │
+   ▼                                     │
+handler                                  │
+   │                                     │
+   └─ vuelta: route mw → global mw ──────┘
+          │
+          ▼
+   response mapping
+```
+
+Visto en código:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  console.log('1 global in')
+  await next()
+  console.log('6 global out')
+})
+
+app.get('/users/:id', {
+  params: v.object({
+    id: v.pipe(v.string(), v.transform(Number), v.number())
+  }),
+  middleware: [
+    async (ctx, next) => {
+      console.log('3 route in')
+      await next()
+      console.log('5 route out')
+    }
+  ],
+  handler: ctx => {
+    console.log('4 handler')
+    return { id: ctx.params.id }
+  }
+})
+
+app.listen()
+```
+
+`GET /users/42` loguea `1 global in`, después corre la validation (paso
+2, en silencio), después `3 route in`, `4 handler`, `5 route out`,
+`6 global out`.
+
+Como la validation queda entre medio, el middleware global ve el string
+crudo `ctx.params.id`, mientras que el middleware de ruta y el handler
+ven el número.
+
+## Los providers siguen la misma regla
+
+[`provide()`](../providers/overview.mdx) comparte la secuencia con
+`use()`, así que aplica el mismo snapshot:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .provide(() => ({ startedAt: Date.now() }))
+  .get('/uptime', ctx => ({ uptime: Date.now() - ctx.startedAt }))
+
+app.listen()
+```
+
+Registrar la ruta antes que el provider sería un error de compilación,
+porque `ctx.startedAt` todavía no sería parte del tipo del context. El
+sistema de tipos y el runtime están de acuerdo acá: leen la misma
+lista, en el mismo orden.
+
+## Middleware con scope
+
+Un [scope](./scoped.mdx) se aplica encima del snapshot: cuando una ruta
+se registra, Arcton conserva el middleware con scope cuyo path
+contiene a esa ruta, y descarta el resto.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  console.log('global')
+  await next()
+})
+
+app.use('/admin', async (ctx, next) => {
+  console.log('admin only')
+  await next()
+})
+
+app.get('/admin/stats', () => ({ users: 42 }))  // both
+app.get('/health', () => ({ status: 'ok' }))    // global only
+
+app.listen()
+```
+
+La decisión ocurre una sola vez, al registrarse. Nada se vuelve a
+verificar por request.
+
+## La excepción: 404 y 405
+
+Las respuestas que Arcton genera porque nada matcheó se comportan
+distinto: **el middleware global corre sobre ellas sin importar el
+orden de registro.**
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => ({ ok: true }))
+
+app.use(async (ctx, next) => {
+  await next()
+  ctx.response.headers.set('Access-Control-Allow-Origin', '*')
+})
+
+app.listen()
+```
+
+`GET /missing` responde `404` **con** el header de CORS, aunque el
+middleware se registró después de todas las rutas.
+
+La razón es que la regla del snapshot es sobre una ruta: "antes" y
+"después" solo significan algo en relación al propio registro de una
+ruta. Un `404` no tiene ninguna ruta, así que no hay nada respecto de
+lo cual estar antes o después — y las cosas que pertenecen a esas
+respuestas (CORS, logging, request ids) son exactamente las que deben
+cubrir cada respuesta. Arcton junta el middleware `use()` sin scope una
+sola vez cuando se llama a `listen()`, y lo aplica ahí.
+
+Qué **no** corre en `404`/`405`:
+
+| | Ruta matcheada | `404` / `405` |
+|---|---|---|
+| `use(middleware)` | solo antes | siempre |
+| `use(scope, middleware)` | solo antes, bajo el scope | no |
+| middleware de ruta | sí | no |
+| `provide()` | solo antes | no |
+| validation | sí | no |
+
+## Módulos
+
+Montar un [módulo](../routing/modules.mdx) sigue la misma regla desde
+el lado del padre: el middleware global y los providers del padre
+registrados antes de `app.use(module)` envuelven cada ruta que trae el
+módulo, y cualquier cosa registrada después no lo hace.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const users = Arcton({ prefix: '/users' })
+users.get('/:id', ctx => ({ id: ctx.params.id }))
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  ctx.response.headers.set('X-Before', 'yes')
+  await next()
+})
+
+app.use(users)
+
+app.use(async (ctx, next) => {
+  ctx.response.headers.set('X-After', 'no')
+  await next()
+})
+
+app.listen()
+```
+
+`GET /users/1` lleva `X-Before` y no `X-After`.
+
+El propio middleware del módulo sigue funcionando después de montarlo,
+y corre adentro del middleware del padre.
+
+## Por qué funciona así
+
+Resolver la cadena una sola vez, al registrarse, hace que un request
+nunca tenga que preguntar "¿qué middleware aplica acá?" — la respuesta
+ya se calculó cuando se creó la ruta. También hace honesto al sistema
+de tipos: `ctx` se tipa a partir de los providers registrados antes del
+handler, que es exactamente el conjunto que va a correr.
+
+Ver [Pipeline](../architecture/pipeline.mdx) para cómo se construye la
+cadena.

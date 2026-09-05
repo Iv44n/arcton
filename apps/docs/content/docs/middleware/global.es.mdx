@@ -1,0 +1,131 @@
+---
+title: Global Middleware
+description: Registrar middleware para cada ruta con app.use(), incluyendo las respuestas que Arcton genera por su cuenta.
+---
+
+`app.use(middleware)` aplica un middleware a cada ruta registrada
+después de la llamada:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  console.log(`→ ${ctx.request.method} ${new URL(ctx.request.url).pathname}`)
+  await next()
+})
+
+app.get('/', () => ({ ok: true }))
+app.get('/health', () => ({ status: 'ok' }))
+
+app.listen()
+```
+
+Ambas rutas loguean. Registra el middleware global cerca del principio
+del archivo, antes de las rutas que debería cubrir — ver
+[Execution order](./execution-order.mdx).
+
+## Varios middleware
+
+Llama a `use()` una vez por middleware. Se anidan en orden de registro,
+así que el primero registrado es el más exterior:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  const start = performance.now()
+  await next()
+  ctx.response.headers.set('X-Time', `${performance.now() - start}ms`)
+})
+
+app.use(async (ctx, next) => {
+  ctx.response.headers.set('X-Request-Id', crypto.randomUUID())
+  await next()
+})
+
+app.get('/', () => ({ ok: true }))
+
+app.listen()
+```
+
+## También cubre 404 y 405
+
+El middleware global corre sobre las respuestas que Arcton genera
+cuando ninguna ruta matchea el path, o cuando el path matchea pero el
+método no:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  await next()
+  ctx.response.headers.set('Access-Control-Allow-Origin', '*')
+})
+
+app.get('/', () => ({ ok: true }))
+
+app.listen()
+```
+
+`GET /missing` responde `404` **con** el header
+`Access-Control-Allow-Origin`. Eso es lo que hace del middleware global
+el lugar correcto para cosas que deben cubrir cada respuesta HTTP —
+headers de CORS, logging de requests, timing de respuestas.
+
+<Callout>
+  En `404` y `405`, el middleware global corre sin importar dónde esté
+  ubicado en relación con tus rutas: un `use()` escrito después de todas
+  tus rutas igual aplica. Una ruta matcheada, en cambio, solo corre el
+  middleware registrado antes de ella.
+  [Execution order](./execution-order.mdx) explica por qué las dos
+  reglas difieren.
+</Callout>
+
+El [middleware con scope](./scoped.mdx) y el
+[middleware de ruta](./route-level.mdx) no corren sobre esas respuestas,
+porque no hay ninguna ruta matcheada a la que puedan pertenecer.
+
+## Leer el request
+
+El context lleva el `Request` estándar, así que todo lo que puedes hacer
+con la Fetch API está disponible:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  const auth = ctx.request.headers.get('authorization')
+
+  if (auth === null) {
+    return new Response('Unauthorized', { status: 401 })
+  }
+
+  await next()
+})
+
+app.get('/private', () => ({ secret: true }))
+
+app.listen()
+```
+
+<Callout>
+  El middleware global corre antes de la
+  [validation](../validation/overview.mdx), así que ve los valores
+  crudos: `ctx.params` y `ctx.query` siguen siendo strings ahí, incluso
+  en una ruta cuyo schema los convierte.
+</Callout>
+
+## Agregar valores al context
+
+Cuando un middleware existe solo para calcular un valor que el handler
+necesita, usa [`provide()`](../providers/overview.mdx) en su lugar —
+pone el valor sobre el context y lo tipa para todo lo que se registre
+después.

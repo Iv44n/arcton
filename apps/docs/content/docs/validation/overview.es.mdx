@@ -1,0 +1,68 @@
+---
+title: Descripción general de validación
+description: Valida params, query y body con un Standard Schema, y lee el resultado ya transformado directamente desde `ctx`.
+---
+
+Cualquier método HTTP también acepta un objeto de opciones en lugar de un handler
+simple, lo que te permite adjuntar un esquema a `params`, `query` y/o `body`:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/users/:id/orders', {
+  params: v.object({
+    id: v.pipe(v.string(), v.transform(Number), v.number())
+  }),
+  query: v.object({
+    notify: v.optional(
+      v.pipe(
+        v.string(),
+        v.transform(s => s === 'true'),
+        v.boolean()
+      )
+    )
+  }),
+  body: v.object({
+    item: v.pipe(v.string(), v.minLength(1)),
+    quantity: v.pipe(v.number(), v.integer(), v.minValue(1))
+  }),
+  handler: ctx => ({
+    userId: ctx.params.id,
+    notify: ctx.query.notify ?? false,
+    order: ctx.body
+  })
+})
+
+app.listen()
+```
+
+`ctx.params.id` acá es un `number`, no un `string` — la validación reemplaza
+`ctx.params`, `ctx.query` y `ctx.body` con el output del esquema, así que las
+coerciones y transformaciones son lo que el handler realmente ve.
+
+## Funciona cualquier Standard Schema
+
+`params`, `query` y `body` aceptan cada uno cualquier
+[Standard Schema](https://standardschema.dev/) — Zod 3.24+, Valibot y ArkType lo
+implementan, así que cualquiera de ellos funciona acá. Los ejemplos de esta sección
+usan Valibot; mantén la consistencia con la librería de esquemas que elijas para un
+proyecto.
+
+## Orden y corte de la cadena
+
+La validación corre **params → query → body**, en ese orden. El primer esquema que
+falla responde de inmediato con `400` y nada más abajo en la cadena — ni el route
+middleware ni el handler — corre. Ver [Errores de validación](./validation-errors.mdx)
+para la forma exacta de la response.
+
+La validación de body solo corre para una ruta que declaró un esquema de `body`, y
+solo después de que el body de la request fue parseado según su `Content-Type` — ver
+[Parsers de Body](./body-parsers.mdx). El middleware global corre antes que todo
+esto, así que siempre ve el `ctx.params` / `ctx.query` crudo, sin transformar — ver
+[Orden de ejecución](../middleware/execution-order.mdx).
+
+Para una mirada más profunda a cada parte, ver
+[Params y Query](./params-and-query.mdx) y [Body](./body.mdx).
