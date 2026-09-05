@@ -1,0 +1,54 @@
+---
+title: Providers vs Middleware
+description: Cuándo agregar valores tipados con provide() y cuándo usar use() para controlar el flujo alrededor de una request.
+---
+
+`provide()` y `use()` corren ambos por request, en orden de registro, y se pueden
+mezclar libremente — pero existen para trabajos distintos.
+
+Un provider no tiene `next` y no puede cortar la cadena; lo que devuelve se mezcla
+sobre `ctx` y la cadena siempre continúa. El middleware recibe `next`, corre código
+antes y después de llamarlo, y puede cortar la cadena devolviendo un valor sin llamar
+a `next()` — deteniendo todo lo que sigue, incluyendo cualquier provider o handler
+que de otra forma correría.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .use(async (ctx, next) => {
+    console.log(ctx.request.method, new URL(ctx.request.url).pathname)
+    await next()
+  })
+  .provide(ctx => {
+    const authHeader = ctx.request.headers.get('authorization')
+    return {
+      user: authHeader === 'secret' ? { id: 1, name: 'Alice' } : null
+    }
+  })
+  .get(
+    '/profile',
+    async (ctx, next) => {
+      if (!ctx.user) return new Response('Unauthorized', { status: 401 })
+      await next()
+    },
+    ctx => ({ user: ctx.user })
+  )
+
+app.listen()
+```
+
+El `use()` de logging de arriba solo observa la request; no agrega nada al tipo de
+`ctx`. La llamada a `provide()` adjunta `user`, tipado, a todo lo que se registre
+después. El route middleware en `/profile` es la pieza que realmente puede rechazar
+la request — devolviendo `401` y sin llamar nunca a `next()` — algo que un provider no
+tiene ningún mecanismo para hacer.
+
+Recurre a `provide()` cuando estás adjuntando un valor tipado que todo lo que sigue
+debería poder leer. Recurre a `use()` cuando necesitas correr código alrededor del
+resto de la cadena, inspeccionar o reemplazar la response, o detener la request
+temprano. Ver [Descripción general de Providers](./overview.mdx) y
+[Descripción general de Middleware](../middleware/overview.mdx) para cada uno por
+separado.

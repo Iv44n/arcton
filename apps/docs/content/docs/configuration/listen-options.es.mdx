@@ -1,0 +1,137 @@
+---
+title: Opciones de Listen
+description: Configura el puerto, hostname, adapter y la etiqueta de entorno que se pasan a app.listen().
+---
+
+## Levantar un servidor
+
+`app.listen()` recibe un objeto de opciones opcional y devuelve un
+`RuntimeServer`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen({ port: 8080, hostname: '0.0.0.0' })
+```
+
+Todos los campos son opcionales:
+
+<TypeTable
+  type={{
+    port: {
+      description: 'Puerto en el que escuchar.',
+      type: 'number',
+      default: '3000'
+    },
+    hostname: {
+      description: 'Hostname al que hacer bind.',
+      type: 'string'
+    },
+    adapter: {
+      description: 'Qué runtime sirve la app.',
+      type: 'RuntimeAdapter',
+      default: 'bunAdapter'
+    },
+    env: {
+      description: 'Etiqueta que se muestra en el banner de inicio.',
+      type: 'string',
+      default: "process.env.NODE_ENV ?? 'development'"
+    }
+  }}
+/>
+
+Llamar a `app.listen()` sin argumentos arranca en el puerto 3000 usando el
+adapter de Bun:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen()
+```
+
+## Elegir un puerto libre
+
+Pasar `port: 0` le pide al sistema operativo un puerto libre en vez de uno
+fijo. Lee el puerto real desde el servidor que te devuelve:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+const server = app.listen({ port: 0 })
+
+console.log(server.port) // an OS-assigned port
+console.log(server.url) // e.g. http://localhost:54231/
+
+server.stop()
+```
+
+Este es exactamente el patrón que se usa para testear una app real de punta a
+punta — consulta [Resumen de testing](../testing/overview.mdx).
+
+## Elegir un adapter
+
+`adapter` selecciona qué runtime sirve la app. El valor por defecto es
+`bunAdapter`. Pasa `nodeAdapter` para correr sobre Node.js en su lugar:
+
+```ts
+import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen({ adapter: nodeAdapter })
+```
+
+Consulta [Adapters](../api/adapters.mdx) para saber qué es un adapter, y
+[Soporte de runtime](../introduction/runtime-support.mdx) para las
+diferencias concretas entre los dos adapters que vienen incluidos.
+
+## El banner de inicio y el servidor devuelto
+
+`listen()` imprime un banner de inicio — el wordmark de Arcton, seguido de la
+versión de Arcton, el nombre y la versión del runtime, la etiqueta de
+entorno y la URL en la que está escuchando. La opción `env` controla
+solamente esa etiqueta; consulta [Entorno](./environment.mdx) para los
+detalles.
+
+Devuelve un `RuntimeServer`:
+
+```ts
+interface RuntimeServer {
+  readonly port: number
+  readonly url: URL
+  stop(closeActiveConnections?: boolean): void | Promise<void>
+}
+```
+
+`stop()` devuelve `void` en el adapter de Bun y un `Promise<void>` en el de
+Node, así que siempre es seguro esperarlo con `await`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+const server = app.listen({ port: 0 })
+
+await server.stop()
+```
+
+Consulta [listen()](../api/listen.mdx) para la referencia completa de la
+API.

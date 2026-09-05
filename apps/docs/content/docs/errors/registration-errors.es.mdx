@@ -1,0 +1,203 @@
+---
+title: Errores de Registro
+description: Las verificaciones que Arcton hace sobre las rutas y el middleware antes de que llegue cualquier request
+---
+
+## Se verifica una sola vez, en el momento de registro
+
+Construir el árbol de rutas ocurre una sola vez, cuando el módulo carga —
+al llamar a `.get()`/`.post()`/etc., `.use()`, `.ws()`, o al propio
+`Arcton({ prefix })`. Arcton valida cada una de estas llamadas de inmediato
+y lanza una excepción de forma síncrona si algo está mal, así un error
+falla rápido al arrancar en lugar de convertirse en un match confuso en
+tiempo de request.
+
+## Ruta duplicada
+
+Registrar el mismo método y path dos veces lanza:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/x', () => 'first')
+app.get('/x', () => 'second')
+
+app.listen()
+```
+
+```
+Duplicate route: GET /x is already registered
+```
+
+Esto también ocurre cuando montar un módulo produce un duplicado — ver
+[Módulos](../routing/modules.mdx).
+
+## Nombre de parámetro en conflicto
+
+Dos nombres de parámetro distintos no pueden ocupar la misma posición en el
+árbol de rutas:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ctx.params.id)
+app.get('/users/:userId', ctx => ctx.params.userId)
+
+app.listen()
+```
+
+```
+Conflicting parameter name: "userId" conflicts with "id" at same position
+```
+
+Un segmento dinámico y uno wildcard en la misma posición no entran en
+conflicto entre sí — solo lo hacen dos segmentos dinámicos, o dos wildcard,
+con nombres distintos. Ver [Precedencia](../routing/precedence.mdx).
+
+## Nombre de parámetro inválido
+
+Un nombre `:param` o `*wildcard` debe empezar con una letra y contener solo
+letras, dígitos o `_`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:1id', ctx => ctx.params)
+
+app.listen()
+```
+
+```
+Invalid dynamic parameter name ":1id" in route "/users/:1id": must start with a letter and contain only letters, digits or "_"
+```
+
+La misma verificación, con "wildcard" en lugar de "dynamic", aplica a los
+segmentos `*name`.
+
+## Nombre de parámetro duplicado en una misma ruta
+
+El mismo nombre de parámetro no puede aparecer dos veces en una sola ruta:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/pair/:a/:a', ctx => ctx.params.a)
+
+app.listen()
+```
+
+```
+Duplicate parameter name "a" in route "/pair/:a/:a"
+```
+
+## Posición del segmento wildcard
+
+Un segmento `*wildcard` debe ser el último segmento de la ruta:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/files/*path/edit', ctx => ctx.params.path)
+
+app.listen()
+```
+
+```
+Wildcard segment must be the last segment in route "/files/*path/edit"
+```
+
+## Formato del path
+
+Todo path de ruta debe empezar con `/` y no puede contener un segmento
+vacío:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('users', () => 'nope')
+
+app.listen()
+```
+
+```
+Route path must start with "/", got "users"
+```
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users//profile', () => 'nope')
+
+app.listen()
+```
+
+```
+Route path must not contain empty segments ("//"): "/users//profile"
+```
+
+## Prefixes y scopes estáticos
+
+`ArctonConfig.prefix` y el `scope` en `use(scope, middleware)` deben ser
+ambos paths estáticos — sin segmentos `:param` ni `*wildcard`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton({ prefix: '/api/:version' })
+
+app.listen()
+```
+
+```
+Prefix "/api/:version" must be a static path — dynamic/wildcard segments aren't supported (e.g. app.use('/api', mw), not app.use('/api/:id', mw))
+```
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.use('/users/:id', async (ctx, next) => {
+  await next()
+})
+
+app.listen()
+```
+
+```
+Scope "/users/:id" must be a static path — dynamic/wildcard segments aren't supported (e.g. app.use('/api', mw), not app.use('/api/:id', mw))
+```
+
+## use() con el argumento incorrecto
+
+`use()` acepta una función de middleware, un par `(scope, middleware)`, o
+una app de Arcton para montar como módulo — cualquier otra cosa lanza una
+excepción:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.use({} as never)
+
+app.listen()
+```
+
+```
+use() expects a middleware function, a (scope, middleware) pair, or an Arcton app to mount
+```

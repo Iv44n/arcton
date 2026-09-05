@@ -1,0 +1,58 @@
+---
+title: Descripción general de Providers
+description: Compone valores tipados sobre ctx con provide(), disponibles para todo lo que se registre después.
+---
+
+`provide()` compone context tipado: corre una función por request y mezcla lo que sea
+que devuelva, plano y tipado, sobre `ctx`, para todo lo que se registre después:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .provide(ctx => ({
+    requestId: ctx.request.headers.get('x-request-id') ?? crypto.randomUUID()
+  }))
+  .get('/whoami', ctx => ({ requestId: ctx.requestId }))
+
+app.listen()
+```
+
+`ctx.requestId` pasa el type-check en el handler de arriba porque `.get()` está
+encadenado directamente sobre el valor que devuelve `.provide()` — ese es el objeto
+cuyo tipo realmente trae `requestId`. Ver [Context tipado](./typed-context.mdx) para
+saber exactamente por qué importa el encadenamiento.
+
+## Los providers pueden construir uno sobre otro
+
+Los providers corren en orden de registro, y uno posterior puede leer lo que agregó
+uno anterior:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .provide(() => ({ db: { query: async (_sql: string) => [] } }))
+  .provide(async ctx => {
+    const users = await ctx.db.query('select * from users')
+    return { users }
+  })
+  .get('/users', ctx => ctx.users)
+
+app.listen()
+```
+
+## Lo que no puedes proveer
+
+Volver a proveer una key que ya está en `ctx` — una que ya proveíste antes, o uno de
+los campos base `request`, `params`, `query`, `response`, `body` — es un error de
+compilación, no algo que se chequea en runtime.
+
+Los providers corren antes de la validación y del route middleware, y no corren para
+responses `404`/`405`. Para ver con más profundidad cómo `provide()` compone context
+tipado, ver [Context tipado](./typed-context.mdx); para saber cuándo usar `provide()`
+en vez de `use()`, ver [Providers vs Middleware](./providers-vs-middleware.mdx).

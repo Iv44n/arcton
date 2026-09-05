@@ -1,0 +1,62 @@
+---
+title: Errores no Capturados
+description: Qué pasa cuando un handler, provider o parser lanza una excepción
+---
+
+## Un throw se convierte en un 500
+
+El propio pipeline de Arcton — providers, middleware, validación, el
+handler — nunca se traga una excepción. Si un handler, un
+[provider](../providers/overview.mdx), o un body parser personalizado
+registrado con `app.parser()` lanza una excepción, ese error se propaga
+hasta llegar al runtime adapter que sirve la request.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/risky', () => {
+  throw new Error('boom')
+})
+
+app.listen()
+```
+
+Una request a `/risky` aquí registra el error con `console.error` y
+responde con un `500` — los dos adapters que vienen con el framework se
+comportan así. Ver [Adapters](../api/adapters.mdx) para el mecanismo exacto
+en Bun y Node.
+
+## Dos errores que el propio Arcton puede lanzar en tiempo de request
+
+Un par de checks propios de Arcton lanzan una excepción de forma síncrona
+mientras se construye una respuesta, y quedan sin capturar de la misma
+manera:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/broken', ctx => {
+  ctx.response.status = 999
+  return { ok: true }
+})
+
+app.listen()
+```
+
+Configurar un status fuera de `[200, 599]` lanza
+`Invalid response status 999: must be between 200 and 599` cuando la
+respuesta se materializa — el mismo resultado en 500 que cualquier otro
+throw no capturado. Asignar `ctx.response.status` después de que el body ya
+finalizó lanza por una razón distinta
+(`TypeError: Attempted to assign to readonly property.`) — ver el callout
+en [Respondiendo con errores](./responding-with-errors.mdx).
+
+Conviene envolver las partes de la aplicación que pueden fallar
+legítimamente — una llamada downstream, un parseo del que no se confía —
+con los patrones de
+[Respondiendo con errores](./responding-with-errors.mdx), en lugar de
+dejar que lleguen al adapter como un 500 sin más.

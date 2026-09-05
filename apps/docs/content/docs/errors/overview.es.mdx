@@ -1,0 +1,41 @@
+---
+title: Errores
+description: Cómo Arcton convierte un error, propio o de quien hace la request, en una respuesta
+---
+
+## Toda respuesta pasa por el mismo mapeo
+
+Arcton no tiene un canal separado para las respuestas de error. Un handler que
+encuentra un problema responde exactamente igual que uno que tiene éxito:
+devolviendo un `Response`, devolviendo un valor plano que se mapea a uno, o
+configurando `ctx.response` antes de que el body finalice.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => {
+  if (ctx.params.id === '0') {
+    return new Response('Not found', { status: 404 })
+  }
+
+  return { id: ctx.params.id }
+})
+
+app.listen()
+```
+
+Esa misma idea cubre tres situaciones que pueden surgir:
+
+- **Algo que el cliente hizo mal** — un header faltante, un id inválido, un
+  body de request que falla la validación. Se responde con un `Response` 4xx
+  (manualmente, o mediante la propia validación de Arcton). Ver
+  [Respondiendo con errores](./responding-with-errors.mdx).
+- **Algo que no se manejó** — una excepción lanzada en un handler, un
+  provider, o un body parser personalizado. Ver
+  [Errores no capturados](./uncaught-errors.mdx).
+- **Algo mal en cómo se registró una ruta o un middleware** — una ruta
+  duplicada, un nombre de parámetro inválido, un scope no estático. Estos
+  fallan de inmediato, al arrancar, antes de que llegue cualquier request. Ver
+  [Errores de registro](./registration-errors.mdx).
