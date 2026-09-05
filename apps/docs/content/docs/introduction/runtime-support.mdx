@@ -68,7 +68,6 @@ Everything else — routes, middleware, providers, validation, response mapping
 | Package | `@arcton/adapter-bun` | `@arcton/adapter-node` |
 | `adapter.version` | `Bun.version` | the Node.js version without the leading `v` |
 | `server.stop()` | returns immediately | returns a promise to await |
-| `ws.data` | carries the upgrade payload | `undefined` |
 
 `stop()` is the one that shows up in code. On Node.js, await it:
 
