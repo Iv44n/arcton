@@ -1,9 +1,9 @@
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => {
-  return 'Hello, Arcton!'
-})
+app.get("/", () => {
+	return "Hello, Arcton!";
+});
 
-app.listen()
+app.listen();

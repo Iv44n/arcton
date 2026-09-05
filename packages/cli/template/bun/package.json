@@ -1,16 +1,16 @@
 {
-  "name": "my-arcton-app",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "start": "bun run src/index.ts",
-    "compile": "bun build --compile --minify --sourcemap ./src/index.ts --outfile arcton-app",
-    "dev": "bun --hot src/index.ts"
-  },
-  "dependencies": {
-    "@arcton/core": "latest"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
-  }
+	"name": "my-arcton-app",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"start": "bun run src/index.ts",
+		"compile": "bun build --compile --minify --sourcemap ./src/index.ts --outfile arcton-app",
+		"dev": "bun --hot src/index.ts"
+	},
+	"dependencies": {
+		"@arcton/core": "latest"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	}
 }

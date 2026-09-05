@@ -2,7 +2,7 @@ import type { Middleware } from '@arcton/contracts'
 import { Arcton } from '@arcton/core'
 import * as v from 'valibot'
 
-const app = Arcton({ port: 3002, env: 'development' })
+const app = Arcton()
 
 app.use(async (ctx, next) => {
   console.log(`→ ${ctx.request.method} ${new URL(ctx.request.url).pathname}`)
@@ -169,4 +169,11 @@ app.ws('/chat', {
   }
 })
 
-app.listen()
+const products = Arcton({ prefix: '/products' })
+
+products.get('/', () => ({ list: true }))
+products.get('/:id', ctx => ({ id: ctx.params.id }))
+
+app.use(products)
+
+app.listen({ port: 3002, env: 'development' })

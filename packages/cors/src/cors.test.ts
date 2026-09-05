@@ -63,7 +63,9 @@ test('wildcard origin: Access-Control-Allow-Origin is "*", no Vary', async () =>
 test('a single allowed origin string: echoes it back and sets Vary', async () => {
   const middleware = cors({ origin: 'https://app.example.com' })
   const ctx = makeCtx(
-    req('http://localhost/', { headers: { origin: 'https://app.example.com' } })
+    req('http://localhost/', {
+      headers: { origin: 'https://app.example.com' }
+    })
   )
 
   await middleware(ctx, async () => {})
@@ -150,7 +152,9 @@ test('credentials: true adds Access-Control-Allow-Credentials', async () => {
     credentials: true
   })
   const ctx = makeCtx(
-    req('http://localhost/', { headers: { origin: 'https://app.example.com' } })
+    req('http://localhost/', {
+      headers: { origin: 'https://app.example.com' }
+    })
   )
 
   await middleware(ctx, async () => {})

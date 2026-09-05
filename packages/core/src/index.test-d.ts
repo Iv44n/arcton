@@ -4,6 +4,7 @@
 // checked purely by `tsc --noEmit`, no runtime assertions, excluded from
 // `bun test`'s file matching (`.test-d.ts`, not `.test.ts`).
 
+import { bunAdapter } from '@arcton/adapter-bun'
 import type {
   Middleware,
   QueryParams,
@@ -224,3 +225,12 @@ Arcton().post('/users/:id', {
 // No overload accepts (path, options, extraArg) — mixing the two call shapes.
 // @ts-expect-error
 Arcton().get('/x', { handler: () => {} }, () => {})
+
+// ── ArctonConfig / ArctonListenOptions ──────────────────────────────────────
+
+// `port` moved to ArctonListenOptions — ArctonConfig no longer accepts it.
+// @ts-expect-error - "port" is not a key of ArctonConfig anymore
+Arcton({ port: 3000 })
+
+// adapter/env now belong to listen(), alongside port/hostname.
+Arcton().listen({ adapter: bunAdapter, env: 'development' })

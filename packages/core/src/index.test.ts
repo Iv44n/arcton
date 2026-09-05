@@ -66,8 +66,8 @@ test('Arcton returns an app with listen()', () => {
 })
 
 test('Arcton stores the given config', () => {
-  const app = Arcton({ port: 4000 })
-  expect(app.config.port).toBe(4000)
+  const app = Arcton({ prefix: '/api' })
+  expect(app.config.prefix).toBe('/api')
 })
 
 test('app.get/app.ws register routes served by listen()', async () => {
@@ -135,12 +135,12 @@ test('a handler returning a plain value is auto-mapped to JSON, a Response is pa
 
 test('end-to-end: dynamic route params + 405 with Allow', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.get('/users/:id', ctx => ({ id: ctx.params.id }))
   app.post('/users/:id', ctx => ({ updated: ctx.params.id }))
 
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const get = await call(handler, new Request('http://localhost/users/42'))
   expect(get.status).toBe(200)
@@ -156,11 +156,11 @@ test('end-to-end: dynamic route params + 405 with Allow', async () => {
 
 test('mapResponse: null/undefined/void → empty body, status 200', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/undefined', () => undefined)
   app.get('/null', () => null as unknown as Body)
   app.get('/void', () => {})
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   for (const path of ['/undefined', '/null', '/void']) {
     const res = await call(handler, new Request(`http://localhost${path}`))
@@ -171,7 +171,7 @@ test('mapResponse: null/undefined/void → empty body, status 200', async () => 
 
 test('mapResponse: Response result is returned as-is, ctx.response fully ignored', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', ctx => {
     ctx.response.status = 500
     ctx.response.headers.set('X-Should-Not-Appear', 'yes')
@@ -180,7 +180,7 @@ test('mapResponse: Response result is returned as-is, ctx.response fully ignored
       headers: { 'X-Custom': 'ok' }
     })
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.status).toBe(201)
@@ -191,9 +191,9 @@ test('mapResponse: Response result is returned as-is, ctx.response fully ignored
 
 test('mapResponse: string without explicit Content-Type → text/plain; charset=UTF-8', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', () => 'hello')
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.headers.get('Content-Type')).toBe('text/plain; charset=UTF-8')
@@ -202,12 +202,12 @@ test('mapResponse: string without explicit Content-Type → text/plain; charset=
 
 test('mapResponse: string with explicit Content-Type is respected', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', ctx => {
     ctx.response.headers.set('Content-Type', 'text/csv')
     return 'a,b,c'
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.headers.get('Content-Type')).toBe('text/csv')
@@ -216,9 +216,9 @@ test('mapResponse: string with explicit Content-Type is respected', async () => 
 
 test('mapResponse: Blob with .type set → uses blob.type', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', () => new Blob(['hi'], { type: 'image/png' }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.headers.get('Content-Type')).toBe('image/png')
@@ -226,9 +226,9 @@ test('mapResponse: Blob with .type set → uses blob.type', async () => {
 
 test('mapResponse: Blob without .type (and no explicit Content-Type) → application/octet-stream', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', () => new Blob(['hi']))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.headers.get('Content-Type')).toBe('application/octet-stream')
@@ -236,14 +236,14 @@ test('mapResponse: Blob without .type (and no explicit Content-Type) → applica
 
 test('mapResponse: FormData → multipart/form-data; boundary=..., ignores explicit Content-Type', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', ctx => {
     ctx.response.headers.set('Content-Type', 'application/json')
     const form = new FormData()
     form.set('a', 'b')
     return form
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.headers.get('Content-Type')).toMatch(
@@ -256,9 +256,9 @@ test('mapResponse: FormData → multipart/form-data; boundary=..., ignores expli
 
 test('mapResponse: URLSearchParams → application/x-www-form-urlencoded;charset=UTF-8', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', () => new URLSearchParams({ a: 'b' }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.headers.get('Content-Type')).toBe(
@@ -269,9 +269,9 @@ test('mapResponse: URLSearchParams → application/x-www-form-urlencoded;charset
 
 test('mapResponse: Uint8Array → application/octet-stream', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', () => new Uint8Array([1, 2, 3]))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.headers.get('Content-Type')).toBe('application/octet-stream')
@@ -282,9 +282,9 @@ test('mapResponse: Uint8Array → application/octet-stream', async () => {
 
 test('mapResponse: Int32Array (any ArrayBufferView, not just Uint8Array) → application/octet-stream', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', () => new Int32Array([1, 2, 3]))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.headers.get('Content-Type')).toBe('application/octet-stream')
@@ -292,10 +292,10 @@ test('mapResponse: Int32Array (any ArrayBufferView, not just Uint8Array) → app
 
 test('mapResponse: object/array → application/json; charset=UTF-8', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/object', () => ({ ok: true }))
   app.get('/array', () => [1, 2, 3])
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const objectRes = await call(handler, new Request('http://localhost/object'))
   expect(objectRes.headers.get('Content-Type')).toBe(
@@ -312,9 +312,9 @@ test('mapResponse: object/array → application/json; charset=UTF-8', async () =
 
 test('mapResponse: Map/Set fall into the object branch — silent JSON loss, declared', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', () => new Map([['a', 1]]))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.headers.get('Content-Type')).toBe(
@@ -325,9 +325,9 @@ test('mapResponse: Map/Set fall into the object branch — silent JSON loss, dec
 
 test('mapResponse: an unserializable runtime value (e.g. number, no static types) throws', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', () => 42 as unknown as Body)
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await expect(call(handler, new Request('http://localhost/'))).rejects.toThrow(
     /number/
@@ -336,12 +336,12 @@ test('mapResponse: an unserializable runtime value (e.g. number, no static types
 
 test('mapResponse: ctx.response.status outside [200, 599] throws a descriptive error', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', ctx => {
     ctx.response.status = 700
     return { ok: true }
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await expect(call(handler, new Request('http://localhost/'))).rejects.toThrow(
     /700/
@@ -350,12 +350,12 @@ test('mapResponse: ctx.response.status outside [200, 599] throws a descriptive e
 
 test('mapResponse: ctx.response.headers merge on top of the inferred headers', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', ctx => {
     ctx.response.headers.set('X-Trace', '123')
     return { ok: true }
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.headers.get('Content-Type')).toBe(
@@ -366,13 +366,13 @@ test('mapResponse: ctx.response.headers merge on top of the inferred headers', a
 
 test('mapResponse: status 204 forces a null body — inferred Content-Type dropped, explicit headers pass through', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', ctx => {
     ctx.response.status = 204
     ctx.response.headers.set('X-Explicit', 'yes')
     return { ok: true }
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.status).toBe(204)
@@ -383,13 +383,13 @@ test('mapResponse: status 204 forces a null body — inferred Content-Type dropp
 
 test('mapResponse: status 204 forces a null body — explicit Content-Type survives, unlike the inferred one above', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', ctx => {
     ctx.response.status = 204
     ctx.response.headers.set('Content-Type', 'text/plain; charset=UTF-8')
     return { ok: true }
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.status).toBe(204)
@@ -401,9 +401,9 @@ test('mapResponse: status 204 forces a null body — explicit Content-Type survi
 
 test('ctx.query: no query string → {}', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', ctx => ctx.query)
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(await res.json()).toEqual({})
@@ -411,9 +411,9 @@ test('ctx.query: no query string → {}', async () => {
 
 test('ctx.query: a key with no value → empty string', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', ctx => ctx.query)
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/?q='))
   expect(await res.json()).toEqual({ q: '' })
@@ -421,9 +421,9 @@ test('ctx.query: a key with no value → empty string', async () => {
 
 test('ctx.query: repeated key → last value wins', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', ctx => ctx.query)
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/?a=1&a=2'))
   expect(await res.json()).toEqual({ a: '2' })
@@ -431,9 +431,9 @@ test('ctx.query: repeated key → last value wins', async () => {
 
 test('ctx.query: "+" decodes as a space', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', ctx => ctx.query)
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/?a=b+c'))
   expect(await res.json()).toEqual({ a: 'b c' })
@@ -441,12 +441,12 @@ test('ctx.query: "+" decodes as a space', async () => {
 
 test('error path: a synchronously throwing handler propagates uncaught', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   const err = new Error('handler boom')
   app.get('/', () => {
     throw err
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await expect(call(handler, new Request('http://localhost/'))).rejects.toBe(
     err
@@ -455,12 +455,12 @@ test('error path: a synchronously throwing handler propagates uncaught', async (
 
 test('error path: a rejecting async handler propagates uncaught', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   const err = new Error('async boom')
   app.get('/', async () => {
     throw err
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await expect(call(handler, new Request('http://localhost/'))).rejects.toBe(
     err
@@ -469,9 +469,9 @@ test('error path: a rejecting async handler propagates uncaught', async () => {
 
 test('error path: mapResponse throwing propagates uncaught, unnormalized', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   app.get('/', () => 42 as unknown as Body)
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await expect(call(handler, new Request('http://localhost/'))).rejects.toThrow(
     /Cannot serialize handler result/
@@ -480,14 +480,14 @@ test('error path: mapResponse throwing propagates uncaught, unnormalized', async
 
 test('app.use: a global middleware setting a header on the way out reaches the Response', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.use(async (ctx, next) => {
     await next()
     ctx.response.headers.set('X-Powered-By', 'arcton')
   })
   app.get('/', () => ({ ok: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.headers.get('X-Powered-By')).toBe('arcton')
@@ -495,7 +495,7 @@ test('app.use: a global middleware setting a header on the way out reaches the R
 
 test('app.use: replacing the body after next() inherits headers already set on ctx.response', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.use(async (ctx, next) => {
     await next()
@@ -503,7 +503,7 @@ test('app.use: replacing the body after next() inherits headers already set on c
     return { replaced: true }
   })
   app.get('/', () => ({ original: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.headers.get('X-Trace')).toBe('outer')
@@ -512,7 +512,7 @@ test('app.use: replacing the body after next() inherits headers already set on c
 
 test('app.use: replacing with a raw Response after next() overrides completely, no header inheritance', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.use(async (ctx, next) => {
     await next()
@@ -520,7 +520,7 @@ test('app.use: replacing with a raw Response after next() overrides completely, 
     return new Response('replaced', { status: 201 })
   })
   app.get('/', () => ({ original: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(res.status).toBe(201)
@@ -530,7 +530,7 @@ test('app.use: replacing with a raw Response after next() overrides completely, 
 
 test('app.use: short-circuit middleware returning an object skips the handler', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   let handlerCalled = false
 
   app.use(() => ({ blocked: true }))
@@ -538,7 +538,7 @@ test('app.use: short-circuit middleware returning an object skips the handler', 
     handlerCalled = true
     return { ok: true }
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/'))
   expect(handlerCalled).toBe(false)
@@ -547,7 +547,7 @@ test('app.use: short-circuit middleware returning an object skips the handler', 
 
 test('app.use: global middleware runs on 404, e.g. to set CORS headers on it', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   let middlewareCalled = false
 
   app.use(async (ctx, next) => {
@@ -556,7 +556,7 @@ test('app.use: global middleware runs on 404, e.g. to set CORS headers on it', a
     ctx.response.headers.set('Access-Control-Allow-Origin', '*')
   })
   app.get('/exists', () => ({ ok: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/missing'))
   expect(res.status).toBe(404)
@@ -566,14 +566,14 @@ test('app.use: global middleware runs on 404, e.g. to set CORS headers on it', a
 
 test('app.use: global middleware runs on 405, alongside the Allow header', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.use(async (ctx, next) => {
     await next()
     ctx.response.headers.set('X-Powered-By', 'arcton')
   })
   app.get('/users', () => ({ ok: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(
     handler,
@@ -586,14 +586,14 @@ test('app.use: global middleware runs on 405, alongside the Allow header', async
 
 test("app.use: applies to 404/405 regardless of registration order relative to routes (unlike a route's own snapshot)", async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.get('/exists', () => ({ ok: true })) // registered BEFORE the use() below
   app.use(async (ctx, next) => {
     await next()
     ctx.response.headers.set('X-Trace', 'yes')
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/missing'))
   expect(res.status).toBe(404)
@@ -602,14 +602,14 @@ test("app.use: applies to 404/405 regardless of registration order relative to r
 
 test("use(scope, mw): does NOT run on 404/405 — there's no matched route to belong to", async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   let scopedCalled = false
 
   app.use('/api', () => {
     scopedCalled = true
   })
   app.get('/api/users', () => ({ ok: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/api/missing'))
   expect(res.status).toBe(404)
@@ -618,7 +618,7 @@ test("use(scope, mw): does NOT run on 404/405 — there's no matched route to be
 
 test('route-level middleware does NOT run on 404/405', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   let routeMwCalled = false
 
   app.get(
@@ -629,7 +629,7 @@ test('route-level middleware does NOT run on 404/405', async () => {
     },
     () => ({ ok: true })
   )
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(
     handler,
@@ -641,10 +641,10 @@ test('route-level middleware does NOT run on 404/405', async () => {
 
 test('app.provide: a provided value is flat on ctx for handlers registered after it', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter }).provide(async () => ({ user: { id: 'u1' } }))
+  const app = Arcton().provide(async () => ({ user: { id: 'u1' } }))
 
   app.get('/me', ({ user }) => ({ userId: user.id }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/me'))
   expect(await res.json()).toEqual({ userId: 'u1' })
@@ -652,12 +652,12 @@ test('app.provide: a provided value is flat on ctx for handlers registered after
 
 test('app.provide: composes — a later provide() reads what an earlier one added', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
     .provide(async () => ({ user: { id: 'u1' } }))
     .provide(async ({ user }) => ({ permissions: [user.id] }))
 
   app.get('/whoami', ({ user, permissions }) => ({ user, permissions }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/whoami'))
   expect(await res.json()).toEqual({ user: { id: 'u1' }, permissions: ['u1'] })
@@ -665,7 +665,7 @@ test('app.provide: composes — a later provide() reads what an earlier one adde
 
 test('app.provide: a use() registered after it can read the provided value', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter }).provide(() => ({ user: { id: 'u1' } }))
+  const app = Arcton().provide(() => ({ user: { id: 'u1' } }))
   let sawUser: unknown
 
   app.use(async (ctx, next) => {
@@ -673,7 +673,7 @@ test('app.provide: a use() registered after it can read the provided value', asy
     await next()
   })
   app.get('/', () => ({ ok: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await call(handler, new Request('http://localhost/'))
   expect(sawUser).toEqual({ id: 'u1' })
@@ -681,7 +681,7 @@ test('app.provide: a use() registered after it can read the provided value', asy
 
 test('route-level middleware: runs only for that route, nested inside global middleware', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   const order: string[] = []
 
   app.use(async (_ctx, next) => {
@@ -702,7 +702,7 @@ test('route-level middleware: runs only for that route, nested inside global mid
     }
   )
   app.get('/public', () => ({ ok: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await call(handler, new Request('http://localhost/protected'))
   expect(order).toEqual([
@@ -720,7 +720,7 @@ test('route-level middleware: runs only for that route, nested inside global mid
 
 test('route-level middleware + provide(): both params and provided context are visible together', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter }).provide(() => ({ user: { id: 'u1' } }))
+  const app = Arcton().provide(() => ({ user: { id: 'u1' } }))
 
   app.get(
     '/users/:id/profile',
@@ -731,7 +731,7 @@ test('route-level middleware + provide(): both params and provided context are v
     },
     ({ params, user }) => ({ routeId: params.id, userId: user.id })
   )
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(
     handler,
@@ -742,7 +742,7 @@ test('route-level middleware + provide(): both params and provided context are v
 
 test('route-level middleware: 405 does not run it', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   let middlewareCalled = false
 
   app.get(
@@ -753,7 +753,7 @@ test('route-level middleware: 405 does not run it', async () => {
     },
     () => ({ ok: true })
   )
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(
     handler,
@@ -765,7 +765,7 @@ test('route-level middleware: 405 does not run it', async () => {
 
 test('route-level middleware: a global middleware returning a Body after next() overrides the route body', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.use(async (_ctx, next) => {
     await next()
@@ -779,7 +779,7 @@ test('route-level middleware: a global middleware returning a Body after next() 
     },
     () => ({ from: 'handler' })
   )
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/x'))
   expect(await res.json()).toEqual({ from: 'global' })
@@ -804,7 +804,7 @@ test('route-level middleware: duplicate route registration still throws', () => 
 
 test('registration order: a route registered before app.use() is not affected by it', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   let middlewareCalled = false
 
   app.get('/before', () => ({ ok: true }))
@@ -813,7 +813,7 @@ test('registration order: a route registered before app.use() is not affected by
     return next()
   })
   app.get('/after', () => ({ ok: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await call(handler, new Request('http://localhost/before'))
   expect(middlewareCalled).toBe(false)
@@ -824,14 +824,14 @@ test('registration order: a route registered before app.use() is not affected by
 
 test('registration order: a route registered before app.provide() does not receive it', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.get('/before', ctx => ({
     user: (ctx as unknown as { user?: unknown }).user
   }))
   const withAuth = app.provide(() => ({ user: { id: 'u1' } }))
   withAuth.get('/after', ({ user }) => ({ user }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const before = await call(handler, new Request('http://localhost/before'))
   expect(await before.json()).toEqual({})
@@ -842,7 +842,7 @@ test('registration order: a route registered before app.provide() does not recei
 
 test('registration order: interleaving use()/get() runs each route only against what preceded it', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   const order: string[] = []
 
   app.use(async (_ctx, next) => {
@@ -861,7 +861,7 @@ test('registration order: interleaving use()/get() runs each route only against 
     order.push('handler-two')
     return { ok: true }
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await call(handler, new Request('http://localhost/one'))
   expect(order).toEqual(['A', 'handler-one'])
@@ -875,7 +875,7 @@ test('registration order: interleaving use()/get() runs each route only against 
 
 test('use(scope, mw): only runs for routes under that scope', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   let authRan = false
 
   app.use('/api', () => {
@@ -883,7 +883,7 @@ test('use(scope, mw): only runs for routes under that scope', async () => {
   })
   app.get('/api/users', () => ({ ok: true }))
   app.get('/health', () => ({ ok: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await call(handler, new Request('http://localhost/health'))
   expect(authRan).toBe(false)
@@ -894,7 +894,7 @@ test('use(scope, mw): only runs for routes under that scope', async () => {
 
 test('use(scope, mw): matches the scope itself and nested paths, not a mere string prefix', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   const ran: string[] = []
 
   app.use('/api', () => {
@@ -903,7 +903,7 @@ test('use(scope, mw): matches the scope itself and nested paths, not a mere stri
   app.get('/api', () => ({ ok: true }))
   app.get('/api/users/:id', () => ({ ok: true }))
   app.get('/apiary', () => ({ ok: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await call(handler, new Request('http://localhost/api'))
   await call(handler, new Request('http://localhost/api/users/1'))
@@ -914,7 +914,7 @@ test('use(scope, mw): matches the scope itself and nested paths, not a mere stri
 
 test('use(scope, mw): registration-order semantics — only applies to routes registered after it', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   let authRan = false
 
   app.get('/api/users', () => {
@@ -927,7 +927,7 @@ test('use(scope, mw): registration-order semantics — only applies to routes re
   app.get('/api/orders', () => {
     return { ok: true }
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await call(handler, new Request('http://localhost/api/users'))
   expect(authRan).toBe(false)
@@ -938,14 +938,14 @@ test('use(scope, mw): registration-order semantics — only applies to routes re
 
 test('use(scope, mw): 404 does not run it', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   let authRan = false
 
   app.use('/api', () => {
     authRan = true
   })
   app.get('/api/users', () => ({ ok: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/api/missing'))
   expect(res.status).toBe(404)
@@ -954,7 +954,7 @@ test('use(scope, mw): 404 does not run it', async () => {
 
 test('use(scope, mw): composes with global and route-level middleware in registration order', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   const order: string[] = []
 
   app.use(async (_ctx, next) => {
@@ -976,7 +976,7 @@ test('use(scope, mw): composes with global and route-level middleware in registr
       return { ok: true }
     }
   )
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await call(handler, new Request('http://localhost/api/users'))
   expect(order).toEqual(['global', 'scoped', 'route', 'handler'])
@@ -992,10 +992,10 @@ test('use(scope, mw): rejects a scope with a dynamic or wildcard segment', () =>
 
 test('ArctonConfig.prefix is applied to routes registered directly on this instance', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter, prefix: '/api' })
+  const app = Arcton({ prefix: '/api' })
 
   app.get('/users', () => ({ ok: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const prefixed = await call(
     handler,
@@ -1009,10 +1009,10 @@ test('ArctonConfig.prefix is applied to routes registered directly on this insta
 
 test('prefix "/" is equivalent to no prefix at all', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter, prefix: '/' })
+  const app = Arcton({ prefix: '/' })
 
   app.get('/users', () => ({ ok: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/users'))
   expect(res.status).toBe(200)
@@ -1020,7 +1020,9 @@ test('prefix "/" is equivalent to no prefix at all', async () => {
 
 test('a dynamic/wildcard prefix is rejected at Arcton() construction time', () => {
   expect(() => Arcton({ prefix: '/api/:id' })).toThrow(/must be a static path/)
-  expect(() => Arcton({ prefix: '/api/*rest' })).toThrow(/must be a static path/)
+  expect(() => Arcton({ prefix: '/api/*rest' })).toThrow(
+    /must be a static path/
+  )
 })
 
 test('ws() on a prefixed instance registers the ws route under that prefix', () => {
@@ -1038,17 +1040,67 @@ test('ws() on a prefixed instance registers the ws route under that prefix', () 
       }
     }
   }
-  const app = Arcton({ adapter, prefix: '/api' })
+  const app = Arcton({ prefix: '/api' })
 
   app.ws('/chat', { message() {} })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   expect(capturedWsRoutes.map(route => route.path)).toEqual(['/api/chat'])
 })
 
+// ── ws() capability check — deferred to listen() ────────────────────────
+
+function createNonWsAdapter(): RuntimeAdapter {
+  return {
+    name: 'no-ws',
+    version: '0.0.0',
+    capabilities: { websocket: false },
+    serve(options) {
+      return {
+        port: options.port,
+        url: new URL(`http://localhost:${options.port}`),
+        stop() {}
+      }
+    }
+  }
+}
+
+test('ws() no longer throws immediately on a websocket-incapable adapter — checked at listen() instead', () => {
+  const app = Arcton()
+  expect(() => app.ws('/chat', { message() {} })).not.toThrow()
+})
+
+test('listen() throws if there are ws routes and the adapter does not support websocket', () => {
+  const app = Arcton()
+  app.ws('/chat', { message() {} })
+  expect(() => app.listen({ port: 0, adapter: createNonWsAdapter() })).toThrow(
+    /does not support WebSocket/
+  )
+})
+
+test('listen() does not throw for a websocket-incapable adapter when there are no ws routes at all', () => {
+  const app = Arcton()
+  app.get('/', () => ({ ok: true }))
+  expect(() =>
+    app.listen({ port: 0, adapter: createNonWsAdapter() })
+  ).not.toThrow()
+})
+
+test("listen() catches a ws route that reached this app only through a mounted module, checked against this app's own adapter", () => {
+  const chat = Arcton({ prefix: '/chat' })
+  chat.ws('/room', { message() {} })
+
+  const app = Arcton({ prefix: '/api' })
+  app.use(chat)
+
+  expect(() => app.listen({ port: 0, adapter: createNonWsAdapter() })).toThrow(
+    /does not support WebSocket/
+  )
+})
+
 test('use(scope, mw) inside a prefixed instance compares against the module-local path, not the prefixed one', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter, prefix: '/api' })
+  const app = Arcton({ prefix: '/api' })
   let ran = false
 
   app.use('/users', () => {
@@ -1056,7 +1108,7 @@ test('use(scope, mw) inside a prefixed instance compares against the module-loca
   })
   app.get('/users', () => ({ ok: true }))
   app.get('/health', () => ({ ok: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await call(handler, new Request('http://localhost/api/health'))
   expect(ran).toBe(false)
@@ -1067,30 +1119,188 @@ test('use(scope, mw) inside a prefixed instance compares against the module-loca
 
 test('use(scope, mw) written with the already-prefixed path does not match — scope stays module-local', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter, prefix: '/api' })
+  const app = Arcton({ prefix: '/api' })
   let ran = false
 
   app.use('/api/users', () => {
     ran = true
   })
   app.get('/users', () => ({ ok: true }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await call(handler, new Request('http://localhost/api/users'))
   expect(ran).toBe(false)
+})
+
+// ── use(subApp) — module composition ────────────────────────────────────
+
+test(".use(subApp) mounts a module — its own prefix combines with the mounting app's", async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+
+  const users = Arcton({ prefix: '/users' })
+  users.get('/', () => ({ list: true }))
+  users.get('/:id', ctx => ({ id: ctx.params.id }))
+
+  const app = Arcton({ prefix: '/api' })
+  app.use(users)
+  app.listen({ port: 0, adapter })
+
+  const list = await call(handler, new Request('http://localhost/api/users'))
+  expect(await list.json()).toEqual({ list: true })
+
+  const one = await call(handler, new Request('http://localhost/api/users/42'))
+  expect(await one.json()).toEqual({ id: '42' })
+})
+
+test('.use(subApp): use()/provide() registered on the parent before the mount reach the module; after, do not', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const order: string[] = []
+
+  const users = Arcton({ prefix: '/users' })
+  users.get('/', (ctx: any) => {
+    order.push('handler')
+    return { db: ctx.db }
+  })
+
+  const app = Arcton({ prefix: '/api' })
+  app.use(async (_ctx, next) => {
+    order.push('before')
+    await next()
+  })
+  app.provide(() => ({ db: 'connected' }))
+  app.use(users)
+  app.use(async (_ctx, next) => {
+    order.push('after')
+    await next()
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/api/users'))
+  expect(await res.json()).toEqual({ db: 'connected' })
+  expect(order).toEqual(['before', 'handler'])
+})
+
+test('.use(subApp): a scoped use() on the parent does not reach a mounted module', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  let scopedRan = false
+
+  const users = Arcton({ prefix: '/users' })
+  users.get('/', () => ({ ok: true }))
+
+  const app = Arcton({ prefix: '/api' })
+  app.use('/api/users', () => {
+    scopedRan = true
+  })
+  app.use(users)
+  app.listen({ port: 0, adapter })
+
+  await call(handler, new Request('http://localhost/api/users'))
+  expect(scopedRan).toBe(false)
+})
+
+test("a module's own use(scope, mw) still applies correctly after being mounted", async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  let ran = false
+
+  const users = Arcton({ prefix: '/users' })
+  users.use('/settings', () => {
+    ran = true
+  })
+  users.get('/', () => ({ list: true }))
+  users.get('/settings', () => ({ settings: true }))
+
+  const app = Arcton({ prefix: '/api' })
+  app.use(users)
+  app.listen({ port: 0, adapter })
+
+  await call(handler, new Request('http://localhost/api/users'))
+  expect(ran).toBe(false)
+
+  await call(handler, new Request('http://localhost/api/users/settings'))
+  expect(ran).toBe(true)
+})
+
+test('.use(subApp): a ws() route registered inside a module gets both prefixes applied when mounted', () => {
+  let capturedWsRoutes: { path: string }[] = []
+  const adapter: RuntimeAdapter = {
+    name: 'test',
+    version: '0.0.0',
+    capabilities: { websocket: true },
+    serve(options) {
+      capturedWsRoutes = options.websocket ?? []
+      return {
+        port: options.port,
+        url: new URL(`http://localhost:${options.port}`),
+        stop() {}
+      }
+    }
+  }
+
+  const chat = Arcton({ prefix: '/chat' })
+  chat.ws('/room', { message() {} })
+
+  const app = Arcton({ prefix: '/api' })
+  app.use(chat)
+  app.listen({ port: 0, adapter })
+
+  expect(capturedWsRoutes.map(route => route.path)).toEqual(['/api/chat/room'])
+})
+
+test('.use(subApp): modules nest — a module composed of a sub-module mounts correctly', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+
+  const profile = Arcton({ prefix: '/profile' })
+  profile.get('/', () => ({ profile: true }))
+
+  const users = Arcton({ prefix: '/users' })
+  users.use(profile)
+  users.get('/', () => ({ users: true }))
+
+  const app = Arcton({ prefix: '/api' })
+  app.use(users)
+  app.listen({ port: 0, adapter })
+
+  const usersRes = await call(
+    handler,
+    new Request('http://localhost/api/users')
+  )
+  expect(await usersRes.json()).toEqual({ users: true })
+
+  const profileRes = await call(
+    handler,
+    new Request('http://localhost/api/users/profile')
+  )
+  expect(await profileRes.json()).toEqual({ profile: true })
+})
+
+test('.use(subApp): a duplicate (method, path) after mounting throws, same as a direct duplicate insert', () => {
+  const users = Arcton({ prefix: '/users' })
+  users.get('/', () => ({ ok: true }))
+
+  const app = Arcton({ prefix: '/api' })
+  app.get('/users', () => ({ ok: true }))
+
+  expect(() => app.use(users)).toThrow(/Duplicate route/)
+})
+
+test('use() rejects a value that is neither a middleware function, a (scope, middleware) pair, nor an Arcton app', () => {
+  const app = Arcton()
+  expect(() =>
+    (app.use as (value: unknown) => unknown)({ not: 'an arcton app' })
+  ).toThrow(/expects a middleware function/)
 })
 
 // ── get/post(path, options) — validation ──────────────────────────────────
 
 test('get(path, options): a params schema coerces params for the handler', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.get('/users/:id', {
     params: fakeSchema((p: Record<string, string>) => ({ id: Number(p.id) })),
     handler: ctx => ({ id: ctx.params.id, type: typeof ctx.params.id })
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/users/42'))
   expect(await res.json()).toEqual({ id: 42, type: 'number' })
@@ -1098,7 +1308,7 @@ test('get(path, options): a params schema coerces params for the handler', async
 
 test('get(path, options): a failing params schema returns 400 with issues, handler does not run', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   let handlerCalled = false
 
   app.get('/users/:id', {
@@ -1111,7 +1321,7 @@ test('get(path, options): a failing params schema returns 400 with issues, handl
       return { ok: true }
     }
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/users/abc'))
   expect(handlerCalled).toBe(false)
@@ -1123,13 +1333,13 @@ test('get(path, options): a failing params schema returns 400 with issues, handl
 
 test('post(path, options): a body schema validates a JSON body into ctx.body', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.post('/users', {
     body: fakeSchema((b: { name: string }) => ({ name: b.name.trim() })),
     handler: ctx => ({ name: ctx.body.name })
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(
     handler,
@@ -1144,13 +1354,13 @@ test('post(path, options): a body schema validates a JSON body into ctx.body', a
 
 test('post(path, options): an unsupported body content-type returns 415', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.post('/users', {
     body: fakeSchema((b: { name: string }) => b),
     handler: ctx => ({ name: ctx.body.name })
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(
     handler,
@@ -1165,7 +1375,7 @@ test('post(path, options): an unsupported body content-type returns 415', async 
 
 test('get(path, options): combined with provide() and route-level middleware', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter }).provide(() => ({ user: { id: 'u1' } }))
+  const app = Arcton().provide(() => ({ user: { id: 'u1' } }))
   let sawInMiddleware: unknown
 
   app.get('/users/:id', {
@@ -1178,7 +1388,7 @@ test('get(path, options): combined with provide() and route-level middleware', a
     ],
     handler: ctx => ({ id: ctx.params.id, user: ctx.user })
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/users/9'))
   expect(sawInMiddleware).toEqual({ id: 9, user: { id: 'u1' } })
@@ -1187,7 +1397,7 @@ test('get(path, options): combined with provide() and route-level middleware', a
 
 test('get(path, options): global middleware still sees raw, un-coerced params/query', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   let sawInGlobal: unknown
 
   app.use(async (ctx, next) => {
@@ -1198,7 +1408,7 @@ test('get(path, options): global middleware still sees raw, un-coerced params/qu
     params: fakeSchema((p: Record<string, string>) => ({ id: Number(p.id) })),
     handler: ctx => ({ id: ctx.params.id })
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await call(handler, new Request('http://localhost/users/9'))
   expect(sawInGlobal).toEqual({ id: '9' }) // raw string, not coerced
@@ -1206,13 +1416,13 @@ test('get(path, options): global middleware still sees raw, un-coerced params/qu
 
 test('get(path, handler): plain-handler shape is unaffected — no validate step, no schema', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.get('/users/:id', ctx => ({
     id: ctx.params.id,
     type: typeof ctx.params.id
   }))
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(handler, new Request('http://localhost/users/42'))
   expect(await res.json()).toEqual({ id: '42', type: 'string' })
@@ -1222,13 +1432,13 @@ test('get(path, handler): plain-handler shape is unaffected — no validate step
 
 test('a body schema against multipart/form-data validates the parsed FormData', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.post('/upload', {
     body: fakeSchema((f: FormData) => ({ name: f.get('name') })),
     handler: ctx => ctx.body
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const form = new FormData()
   form.set('name', 'Ivan')
@@ -1241,7 +1451,7 @@ test('a body schema against multipart/form-data validates the parsed FormData', 
 
 test('app.parser(): a custom parser handles its registered media type', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.parser('application/vnd.foo', async request => {
     const text = await request.text()
@@ -1251,7 +1461,7 @@ test('app.parser(): a custom parser handles its registered media type', async ()
     body: fakeSchema((v: { n: number }) => v),
     handler: ctx => ctx.body
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(
     handler,
@@ -1266,7 +1476,7 @@ test('app.parser(): a custom parser handles its registered media type', async ()
 
 test('app.parser(): registering the same media type again replaces the previous parser', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
 
   app.parser('application/json', async () => ({ from: 'first' }))
   app.parser('application/json', async () => ({ from: 'second' }))
@@ -1274,7 +1484,7 @@ test('app.parser(): registering the same media type again replaces the previous 
     body: fakeSchema((v: { from: string }) => v),
     handler: ctx => ctx.body
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   const res = await call(
     handler,
@@ -1289,7 +1499,7 @@ test('app.parser(): registering the same media type again replaces the previous 
 
 test('app.parser(): a throwing custom parser propagates uncaught', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
-  const app = Arcton({ adapter })
+  const app = Arcton()
   const err = new Error('custom parser boom')
 
   app.parser('application/vnd.foo', () => {
@@ -1299,7 +1509,7 @@ test('app.parser(): a throwing custom parser propagates uncaught', async () => {
     body: fakeSchema((v: unknown) => ({ v })),
     handler: ctx => ctx.body
   })
-  app.listen({ port: 0 })
+  app.listen({ port: 0, adapter })
 
   await expect(
     call(

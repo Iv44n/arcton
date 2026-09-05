@@ -1,10 +1,10 @@
-import { nodeAdapter } from '@arcton/adapter-node'
-import { Arcton } from '@arcton/core'
+import { nodeAdapter } from "@arcton/adapter-node";
+import { Arcton } from "@arcton/core";
 
-const app = Arcton({ adapter: nodeAdapter })
+const app = Arcton();
 
-app.get('/', () => {
-  return 'Hello, Arcton!'
-})
+app.get("/", () => {
+	return "Hello, Arcton!";
+});
 
-app.listen()
+app.listen({ adapter: nodeAdapter });

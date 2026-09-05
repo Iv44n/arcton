@@ -162,9 +162,7 @@ test('empty prefix grafts source directly onto target, no intermediate node', ()
   expect(target.static.size).toBe(1)
   const statusHandler = target.static.get('status')?.handlers.get('GET')
   expect(statusHandler).toBeDefined()
-  expect((statusHandler as unknown as { label: string }).label).toBe(
-    'wrapped'
-  )
+  expect((statusHandler as unknown as { label: string }).label).toBe('wrapped')
 })
 
 test('multi-segment prefix nests the grafted tree under every segment', () => {
@@ -187,9 +185,10 @@ test('static + static: unrelated existing route in target is untouched by the gr
   graftTree(target, source, parse('/api').segments, tag('wrapped'))
 
   expect(target.static.get('health')?.handlers.get('GET')).toBe(noop)
-  const grafted = target.static.get('api')?.static.get('status')?.handlers.get(
-    'GET'
-  )
+  const grafted = target.static
+    .get('api')
+    ?.static.get('status')
+    ?.handlers.get('GET')
   expect(grafted).toBeDefined()
   expect(grafted).not.toBe(noop)
 })

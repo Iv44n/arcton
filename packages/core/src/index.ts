@@ -19,18 +19,13 @@ import figlet from 'figlet'
 import pkg from '../package.json' with { type: 'json' }
 import { normalizeMediaType } from './middleware/body'
 import { runPipeline, type Step } from './middleware/pipeline'
-import { parse } from './router/parse'
+import { parse, type Segment } from './router/parse'
 import { createRouter } from './router/router'
 import { mapResponse } from './router/serialize'
-import type { RouteNode } from './router/tree'
+import { graftTree, type RouteNode } from './router/tree'
 import type { ExtractParams } from './router/types'
 
 export interface ArctonConfig {
-  port?: number
-  hostname?: string
-  adapter?: RuntimeAdapter
-  /** Defaults to `process.env.NODE_ENV`, falling back to `'development'`. */
-  env?: string
   /**
    * Where this instance's routes live within a mounting app's tree, e.g.
    * `/api`. Applied once, to every route/ws route registered directly on
@@ -45,6 +40,9 @@ export interface ArctonConfig {
 export interface ArctonListenOptions {
   port?: number
   hostname?: string
+  adapter?: RuntimeAdapter
+  /** Defaults to `process.env.NODE_ENV`, falling back to `'development'`. */
+  env?: string
 }
 
 // `Route` infers as the literal passed for `path`, so `ctx.params` comes
@@ -105,6 +103,16 @@ export interface ArctonApp<TProvided = {}> {
     scope: string,
     middleware: Middleware<RouteParams, QueryParams, {}, TProvided>
   ): ArctonApp<TProvided>
+  /**
+   * Mounts a module — another `Arcton()` instance — under this app's own
+   * `prefix`. Grafts its already-built route tree (and ws routes) into this
+   * app's tree, wrapped once with this app's own `use()`/`provide()` steps
+   * registered so far — same snapshot-at-registration-time semantics as
+   * everything else. Accepts any `ArctonApp<any>` — this app's own
+   * `TProvided` is unaffected, and the module's handlers aren't retyped
+   * against whatever this app goes on to `provide()`.
+   */
+  use(app: ArctonApp<any>): ArctonApp<TProvided>
   /**
    * Composes typed context — adds `R` flat onto `ctx` for every
    * middleware/handler registered after this call. Rejects re-providing a
@@ -229,6 +237,12 @@ function attachInternal(app: object, state: InternalState): void {
   Object.defineProperty(app, INTERNAL, { value: state, enumerable: false })
 }
 
+// `undefined` for any plain object that isn't an Arcton() instance — lets
+// use()'s mount branch tell a module apart from anything else.
+function getInternal(value: object): InternalState | undefined {
+  return (value as Record<symbol, InternalState | undefined>)[INTERNAL]
+}
+
 // Defers Object.fromEntries(url.searchParams) until something actually
 // reads ctx.query — most requests (every 404/405, plus any handler that
 // never touches it) skip it entirely. A get/set pair (not a getter alone)
@@ -248,9 +262,8 @@ function lazyQuery(url: URL): {
 }
 
 export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
-  const adapter = config.adapter ?? bunAdapter
-  const environment = config.env ?? process.env.NODE_ENV ?? 'development'
   const prefix = normalizePrefix(config.prefix)
+  const prefixSegments: Segment[] = prefix ? parse(prefix).segments : []
   const router = createRouter()
   const websocketRoutes: RuntimeWebSocketRoute[] = []
   const steps: Step[] = []
@@ -318,6 +331,30 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     return app as unknown as ArctonApp<never>
   }
 
+  // A scoped 'use' step is dropped here, not carried over: runPipeline
+  // never looks at `step.scope` (only insertRoute's own per-route filter
+  // does), and a mounted module is grafted whole, with no single path of
+  // its own to test a scope against — same reasoning as listen()'s
+  // notFoundSteps for 404/405.
+  function mountApp(subInternal: InternalState): void {
+    const parentSteps = steps.filter(
+      step => step.kind !== 'use' || step.scope === undefined
+    )
+    const wrap = (handler: RouteHandler): RouteHandler =>
+      parentSteps.length === 0
+        ? handler
+        : ctx => runPipeline(parentSteps, handler, ctx, parsers)
+
+    graftTree(router.root, subInternal.root, prefixSegments, wrap)
+
+    for (const route of subInternal.websocketRoutes) {
+      websocketRoutes.push({
+        path: joinPrefix(prefix, route.path),
+        handler: route.handler
+      })
+    }
+  }
+
   // A RouteOptions object is the only 1-argument call shape that isn't a
   // bare handler — the variadic middleware+handler tuple always ends in a
   // function, so `typeof args[0] === 'function'` is enough to tell the two
@@ -375,16 +412,26 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
       return registerRoute('OPTIONS', path, args)
     },
     ws(path: string, handler: RuntimeWebSocketHandler) {
-      if (!adapter.capabilities.websocket) {
-        throw new Error(
-          `Runtime "${adapter.name}" does not support WebSocket routes.`
-        )
-      }
-
       websocketRoutes.push({ path: joinPrefix(prefix, path), handler })
       return app
     },
     use(...args: unknown[]) {
+      if (
+        args.length === 1 &&
+        typeof args[0] === 'object' &&
+        args[0] !== null
+      ) {
+        const subInternal = getInternal(args[0])
+        if (!subInternal) {
+          throw new Error(
+            'use() expects a middleware function, a (scope, middleware) ' +
+              'pair, or an Arcton app to mount'
+          )
+        }
+        mountApp(subInternal)
+        return app
+      }
+
       if (args.length >= 2) {
         const [scope, mw] = args as [string, Middleware]
         assertStaticPath(scope, 'Scope')
@@ -403,6 +450,18 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
       return app
     },
     listen(options = {}) {
+      const adapter = options.adapter ?? bunAdapter
+      const environment = options.env ?? process.env.NODE_ENV ?? 'development'
+
+      // Checked here, not at ws()/mount time — this is the earliest point
+      // the final set of ws routes (including any merged in via mountApp)
+      // and the actual serving adapter are both known.
+      if (websocketRoutes.length > 0 && !adapter.capabilities.websocket) {
+        throw new Error(
+          `Runtime "${adapter.name}" does not support WebSocket routes.`
+        )
+      }
+
       // 404/405 has no matched route, so no per-route snapshot to attach
       // to — there's nothing for scoped use()/route middleware to be
       // "before or after". Only unscoped use() steps apply, and they apply
@@ -416,8 +475,8 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
       )
 
       const server = adapter.serve({
-        port: options.port ?? config.port ?? 3000,
-        hostname: options.hostname ?? config.hostname,
+        port: options.port ?? 3000,
+        hostname: options.hostname,
         websocket: websocketRoutes,
         async fetch(request) {
           const method = request.method as HttpMethod
