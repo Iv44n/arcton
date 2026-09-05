@@ -35,6 +35,55 @@ function formatPath(segments: Segment[]): string {
     .join('/')}`
 }
 
+function getOrCreateStaticChild(node: RouteNode, key: string): RouteNode {
+  let next = node.static.get(key)
+  if (!next) {
+    next = createRouteNode()
+    node.static.set(key, next)
+  }
+  return next
+}
+
+// A dynamic and a wildcard slot on the same node coexist fine (match.ts
+// tries them in priority order) — only a same-slot name mismatch conflicts.
+function getOrCreateDynamicChild(node: RouteNode, name: string): RouteNode {
+  if (node.dynamic) {
+    if (node.dynamic.name !== name) {
+      throw new Error(
+        `Conflicting parameter name: "${name}" conflicts with "${node.dynamic.name}" at same position`
+      )
+    }
+  } else {
+    node.dynamic = { node: createRouteNode(), name }
+  }
+  return node.dynamic.node
+}
+
+function getOrCreateWildcardChild(node: RouteNode, name: string): RouteNode {
+  if (node.wildcard) {
+    if (node.wildcard.name !== name) {
+      throw new Error(
+        `Conflicting parameter name: "${name}" conflicts with "${node.wildcard.name}" at same position`
+      )
+    }
+  } else {
+    node.wildcard = { node: createRouteNode(), name }
+  }
+  return node.wildcard.node
+}
+
+function assertNoHandlerConflict(
+  node: RouteNode,
+  method: HttpMethod,
+  segments: Segment[]
+): void {
+  if (node.handlers.has(method)) {
+    throw new Error(
+      `Duplicate route: ${method} ${formatPath(segments)} is already registered`
+    )
+  }
+}
+
 export function insert(
   root: RouteNode,
   parsed: ParsedRoute,
@@ -45,41 +94,84 @@ export function insert(
 
   for (const segment of parsed.segments) {
     if (segment.type === 'static') {
-      let next = node.static.get(segment.value)
-      if (!next) {
-        next = createRouteNode()
-        node.static.set(segment.value, next)
-      }
-      node = next
+      node = getOrCreateStaticChild(node, segment.value)
     } else if (segment.type === 'dynamic') {
-      if (node.dynamic) {
-        if (node.dynamic.name !== segment.name) {
-          throw new Error(
-            `Conflicting parameter name: "${segment.name}" conflicts with "${node.dynamic.name}" at same position`
-          )
-        }
-      } else {
-        node.dynamic = { node: createRouteNode(), name: segment.name }
-      }
-      node = node.dynamic.node
+      node = getOrCreateDynamicChild(node, segment.name)
     } else {
-      if (node.wildcard) {
-        if (node.wildcard.name !== segment.name) {
-          throw new Error(
-            `Conflicting parameter name: "${segment.name}" conflicts with "${node.wildcard.name}" at same position`
-          )
-        }
-      } else {
-        node.wildcard = { node: createRouteNode(), name: segment.name }
-      }
-      node = node.wildcard.node
+      node = getOrCreateWildcardChild(node, segment.name)
     }
   }
 
-  if (node.handlers.has(method)) {
-    throw new Error(
-      `Duplicate route: ${method} ${formatPath(parsed.segments)} is already registered`
+  assertNoHandlerConflict(node, method, parsed.segments)
+  node.handlers.set(method, handler)
+}
+
+// `source` is left untouched (grafting doesn't consume it — it can be
+// grafted into more than one `target`), and this reuses the exact same
+// get-or-create/conflict primitives as `insert`, so a name clash or a
+// duplicate (method, path) throws the same error either way.
+export function graftTree(
+  target: RouteNode,
+  source: RouteNode,
+  prefixSegments: Segment[],
+  wrap: (handler: RouteHandler) => RouteHandler
+): void {
+  let node = target
+  const pathSoFar: Segment[] = []
+
+  for (const segment of prefixSegments) {
+    if (segment.type !== 'static') {
+      throw new Error(
+        `Mount prefix must be a static path — got a "${segment.type}" segment`
+      )
+    }
+    node = getOrCreateStaticChild(node, segment.value)
+    pathSoFar.push(segment)
+  }
+
+  graftInto(node, source, pathSoFar, wrap)
+}
+
+function graftInto(
+  target: RouteNode,
+  source: RouteNode,
+  pathSoFar: Segment[],
+  wrap: (handler: RouteHandler) => RouteHandler
+): void {
+  for (const [method, handler] of source.handlers) {
+    assertNoHandlerConflict(target, method, pathSoFar)
+    target.handlers.set(method, wrap(handler))
+  }
+
+  for (const [key, childSource] of source.static) {
+    const childTarget = getOrCreateStaticChild(target, key)
+    graftInto(
+      childTarget,
+      childSource,
+      [...pathSoFar, { type: 'static', value: key }],
+      wrap
     )
   }
-  node.handlers.set(method, handler)
+
+  if (source.dynamic) {
+    const { node: childSource, name } = source.dynamic
+    const childTarget = getOrCreateDynamicChild(target, name)
+    graftInto(
+      childTarget,
+      childSource,
+      [...pathSoFar, { type: 'dynamic', name }],
+      wrap
+    )
+  }
+
+  if (source.wildcard) {
+    const { node: childSource, name } = source.wildcard
+    const childTarget = getOrCreateWildcardChild(target, name)
+    graftInto(
+      childTarget,
+      childSource,
+      [...pathSoFar, { type: 'wildcard', name }],
+      wrap
+    )
+  }
 }

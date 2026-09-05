@@ -18,10 +18,13 @@ export function createRouter(): Router & {
   // their own purposes, like reading `searchParams`) and would otherwise
   // parse the same request URL twice.
   matchPathname(method: HttpMethod, pathname: string): MatchResult
+  // For module composition — see `graftTree` in tree.ts.
+  readonly root: RouteNode
 } {
   const root: RouteNode = createRouteNode()
 
   return {
+    root,
     insert(method, path, handler) {
       insertRoute(root, parse(path), method, handler)
     },

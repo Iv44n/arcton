@@ -22,6 +22,7 @@ import { runPipeline, type Step } from './middleware/pipeline'
 import { parse } from './router/parse'
 import { createRouter } from './router/router'
 import { mapResponse } from './router/serialize'
+import type { RouteNode } from './router/tree'
 import type { ExtractParams } from './router/types'
 
 export interface ArctonConfig {
@@ -30,6 +31,15 @@ export interface ArctonConfig {
   adapter?: RuntimeAdapter
   /** Defaults to `process.env.NODE_ENV`, falling back to `'development'`. */
   env?: string
+  /**
+   * Where this instance's routes live within a mounting app's tree, e.g.
+   * `/api`. Applied once, to every route/ws route registered directly on
+   * this instance (see `insertRoute`/`ws`) — a `use(scope, mw)` scope still
+   * compares against the path as written to `.get()`/etc., not against the
+   * prefixed one (see `matchesScope`). Must be a static path, same
+   * constraint as a `use()` scope. `'/'` is equivalent to no prefix.
+   */
+  prefix?: string
 }
 
 export interface ArctonListenOptions {
@@ -166,15 +176,15 @@ export interface RouteOptions<
   >
 }
 
-// A scope is required to be a static path (reusing parse()'s own leading-
-// slash/no-"//" validation) — ":param"/"*wildcard" segments would turn
+// A scope or prefix must be a static path (reusing parse()'s own
+// leading-slash/no-"//" validation) — dynamic/wildcard segments would turn
 // matchesScope into a second matching system instead of a plain string
 // relation between two paths.
-function assertStaticScope(scope: string): void {
-  const { segments } = parse(scope)
+function assertStaticPath(value: string, label: string): void {
+  const { segments } = parse(value)
   if (segments.some(segment => segment.type !== 'static')) {
     throw new Error(
-      `Scope "${scope}" must be a static path — dynamic/wildcard segments ` +
+      `${label} "${value}" must be a static path — dynamic/wildcard segments ` +
         `aren't supported (e.g. app.use('/api', mw), not app.use('/api/:id', mw))`
     )
   }
@@ -182,6 +192,41 @@ function assertStaticScope(scope: string): void {
 
 function matchesScope(path: string, scope: string): boolean {
   return path === scope || path.startsWith(`${scope}/`)
+}
+
+// `undefined` and `'/'` both collapse to `''` — one case downstream instead
+// of two.
+function normalizePrefix(prefix?: string): string {
+  if (!prefix || prefix === '/') return ''
+  assertStaticPath(prefix, 'Prefix')
+  return prefix
+}
+
+// `prefix` is already normalized (never `undefined`, never just `'/'`), so
+// the only case to special-case is `path === '/'` itself — otherwise the
+// prefix would grow a trailing slash (`/api` + `/` → `/api/`, not `/api`).
+function joinPrefix(prefix: string, path: string): string {
+  if (!prefix) return path
+  return path === '/' ? prefix : `${prefix}${path}`
+}
+
+// Keeps each instance's router/steps/parsers/prefix off the public
+// ArctonApp<TProvided> surface — a symbol key instead of a WeakMap, so the
+// state lives alongside the object it describes.
+const INTERNAL = Symbol('arcton.internal')
+
+interface InternalState {
+  root: RouteNode
+  websocketRoutes: RuntimeWebSocketRoute[]
+  steps: Step[]
+  parsers: Map<string, BodyParser>
+  prefix: string
+}
+
+// Avoids TypeScript's excess-property check on a symbol-keyed field
+// against ArctonApp<{}>, and keeps it out of `for...in`/`Object.keys`.
+function attachInternal(app: object, state: InternalState): void {
+  Object.defineProperty(app, INTERNAL, { value: state, enumerable: false })
 }
 
 // Defers Object.fromEntries(url.searchParams) until something actually
@@ -205,6 +250,7 @@ function lazyQuery(url: URL): {
 export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
   const adapter = config.adapter ?? bunAdapter
   const environment = config.env ?? process.env.NODE_ENV ?? 'development'
+  const prefix = normalizePrefix(config.prefix)
   const router = createRouter()
   const websocketRoutes: RuntimeWebSocketRoute[] = []
   const steps: Step[] = []
@@ -266,7 +312,9 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
         ? handler
         : ctx => runPipeline(routeSteps, handler, ctx, parsers)
 
-    router.insert(method, path, composed)
+    // Applied only here — scope matching above still works against `path`
+    // as written to `.get()`, unprefixed (see ArctonConfig.prefix).
+    router.insert(method, joinPrefix(prefix, path), composed)
     return app as unknown as ArctonApp<never>
   }
 
@@ -333,13 +381,13 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
         )
       }
 
-      websocketRoutes.push({ path, handler })
+      websocketRoutes.push({ path: joinPrefix(prefix, path), handler })
       return app
     },
     use(...args: unknown[]) {
       if (args.length >= 2) {
         const [scope, mw] = args as [string, Middleware]
-        assertStaticScope(scope)
+        assertStaticPath(scope, 'Scope')
         steps.push({ kind: 'use', fn: mw, scope })
       } else {
         steps.push({ kind: 'use', fn: args[0] as Middleware })
@@ -448,6 +496,14 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
       return server
     }
   }
+
+  attachInternal(app, {
+    root: router.root,
+    websocketRoutes,
+    steps,
+    parsers,
+    prefix
+  })
 
   return app
 }

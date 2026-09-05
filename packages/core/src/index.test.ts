@@ -988,6 +988,98 @@ test('use(scope, mw): rejects a scope with a dynamic or wildcard segment', () =>
   expect(() => app.use('/api/*rest', () => {})).toThrow(/must be a static path/)
 })
 
+// ── ArctonConfig.prefix ──────────────────────────────────────────────────
+
+test('ArctonConfig.prefix is applied to routes registered directly on this instance', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter, prefix: '/api' })
+
+  app.get('/users', () => ({ ok: true }))
+  app.listen({ port: 0 })
+
+  const prefixed = await call(
+    handler,
+    new Request('http://localhost/api/users')
+  )
+  expect(prefixed.status).toBe(200)
+
+  const unprefixed = await call(handler, new Request('http://localhost/users'))
+  expect(unprefixed.status).toBe(404)
+})
+
+test('prefix "/" is equivalent to no prefix at all', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter, prefix: '/' })
+
+  app.get('/users', () => ({ ok: true }))
+  app.listen({ port: 0 })
+
+  const res = await call(handler, new Request('http://localhost/users'))
+  expect(res.status).toBe(200)
+})
+
+test('a dynamic/wildcard prefix is rejected at Arcton() construction time', () => {
+  expect(() => Arcton({ prefix: '/api/:id' })).toThrow(/must be a static path/)
+  expect(() => Arcton({ prefix: '/api/*rest' })).toThrow(/must be a static path/)
+})
+
+test('ws() on a prefixed instance registers the ws route under that prefix', () => {
+  let capturedWsRoutes: { path: string }[] = []
+  const adapter: RuntimeAdapter = {
+    name: 'test',
+    version: '0.0.0',
+    capabilities: { websocket: true },
+    serve(options) {
+      capturedWsRoutes = options.websocket ?? []
+      return {
+        port: options.port,
+        url: new URL(`http://localhost:${options.port}`),
+        stop() {}
+      }
+    }
+  }
+  const app = Arcton({ adapter, prefix: '/api' })
+
+  app.ws('/chat', { message() {} })
+  app.listen({ port: 0 })
+
+  expect(capturedWsRoutes.map(route => route.path)).toEqual(['/api/chat'])
+})
+
+test('use(scope, mw) inside a prefixed instance compares against the module-local path, not the prefixed one', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter, prefix: '/api' })
+  let ran = false
+
+  app.use('/users', () => {
+    ran = true
+  })
+  app.get('/users', () => ({ ok: true }))
+  app.get('/health', () => ({ ok: true }))
+  app.listen({ port: 0 })
+
+  await call(handler, new Request('http://localhost/api/health'))
+  expect(ran).toBe(false)
+
+  await call(handler, new Request('http://localhost/api/users'))
+  expect(ran).toBe(true)
+})
+
+test('use(scope, mw) written with the already-prefixed path does not match — scope stays module-local', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton({ adapter, prefix: '/api' })
+  let ran = false
+
+  app.use('/api/users', () => {
+    ran = true
+  })
+  app.get('/users', () => ({ ok: true }))
+  app.listen({ port: 0 })
+
+  await call(handler, new Request('http://localhost/api/users'))
+  expect(ran).toBe(false)
+})
+
 // ── get/post(path, options) — validation ──────────────────────────────────
 
 test('get(path, options): a params schema coerces params for the handler', async () => {
