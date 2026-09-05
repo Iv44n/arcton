@@ -1,6 +1,6 @@
 {
   "name": "@arcton/core",
-  "version": "0.0.7",
+  "version": "0.0.10",
   "type": "module",
   "module": "src/index.ts",
   "types": "src/index.ts",
@@ -31,12 +31,10 @@
   },
   "dependencies": {
     "@arcton/adapter-bun": "workspace:*",
-    "@arcton/contracts": "workspace:*",
-    "figlet": "^1.11.4"
+    "@arcton/contracts": "workspace:*"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "@types/figlet": "^1.7.0"
+    "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^7"

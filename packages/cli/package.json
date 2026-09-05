@@ -1,6 +1,6 @@
 {
   "name": "arcton",
-  "version": "0.0.5",
+  "version": "0.0.7",
   "type": "module",
   "bin": {
     "arcton": "./dist/index.js"
@@ -27,13 +27,11 @@
     "@arcton/contracts": "workspace:*",
     "@arcton/core": "workspace:*",
     "@clack/prompts": "^1.7.0",
-    "figlet": "^1.11.4",
     "gradient-string": "^3.0.0",
     "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/figlet": "^1.7.0",
     "@types/gradient-string": "^1.1.6"
   },
   "peerDependencies": {

@@ -4,7 +4,6 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as p from '@clack/prompts'
-import figlet from 'figlet'
 import gradient from 'gradient-string'
 import pc from 'picocolors'
 
@@ -85,11 +84,10 @@ async function resolveLatestVersions(
 }
 
 export async function runCreate(argv: string[]): Promise<void> {
-  const banner = figlet.textSync('ARCTON').trimEnd()
   const arctonGradient = gradient(['#ef4444', '#fb923c'])
 
   console.log()
-  console.log(arctonGradient.multiline(banner))
+  console.log(arctonGradient.multiline('ARCTON'))
   console.log()
 
   p.intro(pc.bgRed(pc.black(' arcton create ')))

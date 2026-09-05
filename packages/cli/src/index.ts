@@ -21,8 +21,8 @@ switch (command) {
   case 'start': {
     // Lazy — create shouldn't depend on @arcton/core's loadability.
     const { Arcton } = await import('@arcton/core')
-    const app = Arcton({ adapter: await resolveAdapter() })
-    const server = app.listen()
+    const app = Arcton()
+    const server = app.listen({ adapter: await resolveAdapter() })
     console.log(`Arcton listening on ${server.url}`)
     break
   }

@@ -15,7 +15,6 @@ import type {
   RuntimeWebSocketRoute,
   StandardSchemaV1
 } from '@arcton/contracts'
-import figlet from 'figlet'
 import pkg from '../package.json' with { type: 'json' }
 import { normalizeMediaType } from './middleware/body'
 import { runPipeline, type Step } from './middleware/pipeline'
@@ -545,7 +544,6 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
         }
       })
 
-      console.log(figlet.textSync('Arcton'))
       console.log(`  Arcton       v${pkg.version}`)
       console.log(`  Runtime      ${adapter.name} v${adapter.version}`)
       console.log(`  Environment  ${environment}`)
