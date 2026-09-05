@@ -1,0 +1,110 @@
+---
+title: Query Parameters
+description: Leer el query string desde el context, cómo se comportan las keys repetidas, y cómo validar el input del query.
+---
+
+Los query parameters llegan en `ctx.query`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/search', ctx => ({
+  term: ctx.query.q,
+  page: ctx.query.page
+}))
+
+app.listen()
+```
+
+`GET /search?q=arcton&page=2` retorna `{"term":"arcton","page":"2"}`.
+
+## Los valores son strings, y pueden faltar
+
+`ctx.query` es un `Record<string, string>`. Una key que no se envió es
+`undefined`, así que maneja la ausencia explícitamente:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/search', ctx => {
+  const term = ctx.query.q ?? ''
+  const page = Number(ctx.query.page ?? '1')
+
+  return { term, page }
+})
+
+app.listen()
+```
+
+Dos detalles que vale la pena conocer:
+
+- Una key enviada sin valor es un string vacío: `?debug` da
+  `ctx.query.debug === ''`.
+- Una key enviada más de una vez conserva el último valor: `?tag=a&tag=b`
+  da `ctx.query.tag === 'b'`.
+
+El query string se parsea la primera vez que algo lee `ctx.query`, así
+que un handler que nunca lo toca no paga nada por eso.
+
+## Validar y convertir
+
+Convertir a mano se vuelve repetitivo apenas una ruta toma más de un
+parámetro. Un schema de `query` hace la conversión y el tipado en un solo
+lugar:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.get('/search', {
+  query: v.object({
+    q: v.string(),
+    page: v.optional(
+      v.pipe(v.string(), v.transform(Number), v.number()),
+      '1'
+    )
+  }),
+  handler: ctx => ({ term: ctx.query.q, page: ctx.query.page })
+})
+
+app.listen()
+```
+
+`ctx.query.page` acá es un `number`, y un request al que le falta `q` se
+responde con `400` antes de que el handler corra. Ver
+[Params and query](../validation/params-and-query.mdx) y
+[Validation errors](../validation/validation-errors.mdx).
+
+## Leer el query string crudo
+
+`ctx.request.url` siempre está disponible cuando necesitas la URL en sí
+— para keys repetidas que quieres conservar, por ejemplo:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/filter', ctx => {
+  const url = new URL(ctx.request.url)
+  const tags = url.searchParams.getAll('tag')
+
+  return { tags }
+})
+
+app.listen()
+```
+
+`GET /filter?tag=a&tag=b` retorna `{"tags":["a","b"]}`.
+
+<Callout>
+  Los query parameters no son parte del matching de rutas. `/search` y
+  `/search?q=x` llegan a la misma ruta, y dos rutas no pueden
+  distinguirse por su query string.
+</Callout>

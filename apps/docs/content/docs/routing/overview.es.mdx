@@ -1,0 +1,152 @@
+---
+title: Routing Overview
+description: Registrar rutas, los tres tipos de segmento de path, y las reglas que debe seguir el path de una ruta.
+---
+
+Registra una ruta llamando al método que quieres que responda:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users', () => [{ id: '1' }])
+app.post('/users', () => ({ created: true }))
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.listen()
+```
+
+Cada método de registro retorna la app, así que las llamadas se encadenan:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .get('/health', () => ({ status: 'ok' }))
+  .get('/version', () => ({ version: '1.0.0' }))
+
+app.listen()
+```
+
+Hay siete métodos disponibles: `get`, `post`, `put`, `delete`, `patch`,
+`head` y `options`. Ver [HTTP methods](./http-methods.mdx).
+
+## Tres tipos de segmento
+
+Un path se divide por `/`, y cada segmento es uno de tres tipos:
+
+| Segmento | Se escribe | Matchea |
+|---|---|---|
+| Static | `users` | exactamente ese texto |
+| Dynamic | `:id` | un solo segmento cualquiera, capturado como `ctx.params.id` |
+| Wildcard | `*path` | el resto del path, capturado como `ctx.params.path` |
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/health', () => ({ status: 'ok' }))            // static
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))    // dynamic
+app.get('/files/*path', ctx => ({ path: ctx.params.path })) // wildcard
+
+app.listen()
+```
+
+`GET /files/docs/readme.md` da `ctx.params.path === 'docs/readme.md'`.
+
+Los valores capturados están tipados a partir del path que escribiste —
+ver [Path parameters](./path-parameters.mdx). Cuando más de una ruta
+podría matchear un request, [Precedence](./precedence.mdx) decide.
+
+## Reglas para el path de una ruta
+
+Estas se verifican cuando la ruta se registra, así que un error tira al
+arrancar en vez de aparecer como sorpresa más adelante.
+
+- Un path debe empezar con `/`.
+- Un path no puede contener `//`.
+- Un nombre de parámetro debe empezar con una letra y contener solo
+  letras, dígitos y `_`.
+- Un wildcard debe ser el último segmento.
+- El mismo nombre de parámetro no puede aparecer dos veces en un mismo
+  path.
+- El mismo método y path no pueden registrarse dos veces.
+- Dos rutas no pueden usar nombres de parámetro distintos en el mismo
+  slot en la misma posición — `'/users/:id'` y `'/users/:userId'` entran
+  en conflicto.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get('/users/:id/posts', ctx => ({ user: ctx.params.id }))  // same name, fine
+
+app.listen()
+```
+
+Los mensajes exactos están listados en
+[Registration errors](../errors/registration-errors.mdx).
+
+## Slashes finales
+
+Los segmentos vacíos se descartan antes de matchear, así que un slash
+final y uno repetido resuelven a la misma ruta:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/me', () => 'me')
+
+app.listen()
+```
+
+`GET /users/me`, `GET /users/me/` y `GET /users//me` llegan todos al
+mismo handler.
+
+## Handlers
+
+Un handler recibe el [context](../fundamentals/context.mdx) y retorna el
+cuerpo de la respuesta. Puede ser sync o async:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/sync', () => ({ ok: true }))
+
+app.get('/async', async () => {
+  const data = await Promise.resolve({ ok: true })
+  return data
+})
+
+app.listen()
+```
+
+La desestructuración funciona cuando solo necesitas parte del contexto:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ({ params }) => ({ id: params.id }))
+
+app.listen()
+```
+
+## Más allá de un solo archivo
+
+Las rutas pueden llevar su propio
+[middleware](../middleware/route-level.mdx) y
+[schemas de validation](../validation/overview.mdx), y una aplicación
+puede dividirse en [módulos](./modules.mdx) que se fusionan en un único
+árbol de rutas.

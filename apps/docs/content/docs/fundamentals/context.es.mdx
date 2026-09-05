@@ -1,0 +1,64 @@
+---
+title: Context
+description: El objeto `ctx` que recibe todo middleware, provider y handler, y cómo crece su tipo según lo que registres.
+---
+
+Todo middleware, provider y handler recibe el mismo tipo de objeto, `ctx`. Su forma
+base siempre está:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => {
+  // ctx.request  → the raw Request
+  // ctx.params   → { id: string }, inferred from the route literal
+  // ctx.query    → Record<string, string>, built from the URL's search params
+  // ctx.response → { status?: number; headers: Headers } until it materializes
+  return { id: ctx.params.id, referer: ctx.request.headers.get('referer') }
+})
+
+app.listen()
+```
+
+- `request` es el [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request) estándar — ver [Request](./request.mdx).
+- `params` se tipa a partir del literal de ruta que le pasaste a `.get()` (o de un
+  esquema de `params`, si la ruta declaró uno) — ver
+  [Parámetros de ruta](../routing/path-parameters.mdx).
+- `query` es `Record<string, string>` por defecto (o el output de un esquema),
+  construido de forma perezosa la primera vez que lo lees — ver
+  [Parámetros de query](../routing/query-parameters.mdx).
+- `response` empieza como `{ status?: number; headers: Headers }` y es lo que usas
+  para darle forma a una response antes de que se materialice — ver [Response](./response.mdx).
+
+## El context crece con lo que registras
+
+`ctx.body` solo aparece en rutas que declaran un esquema de `body`, y cualquier valor
+que devuelva una llamada a `provide()` se mezcla plano sobre `ctx` — sin namespace —
+para todo lo que se registre después:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app
+  .provide(() => ({ requestId: crypto.randomUUID() }))
+  .post('/users', {
+    body: v.object({ name: v.pipe(v.string(), v.minLength(1)) }),
+    handler: ctx => ({
+      requestId: ctx.requestId,
+      body: ctx.body
+    })
+  })
+
+app.listen()
+```
+
+`ctx.requestId` está disponible acá porque la llamada a `provide()` de arriba corrió
+primero; `ctx.body` está disponible porque esta ruta declaró un esquema de `body`.
+Ninguno de los dos estaría en `ctx` — ni pasaría el type-check — sin eso. Ver
+[Providers](../providers/overview.mdx) para cómo compone `provide()`, y
+[Body](../validation/body.mdx) para `ctx.body`.

@@ -1,0 +1,215 @@
+---
+title: WebSockets
+description: Registrar rutas WebSocket con app.ws(), los callbacks del handler, y cómo se combinan los sockets con los módulos.
+---
+
+`app.ws()` registra una ruta WebSocket en el mismo servidor que tus
+rutas HTTP:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => ({ ok: true }))
+
+app.ws('/chat', {
+  message(ws, message) {
+    ws.send(`echo: ${message}`)
+  }
+})
+
+app.listen({ port: 3000 })
+```
+
+Un cliente que se conecta a `ws://localhost:3000/chat` recibe el upgrade
+automáticamente. Todo lo demás en el servidor sigue funcionando sobre
+HTTP.
+
+## El handler
+
+`message` es el único callback requerido. `open`, `close` y `drain` son
+opcionales:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.ws('/chat', {
+  open(ws) {
+    ws.send('connected')
+  },
+  message(ws, message) {
+    ws.send(`echo: ${message}`)
+  },
+  close(ws, code, reason) {
+    console.log('closed', code, reason)
+  },
+  drain(ws) {
+    console.log('socket ready for more data')
+  }
+})
+
+app.listen()
+```
+
+| Callback | Se llama cuando |
+|---|---|
+| `message(ws, message)` | llega un frame — `string` para texto, `ArrayBuffer` para binario |
+| `open(ws)` | la conexión quedó establecida |
+| `close(ws, code, reason)` | la conexión se cerró |
+| `drain(ws)` | un socket con backpressure puede aceptar más datos |
+
+Cada callback puede ser async.
+
+## El socket
+
+El valor `ws` que se pasa a cada callback ofrece dos métodos:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.ws('/chat', {
+  message(ws, message) {
+    if (message === 'bye') {
+      ws.close(1000, 'client said bye')
+      return
+    }
+
+    ws.send(`echo: ${message}`)
+  }
+})
+
+app.listen()
+```
+
+`send()` acepta un string, un `ArrayBuffer` o un typed array. `close()`
+toma un código y una razón opcionales.
+
+## Frames de texto y binarios
+
+`message` es un `string` para frames de texto y un `ArrayBuffer` para
+binarios, así que haz el narrowing antes de usarlo:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.ws('/upload', {
+  message(ws, message) {
+    if (typeof message === 'string') {
+      ws.send(`text of length ${message.length}`)
+      return
+    }
+
+    ws.send(`binary of ${message.byteLength} bytes`)
+  }
+})
+
+app.listen()
+```
+
+## Sockets en módulos
+
+Una ruta WebSocket registrada adentro de un [módulo](./modules.mdx)
+recibe los prefixes cuando se monta:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const chat = Arcton({ prefix: '/chat' })
+
+chat.ws('/room', {
+  message(ws, message) {
+    ws.send(`echo: ${message}`)
+  }
+})
+
+const app = Arcton({ prefix: '/api' })
+
+app.use(chat)
+
+app.listen()
+```
+
+El socket se sirve en `/api/chat/room`.
+
+## Soporte de runtime
+
+Las rutas WebSocket necesitan un adapter que las soporte; tanto el de
+Bun como el de Node.js lo hacen. La verificación ocurre cuando llamas a
+`listen()`, no cuando registras la ruta — montar un módulo todavía puede
+agregar rutas WebSocket después de una llamada a `ws()`, así que
+`listen()` es el primer momento en que se conoce el conjunto completo.
+
+```ts
+import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.ws('/chat', {
+  message(ws, message) {
+    ws.send(`echo: ${message}`)
+  }
+})
+
+app.listen({ adapter: nodeAdapter })
+```
+
+## En qué se diferencian las rutas ws de las rutas HTTP
+
+Las rutas WebSocket se matchean por path exacto — los segmentos
+`:param` y `*wildcard` pertenecen a las rutas HTTP. También las sirve
+directamente el adapter en vez del pipeline HTTP, así que una conexión
+de socket no corre [middleware](../middleware/overview.mdx),
+[providers](../providers/overview.mdx) ni
+[validation](../validation/overview.mdx), y los callbacks reciben el
+socket en vez de un [context](../fundamentals/context.mdx).
+
+Para controlar el acceso a una conexión, verifica adentro de `open` y
+cierra el socket cuando la verificación falle:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const rooms = new Set(['general', 'random'])
+
+const app = Arcton()
+
+app.ws('/room', {
+  open(ws) {
+    ws.send('joined')
+  },
+  message(ws, message) {
+    const room = String(message)
+
+    if (!rooms.has(room)) {
+      ws.close(1008, 'unknown room')
+      return
+    }
+
+    ws.send(`welcome to ${room}`)
+  }
+})
+
+app.listen()
+```
+
+## Conectarse desde un cliente
+
+```ts
+const socket = new WebSocket('ws://localhost:3000/chat')
+
+socket.addEventListener('open', () => {
+  socket.send('hello')
+})
+
+socket.addEventListener('message', event => {
+  console.log(event.data)
+})
+```
