@@ -1,0 +1,68 @@
+---
+title: Estructura del proyecto
+description: Qué genera el scaffold para los templates de Bun y Node.js.
+---
+
+El scaffold de [instalación](./installation.mdx) copia uno de dos templates pequeños
+según el runtime que elijas. Ambos son intencionalmente mínimos — una dependencia, un
+archivo de código fuente.
+
+## Template de Bun
+
+```text
+my-arcton-app/
+├── package.json
+└── src/
+    └── index.ts
+```
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => {
+  return 'Hello, Arcton!'
+})
+
+app.listen()
+```
+
+`package.json` depende de `@arcton/core` y declara tres scripts —
+`dev`, `start` y `compile` — cubiertos en [Desarrollo](./development.mdx) y
+[Despliegue](./deployment.mdx).
+
+## Template de Node.js
+
+```text
+my-arcton-app/
+├── package.json
+├── tsconfig.json
+└── src/
+    └── index.ts
+```
+
+```ts
+import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => {
+  return 'Hello, Arcton!'
+})
+
+app.listen({ adapter: nodeAdapter })
+```
+
+La única diferencia respecto al template de Bun es la dependencia extra
+`@arcton/adapter-node` y la opción `adapter: nodeAdapter` que se pasa a `listen()` — ver
+[Runtimes](../fundamentals/application.mdx) para entender por qué esa es la única línea
+que cambia. Acá `package.json` declara `dev`, `build` y `start`, y
+`tsconfig.json` configura el build de TypeScript que usa el script `build`.
+
+## Creciendo desde acá
+
+Ambos templates son una app de Arcton normal — todo lo de
+[Fundamentos](../fundamentals/application.mdx),
+[Enrutamiento](../routing/overview.mdx) y más allá aplica directamente a `src/index.ts`.

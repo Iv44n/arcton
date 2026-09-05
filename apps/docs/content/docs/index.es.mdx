@@ -1,0 +1,95 @@
+---
+title: Arcton
+description: Un framework backend para TypeScript estructurado para aplicaciones reales, con enrutamiento basado en prioridad, contexto tipado y un núcleo desacoplado del runtime.
+---
+
+Arcton es un framework backend para TypeScript. Escribes handlers que
+retornan valores, compones comportamiento con middleware, y organizas una
+aplicación en módulos que se fusionan en un único árbol de rutas.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => ({ message: 'Welcome to Arcton' }))
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.listen({ port: 3000 })
+```
+
+`ctx.params.id` está tipado como `string` porque el literal de la ruta lo
+dice — sin argumento genérico, sin cast. El objeto retornado se convierte en
+una respuesta JSON.
+
+## Empezá acá
+
+<Cards>
+  <Card
+    title="¿Qué es Arcton?"
+    description="El problema que resuelve y la forma de una app de Arcton."
+    href="./introduction/what-is-arcton.mdx"
+  />
+  <Card
+    title="Instalación"
+    description="Crea un proyecto para Bun o Node.js en un solo comando."
+    href="./getting-started/installation.mdx"
+  />
+  <Card
+    title="Tu primer servidor"
+    description="De un directorio vacío a una API HTTP funcionando."
+    href="./getting-started/first-server.mdx"
+  />
+  <Card
+    title="Enrutamiento"
+    description="Segmentos estáticos, dinámicos y wildcard, y cuál gana."
+    href="./routing/overview.mdx"
+  />
+</Cards>
+
+## Aprendé el modelo
+
+Cuatro ideas cubren la mayor parte de Arcton. Leelas en este orden:
+
+<Cards>
+  <Card
+    title="Context"
+    description="El único objeto que recibe un handler: request, params, query, response."
+    href="./fundamentals/context.mdx"
+  />
+  <Card
+    title="Middleware"
+    description="Composición en capas (onion), y el orden de registro que la gobierna."
+    href="./middleware/overview.mdx"
+  />
+  <Card
+    title="Validation"
+    description="Standard Schema sobre params, query y body, con salida tipada."
+    href="./validation/overview.mdx"
+  />
+  <Card
+    title="Módulos"
+    description="Componé una aplicación a partir de instancias de Arcton que se fusionan al registrarse."
+    href="./routing/modules.mdx"
+  />
+</Cards>
+
+## Referencia
+
+<Cards>
+  <Card
+    title="API Reference"
+    description="Cada export público, con firmas, comportamiento y ejemplos."
+    href="./api/arcton.mdx"
+  />
+  <Card
+    title="Architecture"
+    description="Por qué el router, el pipeline y los adapters están construidos así."
+    href="./architecture/overview.mdx"
+  />
+</Cards>
+
+<Callout>
+  Arcton está en pre-1.0. La API descripta acá es la que se envía hoy.
+</Callout>

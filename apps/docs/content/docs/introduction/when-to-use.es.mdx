@@ -1,0 +1,82 @@
+---
+title: When to Use Arcton
+description: Los tipos de proyectos para los que Arcton encaja, y cómo se compara conceptualmente con Express, Hono, Elysia y NestJS.
+---
+
+Arcton apunta a servicios HTTP en TypeScript donde la forma de un request
+importa: parámetros tipados, input validado, y una aplicación que crece en
+módulos sin convertirse en una pila de routers.
+
+## Buenos casos de uso
+
+**APIs JSON.** Los handlers retornan valores y Arcton los serializa, así
+que un endpoint CRUD es una función que retorna un objeto.
+
+**Servicios con input validado.** Params, query y body toman cada uno un
+[Standard Schema](https://standardschema.dev/), y lo que llega al handler
+es la salida validada, ya coercionada y tipada.
+
+**Aplicaciones organizadas por dominio.** Cada área de la app es un módulo
+con su propio prefix, desarrollado en su propio archivo y montado en el
+padre — ver [Modules](../routing/modules.mdx).
+
+**Proyectos a los que les importa el path del request.** El árbol de
+rutas, el pipeline resuelto por ruta, y el parseo perezoso de query mueven
+todo el trabajo al tiempo de registro.
+
+**Código que debería correr en más de un runtime.** La aplicación se
+escribe contra Arcton; Bun o Node.js es un argumento de `listen()`.
+
+**Tiempo real junto con HTTP.** `app.ws()` registra rutas WebSocket en el
+mismo servidor que las rutas HTTP.
+
+## Comparaciones conceptuales
+
+Estas son analogías para orientarte, no afirmaciones de compatibilidad.
+Arcton tiene su propia API, y el código no se porta sin cambios.
+
+**Si vienes de Express.** El middleware te va a resultar familiar: una
+función que recibe el contexto del request y un `next` que puede
+awaitear, con código después de `await next()` corriendo a la salida. Dos
+cosas difieren. Los handlers retornan un valor en vez de llamar a un
+método `res`, y `use()` aplica a las rutas registradas después en vez de
+a todo el archivo. Ver
+[Execution order](../middleware/execution-order.mdx).
+
+**Si vienes de Hono o Elysia.** El handler que retorna un valor y el
+modelo de runtime-adapter te van a resultar familiares. Arcton deriva
+`ctx.params` del literal de la ruta con el mismo espíritu, mantiene los
+valores provistos planos sobre el contexto a través de
+[`provide()`](../providers/overview.mdx), y fusiona módulos en un único
+árbol de rutas al registrarse.
+
+**Si vienes de NestJS.** La unidad de organización acá también es un
+módulo, pero es una instancia simple de `Arcton()` en vez de una clase
+con decorators, y `provide()` compone contexto tipado por request en vez
+de resolver un grafo de dependencias. Si quieres inyección por
+constructor y decorators, ese es un modelo distinto al que ofrece
+Arcton.
+
+**Si vienes de Fastify.** La validación basada en schemas te va a resultar
+natural. Arcton acepta cualquier librería de Standard Schema en vez de
+una específica, y el tipo de salida del schema fluye hacia el handler.
+
+## Qué esperar de un pre-1.0
+
+Arcton está en pre-1.0 y la API puede cambiar entre releases. Fija tus
+dependencias y lee las notas de release antes de actualizar.
+
+## Siguiente
+
+<Cards>
+  <Card
+    title="Instalación"
+    description="Crea un proyecto para Bun o Node.js."
+    href="../getting-started/installation.mdx"
+  />
+  <Card
+    title="Philosophy"
+    description="Los principios detrás de la API que estás por usar."
+    href="./philosophy.mdx"
+  />
+</Cards>
