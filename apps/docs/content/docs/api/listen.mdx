@@ -1,0 +1,129 @@
+---
+title: listen()
+description: Starts serving requests and returns a handle to the running server
+---
+
+`listen()` is the last call in an Arcton application:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+const server = app.listen({ port: 3000 })
+
+console.log(`Listening on ${server.url}`)
+```
+
+See [Listen options](../configuration/listen-options.mdx) for the usage-first guide.
+
+## listen
+
+**Purpose:** starts the server through the chosen [adapter](./adapters.mdx).
+
+**Signature**
+```ts
+import type { ArctonListenOptions } from '@arcton/core'
+import type { RuntimeServer } from '@arcton/contracts'
+
+declare function listen(options?: ArctonListenOptions): RuntimeServer
+```
+
+**Parameters:** an optional `ArctonListenOptions`, documented below.
+
+**Return type:** [`RuntimeServer`](#runtimeserver).
+
+**Behavior:** prints a startup banner — the Arcton figlet logo, the Arcton version, the runtime name and version, the `env`, and the listening URL — then returns a `RuntimeServer`. Routes, `use()`, and `provide()` calls made after `listen()` don't affect requests already flowing through routes registered before it, since each route's pipeline is snapshotted at registration time.
+
+**Errors:** if any [`ws()`](./arcton-app.mdx#ws) route is registered and the chosen adapter's `capabilities.websocket` is `false`, `listen()` throws `Runtime "<adapter.name>" does not support WebSocket routes.`. Both shipped adapters — [`bunAdapter` and `nodeAdapter`](./adapters.mdx) — support WebSockets, so this only matters with a custom adapter.
+
+## ArctonListenOptions
+
+**Purpose:** the options object accepted by `listen()`.
+
+**Signature**
+```ts
+import type { RuntimeAdapter } from '@arcton/contracts'
+
+interface ArctonListenOptions {
+  port?: number
+  hostname?: string
+  adapter?: RuntimeAdapter
+  env?: string
+}
+```
+
+**Parameters**
+
+<TypeTable
+  type={{
+    port: {
+      description: 'Port to listen on. 0 picks a free port — read the real one from server.port/server.url.',
+      type: 'number',
+      default: '3000'
+    },
+    hostname: {
+      description: 'Hostname to bind to.',
+      type: 'string'
+    },
+    adapter: {
+      description: 'The RuntimeAdapter used to serve requests.',
+      type: 'RuntimeAdapter',
+      default: 'bunAdapter'
+    },
+    env: {
+      description: "Labels the startup banner's Environment line. Nothing else reads it.",
+      type: 'string',
+      default: "process.env.NODE_ENV ?? 'development'"
+    }
+  }}
+/>
+
+**Behavior:** see [Environment](../configuration/environment.mdx) for what `env` does (and only does), [Runtime types](./runtime-types.mdx) for the `RuntimeAdapter` interface, and [Adapters](./adapters.mdx) for the `bunAdapter`/`nodeAdapter` values.
+
+## RuntimeServer
+
+**Purpose:** the handle `listen()` returns for the running server.
+
+**Signature**
+```ts
+interface RuntimeServer {
+  readonly port: number
+  readonly url: URL
+  stop(closeActiveConnections?: boolean): void | Promise<void>
+}
+```
+
+**Parameters**
+
+<TypeTable
+  type={{
+    port: { description: 'The bound port.', type: 'number' },
+    url: { description: 'The full listening URL.', type: 'URL' },
+    closeActiveConnections: {
+      description: "Passed to stop() — force-closes in-flight connections instead of waiting for them.",
+      type: 'boolean',
+      default: 'false'
+    }
+  }}
+/>
+
+**Behavior:** `port` and `url` reflect the address actually bound — useful when `port: 0` picked a free one. `stop()` shuts the server down; it returns `void` on the [Bun adapter](./adapters.mdx) and a `Promise<void>` on the [Node adapter](./adapters.mdx). This is the type used throughout [Testing](../testing/overview.mdx) to start a server on `port: 0`, exercise it with real `fetch` calls, and tear it down afterward.
+
+**Example**
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'ok')
+
+const server = app.listen({ port: 0 })
+
+const res = await fetch(server.url)
+console.log(res.status, server.port)
+
+await server.stop()
+```

@@ -1,0 +1,185 @@
+---
+title: Path Parameters
+description: Capturing dynamic and wildcard segments, the types Arcton infers for them, and how captured values are decoded.
+---
+
+A `:name` segment captures one path segment:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.listen()
+```
+
+`GET /users/42` returns `{"id":"42"}`.
+
+## Types come from the path
+
+Arcton reads the route literal and types `ctx.params` from it. No generic
+argument is involved:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/orgs/:orgId/repos/:repoId', ctx => {
+  // ctx.params is { orgId: string; repoId: string }
+  return { org: ctx.params.orgId, repo: ctx.params.repoId }
+})
+
+app.listen()
+```
+
+Reading a name the path does not declare is a compile error. A route with no
+parameters has no parameter keys to read.
+
+<Callout>
+  Inference needs a literal. If the path comes from a variable typed as
+  `string`, `ctx.params` falls back to `Record<string, string>`. Passing the
+  path inline keeps the precise type.
+</Callout>
+
+## Parameter values are strings
+
+Every captured value is a string, because that is what a URL carries. To work
+with a number, convert it — or declare a schema and let validation produce the
+converted value:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.get('/users/:id', {
+  params: v.object({
+    id: v.pipe(v.string(), v.transform(Number), v.number())
+  }),
+  handler: ctx => ({ id: ctx.params.id, type: typeof ctx.params.id })
+})
+
+app.listen()
+```
+
+`GET /users/42` now returns `{"id":42,"type":"number"}`. See
+[Params and query](../validation/params-and-query.mdx).
+
+## Wildcards
+
+A `*name` segment captures everything left in the path, joined with `/`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/files/*path', ctx => ({ path: ctx.params.path }))
+
+app.listen()
+```
+
+| Request | `ctx.params.path` |
+|---|---|
+| `/files/readme.md` | `readme.md` |
+| `/files/docs/api/index.html` | `docs/api/index.html` |
+
+A wildcard must be the last segment of the path, and it needs at least one
+segment to match: with only `/files/*path` registered, `GET /files` and
+`GET /files/` produce a `404`. Register `/files` separately if you want to
+answer it.
+
+Because a wildcard accepts any remainder, validate the captured value before
+using it to reach anything on disk:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const files: Record<string, string> = {
+  'readme.md': '# Arcton',
+  'docs/intro.md': 'Welcome'
+}
+
+const app = Arcton()
+
+app.get('/files/*path', ctx => {
+  const segments = ctx.params.path.split('/')
+
+  if (segments.some(segment => segment === '..' || segment === '')) {
+    return new Response('Invalid path', { status: 400 })
+  }
+
+  const content = files[ctx.params.path]
+  if (content === undefined) {
+    return new Response('Not found', { status: 404 })
+  }
+
+  return new Response(content, { headers: { 'content-type': 'text/plain' } })
+})
+
+app.listen()
+```
+
+## Percent-encoded values
+
+Captured values are percent-decoded; the static parts of the path are matched
+as written. `GET /users/hello%20world` gives `ctx.params.id === 'hello world'`.
+A value whose escape sequence is malformed is handed to you exactly as it
+arrived rather than failing the request.
+
+## Multiple parameters
+
+Any number of dynamic segments can appear in one path, as long as their names
+differ:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/:year/:month/:slug', ctx => ({
+  year: ctx.params.year,
+  month: ctx.params.month,
+  slug: ctx.params.slug
+}))
+
+app.listen()
+```
+
+A dynamic and a wildcard segment can also share a path, with the wildcard last:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id/files/*path', ctx => ({
+  user: ctx.params.id,
+  path: ctx.params.path
+}))
+
+app.listen()
+```
+
+## Same position, same name
+
+Routes that share a prefix must agree on the parameter name in each position:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get('/users/:id/posts', ctx => ({ user: ctx.params.id }))
+
+app.listen()
+```
+
+Writing `'/users/:userId/posts'` alongside `'/users/:id'` throws at
+registration, because one position would capture under two names. See
+[Registration errors](../errors/registration-errors.mdx).

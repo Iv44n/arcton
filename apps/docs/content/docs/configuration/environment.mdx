@@ -1,0 +1,72 @@
+---
+title: Environment
+description: What the env option does and how to read environment variables in each runtime.
+---
+
+## What `env` does
+
+`app.listen()` takes an `env` option that defaults to
+`process.env.NODE_ENV ?? 'development'`. It is used for exactly one thing: the
+label printed on the startup banner.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen({ env: 'staging' })
+```
+
+The banner then prints `Environment  staging` instead of the default. See
+[Listen options](./listen-options.mdx) for the rest of what `listen()`
+prints and returns.
+
+## Reading environment variables
+
+Beyond that one label, environment variables are read the normal way for
+whichever runtime is serving the app — there's no Arcton-specific config
+layer to go through.
+
+On Bun, `.env` files are loaded automatically, so `process.env` already has
+whatever a `.env` file defines by the time your code runs:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+const databaseUrl = process.env.DATABASE_URL
+
+app.get('/health', () => ({ ok: databaseUrl !== undefined }))
+
+app.listen()
+```
+
+On Node.js, read `process.env` the same way. Load a `.env` file first if you
+use one — for example with Node's own `--env-file` flag when starting the
+process:
+
+```bash
+node --env-file=.env dist/index.js
+```
+
+```ts
+import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+const databaseUrl = process.env.DATABASE_URL
+
+app.get('/health', () => ({ ok: databaseUrl !== undefined }))
+
+app.listen({ adapter: nodeAdapter })
+```
+
+<Callout>
+  `NODE_ENV` isn't read for anything but the `env` default above — if your own
+  code branches on it (feature flags, logging verbosity, and so on), read
+  `process.env.NODE_ENV` directly, the same as `app.listen()` does.
+</Callout>

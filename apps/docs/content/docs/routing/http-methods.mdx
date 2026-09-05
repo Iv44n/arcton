@@ -1,0 +1,126 @@
+---
+title: HTTP Methods
+description: The seven method shorthands, registering several methods on one path, and how Arcton answers a method it has no handler for.
+---
+
+Each HTTP method has its own registration method:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.post('/users', () => ({ created: true }))
+app.put('/users/:id', ctx => ({ replaced: ctx.params.id }))
+app.patch('/users/:id', ctx => ({ updated: ctx.params.id }))
+app.delete('/users/:id', ctx => ({ deleted: ctx.params.id }))
+app.head('/users/:id', () => {})
+app.options('/users', () => {})
+
+app.listen()
+```
+
+The seven available are `get`, `post`, `put`, `delete`, `patch`, `head` and
+`options`. They behave identically apart from the method they answer, and all
+of them accept the same two call shapes — a handler with optional
+[route middleware](../middleware/route-level.mdx), or an
+[options object](../validation/overview.mdx) with schemas.
+
+## Several methods on one path
+
+Register them one at a time. Because every call returns the app, a resource
+reads as a block:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .get('/users/:id', ctx => ({ id: ctx.params.id }))
+  .put('/users/:id', ctx => ({ replaced: ctx.params.id }))
+  .delete('/users/:id', ctx => ({ deleted: ctx.params.id }))
+
+app.listen()
+```
+
+Registering the same method and path twice throws at registration — see
+[Registration errors](../errors/registration-errors.mdx).
+
+## Method not allowed
+
+When a request's path matches but its method has no handler, Arcton answers
+`405` with an `Allow` header listing the methods that path does answer:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.post('/users/:id', ctx => ({ updated: ctx.params.id }))
+
+app.listen()
+```
+
+`DELETE /users/42` returns `405` with `Allow: GET, POST` and an empty body.
+
+The path that answers is the most specific one that matched, and matching does
+not continue past it looking for another pattern that supports the method —
+[Precedence](./precedence.mdx) works through the consequences.
+
+## HEAD and OPTIONS
+
+Both are ordinary methods here: they answer when you register them.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.head('/users/:id', ctx => {
+  ctx.response.headers.set('Content-Type', 'application/json')
+})
+
+app.options('/users/:id', ctx => {
+  ctx.response.status = 204
+  ctx.response.headers.set('Allow', 'GET, HEAD, OPTIONS')
+})
+
+app.listen()
+```
+
+For cross-origin preflight requests, [`@arcton/cors`](../middleware/cors.mdx)
+handles the `OPTIONS` exchange for you, and it only intercepts requests that
+carry `Access-Control-Request-Method` — so an `app.options()` route you
+register for your own purposes keeps working alongside it.
+
+## Choosing a status code
+
+A handler answers `200` unless you say otherwise. Set `ctx.response.status`
+before returning:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.post('/users', ctx => {
+  ctx.response.status = 201
+  ctx.response.headers.set('Location', '/users/42')
+
+  return { id: '42' }
+})
+
+app.delete('/users/:id', ctx => {
+  ctx.response.status = 204
+})
+
+app.listen()
+```
+
+`204`, `205` and `304` always send an empty body, whatever the handler returns.
+See [Response](../fundamentals/response.mdx).

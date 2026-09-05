@@ -1,0 +1,64 @@
+---
+title: Context
+description: The `ctx` object every middleware, provider and handler receives, and how its type grows with what you register.
+---
+
+Every middleware, provider and handler receives the same kind of object,
+`ctx`. Its base shape is always there:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => {
+  // ctx.request  → the raw Request
+  // ctx.params   → { id: string }, inferred from the route literal
+  // ctx.query    → Record<string, string>, built from the URL's search params
+  // ctx.response → { status?: number; headers: Headers } until it materializes
+  return { id: ctx.params.id, referer: ctx.request.headers.get('referer') }
+})
+
+app.listen()
+```
+
+- `request` is the standard [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request) — see [Request](./request.mdx).
+- `params` is typed from the route literal you passed to `.get()` (or from a
+  `params` schema, if the route declared one) — see
+  [Path Parameters](../routing/path-parameters.mdx).
+- `query` is `Record<string, string>` by default (or a schema's output),
+  built lazily the first time you read it — see
+  [Query Parameters](../routing/query-parameters.mdx).
+- `response` starts as `{ status?: number; headers: Headers }` and is what you
+  shape a response through before it materializes — see [Response](./response.mdx).
+
+## Context grows with what you register
+
+`ctx.body` only appears on routes that declare a `body` schema, and any value
+a `provide()` call returns is merged flat onto `ctx` — no namespace — for
+everything registered after it:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app
+  .provide(() => ({ requestId: crypto.randomUUID() }))
+  .post('/users', {
+    body: v.object({ name: v.pipe(v.string(), v.minLength(1)) }),
+    handler: ctx => ({
+      requestId: ctx.requestId,
+      body: ctx.body
+    })
+  })
+
+app.listen()
+```
+
+`ctx.requestId` is available here because the `provide()` call above it ran
+first; `ctx.body` is available because this route declared a `body` schema.
+Neither would be on `ctx` — or type-check — without those. See
+[Providers](../providers/overview.mdx) for how `provide()` composes, and
+[Body](../validation/body.mdx) for `ctx.body`.

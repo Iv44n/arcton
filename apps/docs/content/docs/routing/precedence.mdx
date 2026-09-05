@@ -1,0 +1,142 @@
+---
+title: Route Precedence
+description: Which route wins when several could match, how backtracking works, and why a method mismatch stops the search.
+---
+
+When more than one route could match a request, Arcton follows two rules:
+**static beats dynamic beats wildcard**, applied one segment at a time, with
+backtracking when a branch dead-ends.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/me', () => 'the current user')
+app.get('/users/:id', ctx => `user ${ctx.params.id}`)
+app.get('/users/*path', ctx => `anything else: ${ctx.params.path}`)
+
+app.listen()
+```
+
+| Request | Wins | Why |
+|---|---|---|
+| `GET /users/me` | `/users/me` | a static segment is tried first |
+| `GET /users/42` | `/users/:id` | no static `42`, so the dynamic slot takes it |
+| `GET /users/a/b/c` | `/users/*path` | more segments than `:id` can hold |
+
+Registration order does not matter. Moving `/users/me` to the bottom of the
+file changes nothing — precedence is a property of the path, not of when you
+wrote it.
+
+## Matching walks the path
+
+Arcton stores routes in a tree, one node per segment. At each node it tries the
+static child first, then the dynamic slot, then the wildcard slot.
+
+For `GET /users/42` against the routes above:
+
+```text
+/users/42
+  ├─ "users"  → static child exists          ✓ descend
+  └─ "42"     → static child "me"?           ✗
+               dynamic slot ":id"?           ✓ capture id="42", descend
+               node has a GET handler        ✓ match
+```
+
+## Backtracking
+
+If a branch matches for a while and then dead-ends, Arcton backs out and tries
+the next slot at the point where it still had options, discarding whatever
+parameters that abandoned branch captured.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/a/:b/c', ctx => `deep: ${ctx.params.b}`)
+app.get('/a/*rest', ctx => `rest: ${ctx.params.rest}`)
+
+app.listen()
+```
+
+| Request | Result |
+|---|---|
+| `GET /a/x/c` | `deep: x` — the dynamic branch reaches `c` and matches |
+| `GET /a/x/y` | `rest: x/y` — `y` is not `c`, so matching backs out to the wildcard |
+
+The `b` captured on the way into the abandoned branch is discarded, so the
+handler that finally runs never sees a parameter from a path that did not
+match.
+
+## A method mismatch ends the search
+
+Backtracking applies to *paths*, not to methods. Once matching reaches a node
+that has handlers, that node answers — with the handler for this method if it
+has one, and with `405` if it does not. Arcton does not keep looking for
+another path pattern that happens to support the method.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/me', () => 'the current user')
+app.post('/users/:id', ctx => `updated ${ctx.params.id}`)
+
+app.listen()
+```
+
+| Request | Response |
+|---|---|
+| `GET /users/me` | `200` |
+| `POST /users/42` | `200` |
+| `POST /users/me` | `405` with `Allow: GET` |
+
+`POST /users/me` reaches the `/users/me` node, which only answers `GET`, so it
+returns `405` — even though `/users/:id` would have accepted the `POST`.
+
+<Callout>
+  The most specific path that matches is the one that answers. If a static path
+  should accept the same methods as the dynamic route beside it, register those
+  methods on the static path too.
+</Callout>
+
+Making the example above answer both:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/me', () => 'the current user')
+app.post('/users/me', () => 'updated the current user')
+app.post('/users/:id', ctx => `updated ${ctx.params.id}`)
+
+app.listen()
+```
+
+## No match at all
+
+When no path in the tree matches, the response is `404` with an empty body.
+Global middleware still runs on it, which is how logging and CORS headers reach
+those responses — see [Global middleware](../middleware/global.mdx).
+
+## Wildcards need something to capture
+
+A wildcard matches one or more segments, never zero:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/files', () => 'the index')
+app.get('/files/*path', ctx => `file: ${ctx.params.path}`)
+
+app.listen()
+```
+
+Without that first route, `GET /files` would be a `404`, because `*path` has
+nothing to capture.

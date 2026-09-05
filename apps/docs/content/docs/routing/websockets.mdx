@@ -1,0 +1,211 @@
+---
+title: WebSockets
+description: Registering WebSocket routes with app.ws(), the handler callbacks, and how sockets combine with modules.
+---
+
+`app.ws()` registers a WebSocket route on the same server as your HTTP routes:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => ({ ok: true }))
+
+app.ws('/chat', {
+  message(ws, message) {
+    ws.send(`echo: ${message}`)
+  }
+})
+
+app.listen({ port: 3000 })
+```
+
+A client connecting to `ws://localhost:3000/chat` is upgraded automatically.
+Everything else on the server keeps working over HTTP.
+
+## The handler
+
+`message` is the only required callback. `open`, `close` and `drain` are
+optional:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.ws('/chat', {
+  open(ws) {
+    ws.send('connected')
+  },
+  message(ws, message) {
+    ws.send(`echo: ${message}`)
+  },
+  close(ws, code, reason) {
+    console.log('closed', code, reason)
+  },
+  drain(ws) {
+    console.log('socket ready for more data')
+  }
+})
+
+app.listen()
+```
+
+| Callback | Called when |
+|---|---|
+| `message(ws, message)` | a frame arrives — `string` for text, `ArrayBuffer` for binary |
+| `open(ws)` | the connection has been established |
+| `close(ws, code, reason)` | the connection closed |
+| `drain(ws)` | a backpressured socket can accept more data |
+
+Each callback may be async.
+
+## The socket
+
+The `ws` value passed to every callback offers two methods:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.ws('/chat', {
+  message(ws, message) {
+    if (message === 'bye') {
+      ws.close(1000, 'client said bye')
+      return
+    }
+
+    ws.send(`echo: ${message}`)
+  }
+})
+
+app.listen()
+```
+
+`send()` accepts a string, an `ArrayBuffer` or a typed array. `close()` takes
+an optional code and reason.
+
+## Text and binary frames
+
+`message` is a `string` for text frames and an `ArrayBuffer` for binary ones,
+so narrow before using it:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.ws('/upload', {
+  message(ws, message) {
+    if (typeof message === 'string') {
+      ws.send(`text of length ${message.length}`)
+      return
+    }
+
+    ws.send(`binary of ${message.byteLength} bytes`)
+  }
+})
+
+app.listen()
+```
+
+## Sockets in modules
+
+A WebSocket route registered inside a [module](./modules.mdx) picks up the
+prefixes when it is mounted:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const chat = Arcton({ prefix: '/chat' })
+
+chat.ws('/room', {
+  message(ws, message) {
+    ws.send(`echo: ${message}`)
+  }
+})
+
+const app = Arcton({ prefix: '/api' })
+
+app.use(chat)
+
+app.listen()
+```
+
+The socket is served at `/api/chat/room`.
+
+## Runtime support
+
+WebSocket routes need an adapter that supports them; both the Bun and the
+Node.js adapters do. The check happens when you call `listen()`, not when you
+register the route — mounting a module can still add WebSocket routes after a
+`ws()` call, so `listen()` is the first moment the complete set is known.
+
+```ts
+import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.ws('/chat', {
+  message(ws, message) {
+    ws.send(`echo: ${message}`)
+  }
+})
+
+app.listen({ adapter: nodeAdapter })
+```
+
+## How ws routes differ from HTTP routes
+
+WebSocket routes are matched by exact path — `:param` and `*wildcard` segments
+belong to HTTP routes. They are also served directly by the adapter rather than
+through the HTTP pipeline, so a socket connection does not run
+[middleware](../middleware/overview.mdx), [providers](../providers/overview.mdx)
+or [validation](../validation/overview.mdx), and the callbacks receive the
+socket rather than a [context](../fundamentals/context.mdx).
+
+To gate a connection, check inside `open` and close the socket when the check
+fails:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const rooms = new Set(['general', 'random'])
+
+const app = Arcton()
+
+app.ws('/room', {
+  open(ws) {
+    ws.send('joined')
+  },
+  message(ws, message) {
+    const room = String(message)
+
+    if (!rooms.has(room)) {
+      ws.close(1008, 'unknown room')
+      return
+    }
+
+    ws.send(`welcome to ${room}`)
+  }
+})
+
+app.listen()
+```
+
+## Connecting from a client
+
+```ts
+const socket = new WebSocket('ws://localhost:3000/chat')
+
+socket.addEventListener('open', () => {
+  socket.send('hello')
+})
+
+socket.addEventListener('message', event => {
+  console.log(event.data)
+})
+```

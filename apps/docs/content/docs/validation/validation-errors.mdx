@@ -1,0 +1,84 @@
+---
+title: Validation Errors
+description: The exact response Arcton sends when params, query or body validation fails.
+---
+
+When a `params`, `query` or `body` schema fails, Arcton responds `400` with an
+`application/json` body carrying the issues the schema reported:
+
+```json
+{
+  "issues": [
+    { "message": "Invalid length: Expected >=1 but received 0", "path": ["..."] }
+  ]
+}
+```
+
+The `issues` array is exactly what your schema library returned from its own
+validation call — Arcton doesn't reshape or filter it. Every issue has a
+`message`, and each library adds its own fields alongside it.
+
+Valibot, for example, returns issues carrying `kind`, `type`, `input`,
+`expected`, `received` and `requirement`, with a `path` of segment objects
+rather than plain keys:
+
+```json
+{
+  "issues": [
+    {
+      "kind": "validation",
+      "type": "min_length",
+      "input": "",
+      "expected": ">=1",
+      "received": "0",
+      "message": "Invalid length: Expected >=1 but received 0",
+      "requirement": 1,
+      "path": [{ "type": "object", "origin": "value", "key": "item" }]
+    }
+  ]
+}
+```
+
+Zod and ArkType report their own shapes. Read `message` when you need something
+stable across libraries, and treat the rest as specific to the one you chose —
+if a client depends on the exact fields, pin the schema library that produces
+them.
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/users', {
+  body: v.object({
+    email: v.pipe(v.string(), v.email())
+  }),
+  handler: ctx => ({ created: ctx.body })
+})
+
+app.listen()
+```
+
+A `POST /users` with a body whose `email` field fails `v.email()` gets the
+`400` above; a request whose `email` passes reaches the handler with
+`ctx.body.email` already validated.
+
+## What short-circuits and what doesn't
+
+Validation runs **params → query → body**, and the first failing schema stops
+the request right there — nothing after it in that order runs, and neither
+does any route middleware or the handler. See
+[Validation Overview](./overview.mdx).
+
+Two related failures happen outside schema validation itself, before your
+schema ever sees a value:
+
+- An unsupported request `Content-Type` for a route with a `body` schema
+  responds `415`, before any parsing or validation is attempted.
+- A built-in parser that can't make sense of the body at all (malformed JSON,
+  for instance) responds `400` with a fixed
+  `{"issues":[{"message":"Invalid request body"}]}` — this message isn't from
+  your schema, since the schema never got a value to validate.
+
+Both are covered in full in [Body Parsers](./body-parsers.mdx).

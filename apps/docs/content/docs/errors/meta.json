@@ -1,0 +1,10 @@
+{
+  "title": "Errors",
+  "icon": "TriangleAlert",
+  "pages": [
+    "overview",
+    "responding-with-errors",
+    "uncaught-errors",
+    "registration-errors"
+  ]
+}

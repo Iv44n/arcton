@@ -1,0 +1,55 @@
+---
+title: App Config
+description: Give an Arcton instance a path prefix with ArctonConfig.
+---
+
+## Giving an instance a prefix
+
+Every `Arcton()` instance takes an optional config object. It has exactly one
+field: `prefix`.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton({ prefix: '/api' })
+
+app.get('/users', () => ({ users: [] }))
+
+app.listen()
+```
+
+With `prefix: '/api'`, the route above is reachable at `GET /api/users`. The
+prefix is applied to every route and `ws()` route registered directly on this
+instance — you write `'/users'`, Arcton serves `/api/users`.
+
+## Reading the config back
+
+`app.config` exposes the exact object you passed to `Arcton()`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton({ prefix: '/api' })
+
+console.log(app.config.prefix) // '/api'
+
+app.listen()
+```
+
+## Rules for `prefix`
+
+- `prefix` must be a **static path** — a `:param` or `*wildcard` segment
+  throws when you call `Arcton()`. See
+  [Registration errors](../errors/registration-errors.mdx) for the exact
+  error.
+- `'/'` and omitting `prefix` entirely are equivalent — both mean no prefix.
+- When a module (an `Arcton()` instance mounted with `app.use(module)`) has
+  its own prefix, the parent's prefix and the module's prefix compose. See
+  [Modules](../routing/modules.mdx) for how that composition works.
+
+<Callout>
+  `prefix` only affects routes and `ws()` routes registered directly on that
+  instance. It has nothing to do with `use(scope, middleware)` — a scope is a
+  separate, unprefixed path comparison. See [Scoped
+  middleware](../middleware/scoped.mdx).
+</Callout>

@@ -1,0 +1,66 @@
+---
+title: Typed Context
+description: How provide() grows the type of ctx for everything registered after it, without a namespace.
+---
+
+Every `provide()` call returns a new app value whose type carries the added
+field, for whatever gets registered on *that returned value* afterward:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .get('/before', () => {
+    // ctx has no `user` here — the provide() below hasn't run yet
+    // in registration order
+    return { ok: true }
+  })
+  .provide(ctx => ({
+    user: ctx.request.headers.get('authorization') ? { id: 1 } : null
+  }))
+  .get('/after', ctx => ({ user: ctx.user }))
+
+app.listen()
+```
+
+`ctx.user` type-checks on `/after` and not on `/before`, because `/after` is
+registered on the value `.provide()` returned, and `/before` is registered on
+the value before it.
+
+`provide()` doesn't retroactively widen the type of an `app` you already have
+— it hands back a new, wider-typed one. Registering anything that needs a
+provided value has to happen on that returned value, whether by chaining like
+the example above or by reassigning, e.g. `app = app.provide(...)` with `app`
+declared `let`. Calling `.provide()` and then continuing to register routes
+as separate statements on the original `const app` won't type-check, even
+though the value is present on `ctx` at runtime either way.
+
+## Flat, not namespaced
+
+A provided value sits directly on `ctx` — there's no wrapper object to reach
+through:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .provide(() => ({ user: { id: 1, name: 'Alice' } }))
+  .get('/me', ctx => ctx.user)
+
+app.listen()
+```
+
+## Reserved keys
+
+A `provide()` call can't reuse a key that's already there. That includes the
+base `Context` fields — `request`, `params`, `query`, `response`, `body` — and
+any key a previous `provide()` in the chain already added. Both are enforced
+at the type level: reusing one is a compile error.
+
+See [Providers Overview](./overview.mdx) for the request-by-request mechanics,
+and [Context](../fundamentals/context.mdx) for the base fields a provided
+value sits alongside.

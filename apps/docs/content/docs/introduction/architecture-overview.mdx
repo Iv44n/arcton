@@ -1,0 +1,97 @@
+---
+title: Architecture Overview
+description: How an Arcton request flows from the runtime through the adapter, the router and the pipeline to your handler.
+---
+
+An Arcton application has four layers. This page is the map; each layer has a
+deeper page under [Architecture](../architecture/overview.mdx).
+
+```text
+        Bun  /  Node.js                    the runtime
+               │
+        RuntimeAdapter                     @arcton/adapter-bun | @arcton/adapter-node
+               │  Request
+               ▼
+          route tree                       match method + pathname
+               │  handler + params
+               ▼
+        pipeline (steps)                   middleware · providers · validation
+               │  returned value
+               ▼
+       response mapping                    value → Response
+```
+
+## The adapter owns the runtime
+
+`listen()` hands the adapter one `fetch`-style function and a list of
+WebSocket routes. The adapter starts a real server, converts whatever the
+runtime uses into a standard `Request`, and writes the `Response` back.
+
+Because that is the whole contract, the same application runs on Bun or on
+Node.js by changing one option:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { nodeAdapter } from '@arcton/adapter-node'
+
+const app = Arcton()
+
+app.get('/', () => ({ ok: true }))
+
+app.listen({ adapter: nodeAdapter })
+```
+
+## The router matches paths
+
+Routes are stored in a tree. Each node holds a map of static children plus one
+dynamic slot and one wildcard slot, so following a path is a series of direct
+lookups rather than a scan over a list of patterns.
+
+Matching tries static, then dynamic, then wildcard, and backtracks when a
+branch dead-ends. See [Precedence](../routing/precedence.mdx) for what that
+means when you write overlapping routes, and [Router](../architecture/router.mdx)
+for why the tree is shaped this way.
+
+## The pipeline is resolved when you register
+
+When you register a route, Arcton captures the middleware and providers that
+exist at that moment and stores the finished chain with the route. Nothing is
+re-resolved per request, and no request-time lookup can change which middleware
+a route runs.
+
+The order inside that chain is always:
+
+```text
+global middleware → validation → route middleware → handler
+```
+
+with each middleware wrapping the next, so post-`next()` code unwinds in
+reverse. See [Execution order](../middleware/execution-order.mdx).
+
+## Responses are mapped from values
+
+Whatever the handler returns is mapped to a `Response`: objects to JSON,
+strings to text, binary types to `application/octet-stream`, a `Response`
+straight through. `ctx.response` carries the status and headers accumulated
+along the way. See [Response](../fundamentals/response.mdx).
+
+## Modules merge into one tree
+
+`app.use(module)` grafts a module's route tree into the parent's tree at
+registration time, combining prefixes and wrapping the mounted handlers with
+the parent's middleware. After mounting there is one tree and one lookup per
+request, no matter how the application was organized in source.
+
+See [Modules](../routing/modules.mdx) and
+[Module composition](../architecture/module-composition.mdx).
+
+## Packages
+
+| Package | Role |
+|---|---|
+| `@arcton/core` | `Arcton()`, routing, pipeline, response mapping |
+| `@arcton/contracts` | the types both sides share, including `RuntimeAdapter` |
+| `@arcton/adapter-bun` | serves on Bun |
+| `@arcton/adapter-node` | serves on Node.js |
+| `@arcton/cors` | CORS middleware |
+| `arcton` | the CLI that scaffolds a project |

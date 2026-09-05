@@ -1,0 +1,73 @@
+---
+title: Your First Server
+description: Create an Arcton app, register a route, and start listening for requests.
+---
+
+An Arcton application starts as a single call to `Arcton()`. Register a route
+on it, then call `listen()`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen()
+```
+
+Run it with `bun src/index.ts` (or `tsx src/index.ts` on Node.js) and it
+listens on port 3000 by default, printing a startup banner with the URL it's
+serving.
+
+## Returning data
+
+Whatever the handler returns becomes the response body. Return a plain object
+or array and it's serialized as JSON automatically:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/health', () => ({ status: 'ok' }))
+
+app.listen()
+```
+
+The full set of return types Arcton understands — strings, objects, binary
+data, streams, a raw `Response` — is in [Response](../fundamentals/response.mdx).
+
+## Reading a path parameter
+
+A `:param` segment in the path is captured and typed on `ctx.params`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.listen()
+```
+
+See [Path Parameters](../routing/path-parameters.mdx) for how segments are
+matched, and [Application](../fundamentals/application.mdx) for the rest of
+what an app instance can do.
+
+## Choosing a port
+
+`listen()` takes an options object:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen({ port: 4000 })
+```
+
+The full list of options is in [Listen Options](../configuration/listen-options.mdx).

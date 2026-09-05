@@ -1,0 +1,115 @@
+---
+title: Runtime Support
+description: Running the same Arcton application on Bun or Node.js, and the differences between the two adapters.
+---
+
+The same application runs on Bun and on Node.js. Which runtime serves it is
+decided by the adapter you pass to `listen()`.
+
+## Bun
+
+Bun is the default. Passing no adapter uses `bunAdapter`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => ({ runtime: 'bun' }))
+
+app.listen({ port: 3000 })
+```
+
+Run it with `bun src/index.ts`. To be explicit, import the adapter yourself:
+
+```ts
+import { bunAdapter } from '@arcton/adapter-bun'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => ({ runtime: 'bun' }))
+
+app.listen({ adapter: bunAdapter })
+```
+
+## Node.js
+
+Install `@arcton/adapter-node` and pass it to `listen()`:
+
+```ts
+import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => ({ runtime: 'node' }))
+
+app.listen({ adapter: nodeAdapter })
+```
+
+Everything else — routes, middleware, providers, validation, response mapping
+— behaves identically. Only the adapter changes.
+
+## What both adapters do
+
+- Serve the application over HTTP and expose the bound `port` and `url`.
+- Convert the runtime's native request into a standard `Request`, and write a
+  standard `Response` back.
+- Upgrade [WebSocket routes](../routing/websockets.mdx) registered with
+  `app.ws()`.
+- Log an error thrown out of the request handler with `console.error` and
+  answer `500`.
+
+## Differences worth knowing
+
+| | Bun | Node.js |
+|---|---|---|
+| Package | `@arcton/adapter-bun` | `@arcton/adapter-node` |
+| `adapter.version` | `Bun.version` | the Node.js version without the leading `v` |
+| `server.stop()` | returns immediately | returns a promise to await |
+| `ws.data` | carries the upgrade payload | `undefined` |
+
+`stop()` is the one that shows up in code. On Node.js, await it:
+
+```ts
+import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'ok')
+
+const server = app.listen({ adapter: nodeAdapter })
+
+process.on('SIGTERM', async () => {
+  await server.stop()
+})
+```
+
+## Choosing a port
+
+`port` defaults to `3000`. Passing `0` binds a free port, which is how tests
+avoid collisions — read the real value back from the server:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'ok')
+
+const server = app.listen({ port: 0 })
+
+console.log(`listening on ${server.url}`)
+```
+
+See [Testing](../testing/overview.mdx) for the full pattern.
+
+## Other runtimes
+
+`RuntimeAdapter` is a public interface in `@arcton/contracts`: a `name`, a
+`version`, a `capabilities` object and a `serve()` function. Any runtime that
+can accept a `Request` and return a `Response` can back one. See
+[Runtime types](../api/runtime-types.mdx) and
+[Adapters](../architecture/adapters.mdx).

@@ -1,0 +1,129 @@
+---
+title: Responding with Errors
+description: Patterns for answering a request with a response that represents a failure
+---
+
+## Return a Response and skip the mapping entirely
+
+Returning a `Response` object from a handler is passed straight through — no
+header merge, no status validation. It's the most direct way to answer a
+request that can't succeed:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/profile', ctx => {
+  const token = ctx.request.headers.get('authorization')
+  if (token !== 'secret') {
+    return new Response('Unauthorized', { status: 401 })
+  }
+
+  return { user: 'Alice' }
+})
+
+app.listen()
+```
+
+## Set ctx.response.status and return a plain value
+
+If you'd rather keep returning a plain object and let Arcton serialize it to
+JSON, set the status on `ctx.response` before the handler returns:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.post('/orders', ctx => {
+  ctx.response.status = 201
+  return { created: true }
+})
+
+app.listen()
+```
+
+<Callout>
+`ctx.response.status` can only be set before the response body finalizes —
+inside the handler, or before `await next()` in a global or route middleware.
+Once the body finalizes (the handler returns, a step short-circuits, or a
+layer replaces the body after `next()`), `ctx.response` has become a real
+`Response`, whose `status` has no setter — assigning to it throws
+`TypeError: Attempted to assign to readonly property.`. Header mutation is
+different: `ctx.response.headers.set(...)` / `.append(...)` keeps working
+after `await next()` and still reaches the client.
+</Callout>
+
+```ts
+import type { Middleware } from '@arcton/contracts'
+import { Arcton } from '@arcton/core'
+
+const timing: Middleware = async (ctx, next) => {
+  const start = performance.now()
+  await next()
+  ctx.response.headers.set(
+    'X-Response-Time',
+    `${(performance.now() - start).toFixed(2)}ms`
+  )
+}
+
+const app = Arcton()
+
+app.use(timing)
+app.get('/health', () => ({ status: 'ok' }))
+
+app.listen()
+```
+
+## Catch a thrown error inside middleware
+
+A middleware is a plain async function, so wrapping `await next()` in a
+try/catch turns whatever the rest of the chain throws into a normal response:
+
+```ts
+import type { Middleware } from '@arcton/contracts'
+import { Arcton } from '@arcton/core'
+
+const catchErrors: Middleware = async (ctx, next) => {
+  try {
+    await next()
+  } catch (error) {
+    ctx.response.status = 500
+    return { error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
+const app = Arcton()
+
+app.use(catchErrors)
+
+app.get('/risky', () => {
+  throw new Error('boom')
+})
+
+app.listen()
+```
+
+Because the throw happens before the handler's own return value finalizes the
+response, `ctx.response.status` is still writable when the `catch` block
+runs.
+
+## Arcton's own responses
+
+A few responses come from Arcton itself, not from your code:
+
+- No route matches the request at all → `404` with an empty body.
+- A route exists for the path but not for this method → `405` with an
+  `Allow` header listing the methods that node does have (e.g.
+  `Allow: GET, POST`).
+- A `params`, `query` or `body` schema rejects the request → `400` with a
+  JSON body shaped `{"issues":[{"message":"...","path":[...]}]}` — see
+  [Validation errors](../validation/validation-errors.mdx).
+- The request's `Content-Type` has no parser registered for it → `415` with
+  an empty body — see [Body parsers](../validation/body-parsers.mdx).
+- A built-in parser can't parse the body (malformed JSON, for example) →
+  `400` with `{"issues":[{"message":"Invalid request body"}]}`.
+
+See [Response](../fundamentals/response.mdx) for the full mapping from a
+handler's return value to a `Response`.

@@ -1,0 +1,53 @@
+---
+title: Providers vs Middleware
+description: When to add typed values with provide() and when to use use() for control flow around a request.
+---
+
+`provide()` and `use()` both run per request, in registration order, and both
+can be mixed freely — but they exist for different jobs.
+
+A provider has no `next` and can't short-circuit; what it returns is merged
+onto `ctx` and the chain always continues. Middleware receives `next`, runs
+code before and after calling it, and can short-circuit by returning a value
+without calling `next()` at all — stopping everything downstream, including
+any provider or handler that would otherwise run.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .use(async (ctx, next) => {
+    console.log(ctx.request.method, new URL(ctx.request.url).pathname)
+    await next()
+  })
+  .provide(ctx => {
+    const authHeader = ctx.request.headers.get('authorization')
+    return {
+      user: authHeader === 'secret' ? { id: 1, name: 'Alice' } : null
+    }
+  })
+  .get(
+    '/profile',
+    async (ctx, next) => {
+      if (!ctx.user) return new Response('Unauthorized', { status: 401 })
+      await next()
+    },
+    ctx => ({ user: ctx.user })
+  )
+
+app.listen()
+```
+
+The logging `use()` at the top just observes the request; it doesn't add
+anything to `ctx`'s type. The `provide()` call attaches `user`, typed, to
+everything registered after it. The route middleware on `/profile` is the
+piece that can actually reject the request — returning `401` and never
+calling `next()` — something a provider has no mechanism to do at all.
+
+Reach for `provide()` when you're attaching a typed value everything
+downstream should be able to read. Reach for `use()` when you need to run code
+around the rest of the chain, inspect or replace the response, or stop the
+request early. See [Providers Overview](./overview.mdx) and
+[Middleware Overview](../middleware/overview.mdx) for each on its own.

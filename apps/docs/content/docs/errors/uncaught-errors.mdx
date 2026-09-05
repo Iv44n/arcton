@@ -1,0 +1,58 @@
+---
+title: Uncaught Errors
+description: What happens when a handler, provider, or parser throws
+---
+
+## A throw becomes a 500
+
+Arcton's own pipeline — providers, middleware, validation, the handler —
+never swallows an exception. If a handler, a
+[provider](../providers/overview.mdx), or a custom body parser registered
+with `app.parser()` throws, that error propagates all the way out to the
+runtime adapter serving the request.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/risky', () => {
+  throw new Error('boom')
+})
+
+app.listen()
+```
+
+A request to `/risky` here logs the error with `console.error` and responds
+with a `500` — both shipped adapters behave this way. See
+[Adapters](../api/adapters.mdx) for the exact mechanics on Bun and Node.
+
+## Two errors Arcton itself can throw at request time
+
+A couple of Arcton's own checks throw synchronously while a response is being
+built, and are uncaught the same way:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/broken', ctx => {
+  ctx.response.status = 999
+  return { ok: true }
+})
+
+app.listen()
+```
+
+Setting a status outside `[200, 599]` throws
+`Invalid response status 999: must be between 200 and 599` when the response
+materializes — the same 500 outcome as any other uncaught throw. Assigning to
+`ctx.response.status` after the body has already finalized throws for a
+different reason (`TypeError: Attempted to assign to readonly property.`) —
+see the callout in [Responding with errors](./responding-with-errors.mdx).
+
+Wrap the parts of your app that can legitimately fail — a downstream call, a
+parse you don't trust — with the patterns in
+[Responding with errors](./responding-with-errors.mdx) instead of letting
+them reach the adapter as a bare 500.

@@ -1,0 +1,119 @@
+---
+title: Testing Routes
+description: Test routes end to end with app.listen({ port 0 }) and real fetch.
+---
+
+The reliable way to test a route is to run the real app on a real (ephemeral) port and hit it with a real `fetch` call. Nothing is mocked — matching, middleware, providers, validation and the handler all run exactly as they would in production.
+
+## The basic shape
+
+```ts
+import { expect, test } from 'bun:test'
+import { Arcton } from '@arcton/core'
+
+test('GET /health returns ok', async () => {
+  const app = Arcton()
+  app.get('/health', () => ({ status: 'ok' }))
+
+  const server = app.listen({ port: 0 })
+
+  const res = await fetch(new URL('/health', server.url))
+  expect(await res.json()).toEqual({ status: 'ok' })
+
+  server.stop()
+})
+```
+
+`port: 0` asks the runtime for a free port instead of a fixed one, so tests can run concurrently without colliding. `server.url` is a real `URL` — pass it straight to `fetch`, or resolve a path against it with `new URL(path, server.url)`. Always call `server.stop()` once the test is done so the port is released.
+
+## Testing a 404
+
+A path with no matching route responds `404` with an empty body — worth asserting directly:
+
+```ts
+import { expect, test } from 'bun:test'
+import { Arcton } from '@arcton/core'
+
+test('an unmatched path responds 404', async () => {
+  const app = Arcton()
+  app.get('/health', () => ({ status: 'ok' }))
+
+  const server = app.listen({ port: 0 })
+
+  const res = await fetch(new URL('/missing', server.url))
+  expect(res.status).toBe(404)
+
+  server.stop()
+})
+```
+
+## Testing validation
+
+A route with a `body`, `query` or `params` schema responds `400` with a JSON `{ issues: [...] }` body on the first validation failure. This example uses [Valibot](https://valibot.dev):
+
+```ts
+import { expect, test } from 'bun:test'
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+test('an invalid body responds 400 with issues', async () => {
+  const app = Arcton()
+  app.post('/orders', {
+    body: v.object({ item: v.string(), quantity: v.number() }),
+    handler: ctx => ctx.body
+  })
+
+  const server = app.listen({ port: 0 })
+
+  const res = await fetch(new URL('/orders', server.url), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ item: 'widget' })
+  })
+
+  expect(res.status).toBe(400)
+  const body = (await res.json()) as { issues: { message: string }[] }
+  expect(Array.isArray(body.issues)).toBe(true)
+
+  server.stop()
+})
+```
+
+## Testing a WebSocket route
+
+The same `app.listen({ port: 0 })` server also serves registered [WebSocket routes](../routing/websockets.mdx). Open a `WebSocket` against `server.url` with the protocol swapped to `ws:`:
+
+```ts
+import { expect, test } from 'bun:test'
+import { Arcton } from '@arcton/core'
+
+test('a ws route echoes messages', async () => {
+  const app = Arcton()
+  app.ws('/chat', {
+    message(ws, message) {
+      ws.send(`echo: ${message}`)
+    }
+  })
+
+  const server = app.listen({ port: 0 })
+
+  const wsUrl = new URL('/chat', server.url)
+  wsUrl.protocol = 'ws:'
+  const ws = new WebSocket(wsUrl)
+
+  await new Promise<void>(resolve => {
+    ws.addEventListener('open', () => resolve())
+  })
+
+  const reply = new Promise<string>(resolve => {
+    ws.addEventListener('message', event => resolve(event.data as string))
+  })
+  ws.send('hi')
+  expect(await reply).toBe('echo: hi')
+
+  ws.close()
+  server.stop()
+})
+```
+
+For unit-testing a piece of middleware on its own, without running a server at all, see [Testing middleware](./testing-middleware.mdx).

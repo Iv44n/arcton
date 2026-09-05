@@ -1,0 +1,152 @@
+---
+title: Validation Types
+description: The StandardSchemaV1 and BodyParser type contracts behind route validation and body parsing.
+---
+
+## Overview
+
+Two type-level contracts make request validation and custom body parsing work without Arcton depending on a specific schema or parsing library: `StandardSchemaV1`, the interface `params`/`query`/`body` schemas must implement, and `BodyParser`, the function shape a custom parser registered with `app.parser()` must implement. See [Application](./arcton-app.mdx) for where both are consumed.
+
+## `StandardSchemaV1`
+
+**Purpose** — a vendor-neutral schema interface ([standardschema.dev](https://standardschema.dev/)) implemented by Zod 3.24+, Valibot, ArkType, and others. Any schema that implements it can be passed as `params`, `query`, or `body` on the route-options call shape.
+
+**Signature**
+
+```ts
+interface StandardSchemaV1<Input = unknown, Output = Input> {
+  readonly '~standard': StandardSchemaV1.Props<Input, Output>
+}
+
+namespace StandardSchemaV1 {
+  export interface Props<Input = unknown, Output = Input> {
+    readonly version: 1
+    readonly vendor: string
+    readonly validate: (
+      value: unknown
+    ) => Result<Output> | Promise<Result<Output>>
+    readonly types?: Types<Input, Output> | undefined
+  }
+  export interface Types<Input = unknown, Output = Input> {
+    readonly input: Input
+    readonly output: Output
+  }
+  export type Result<Output> = SuccessResult<Output> | FailureResult
+  export interface SuccessResult<Output> {
+    readonly value: Output
+    readonly issues?: undefined
+  }
+  export interface FailureResult {
+    readonly issues: ReadonlyArray<Issue>
+  }
+  export interface Issue {
+    readonly message: string
+    readonly path?: ReadonlyArray<PropertyKey | PathSegment> | undefined
+  }
+  export interface PathSegment {
+    readonly key: PropertyKey
+  }
+  export type InferOutput<Schema extends StandardSchemaV1> = NonNullable<
+    Schema['~standard']['types']
+  >['output']
+}
+```
+
+**Behavior** — `validate()` returns a `SuccessResult` (`{ value }`) or a `FailureResult` (`{ issues }`), synchronously or via a `Promise`. `types` is a phantom field: it's never populated at runtime, only read through `StandardSchemaV1.InferOutput<Schema>` so TypeScript can infer the validated output type at zero runtime cost. When a route declares a schema, its `InferOutput` — not the pre-validation input — is what `ctx.params`, `ctx.query`, or `ctx.body` are typed and populated as; see [Context](./context.mdx).
+
+**Errors** — none of its own. A schema's `validate()` returning `{ issues }` short-circuits the request with a `400` response; the issues array is passed straight through to the client.
+
+**Example**
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/users/:id/orders', {
+  body: v.object({
+    item: v.pipe(v.string(), v.minLength(1)),
+    quantity: v.pipe(v.number(), v.integer(), v.minValue(1))
+  }),
+  handler: ctx => ({
+    userId: ctx.params.id,
+    order: ctx.body
+  })
+})
+
+app.listen()
+```
+
+This fragment shows the interface directly, without a schema library, by implementing it by hand:
+
+```ts
+import type { StandardSchemaV1 } from '@arcton/contracts'
+
+function positiveNumber(): StandardSchemaV1<unknown, number> {
+  return {
+    '~standard': {
+      version: 1,
+      vendor: 'example',
+      validate(value) {
+        const n = Number(value)
+        return n > 0
+          ? { value: n }
+          : { issues: [{ message: 'must be a positive number' }] }
+      }
+    }
+  }
+}
+```
+
+## `BodyParser`
+
+**Purpose** — the function shape registered with `app.parser(mediaType, parser)` to parse a request body for a media type, overriding or extending the built-ins. See [Application](./arcton-app.mdx) for `parser()` itself.
+
+**Signature**
+
+```ts
+type BodyParser = (request: Request) => unknown | Promise<unknown>
+```
+
+**Parameters**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `request` | `Request` | The raw incoming request — not `ctx`, since parsing happens before a context's params/query are relevant. |
+
+**Return type** — `unknown | Promise<unknown>`: whatever value should become the schema's validation input for that route's `body` option.
+
+**Behavior** — returning `undefined` means "I don't handle this," so the runtime keeps looking (and ultimately responds `415` if nothing else does). Any other value counts as handled, including `false`, `0`, and `''`. A parser is only ever consulted for a route that declares a `body` schema.
+
+**Errors** — a parser that throws propagates like any other user code (see [Uncaught errors](../errors/uncaught-errors.mdx)); it is not caught and converted into a `400`.
+
+**Example**
+
+```ts
+import { Arcton } from '@arcton/core'
+import type { BodyParser } from '@arcton/contracts'
+import * as v from 'valibot'
+
+const csvParser: BodyParser = async request => {
+  const text = await request.text()
+  const [header = '', ...rows] = text.trim().split('\n')
+  const keys = header.split(',')
+  return rows.map(row =>
+    Object.fromEntries(keys.map((key, i) => [key, row.split(',')[i]]))
+  )
+}
+
+const app = Arcton()
+
+app.parser('text/csv', csvParser)
+
+app.post('/import', {
+  body: v.array(v.record(v.string(), v.string())),
+  handler: ctx => ({ imported: ctx.body.length, rows: ctx.body })
+})
+
+app.listen()
+```
+
+See [Body parsers](../validation/body-parsers.mdx) for the built-in parser table and how a route's `body` schema selects one.

@@ -1,0 +1,80 @@
+---
+title: Architecture Overview
+description: The layers of Arcton, what each one owns, and the decisions that shape the rest of the framework.
+---
+
+Arcton is built from four pieces with narrow responsibilities:
+
+| Layer | Owns | Knows nothing about |
+|---|---|---|
+| Adapter | starting a server, native request ↔ `Request` | routing, middleware |
+| Router | mapping a method and path to a handler | what a handler does |
+| Pipeline | running middleware, providers and validation | how a path matched |
+| Response mapping | turning a returned value into a `Response` | the rest of the request |
+
+The pages in this section explain why each one is built the way it is. If you
+are looking for how to use them, start from
+[Fundamentals](../fundamentals/application.mdx) instead.
+
+## One decision shapes most of the rest
+
+Arcton resolves as much as it can **when routes are registered**, not when
+requests arrive.
+
+- A route stores its own finished middleware chain, captured at registration.
+- Mounting a module merges its route tree into the parent's, once.
+- Path scopes are resolved into per-route chains, so the router never learns
+  that scopes exist.
+- Route conflicts are detected at registration and throw immediately.
+
+At request time, what is left is: match a path, run a prepared chain, map a
+value. Nothing has to be recomputed, and nothing about the application's shape
+can change between requests.
+
+This also keeps the type system honest. `ctx` is typed from the providers
+registered before a handler, and that is exactly the set that runs — because
+the types and the runtime read the same list, in the same order. See
+[Pipeline](./pipeline.mdx).
+
+## Where the boundaries are
+
+```text
+   @arcton/adapter-bun            @arcton/adapter-node
+              └───────────┬───────────────┘
+                          │  implements RuntimeAdapter
+                  @arcton/contracts          ← the shared vocabulary
+                          │  types only, no runtime code
+                    @arcton/core             ← routing, pipeline, mapping
+                          │
+                     your application
+```
+
+`@arcton/contracts` holds no logic. It exists so the core and the adapters can
+depend on a shared description of a runtime without depending on each other,
+and so your own code can name those types. See
+[Runtime abstraction](./runtime-abstraction.mdx).
+
+## Reading order
+
+<Cards>
+  <Card
+    title="Router"
+    description="Why routes live in a tree with three slots per node."
+    href="./router.mdx"
+  />
+  <Card
+    title="Pipeline"
+    description="Why middleware, providers and validation share one sequence."
+    href="./pipeline.mdx"
+  />
+  <Card
+    title="Adapters"
+    description="Why the core cannot see Bun or Node.js."
+    href="./adapters.mdx"
+  />
+  <Card
+    title="Module composition"
+    description="Why mounting merges trees instead of nesting routers."
+    href="./module-composition.mdx"
+  />
+</Cards>

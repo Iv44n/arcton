@@ -1,0 +1,73 @@
+---
+title: Application
+description: Create an Arcton app with `Arcton()` and see the full surface of an app instance.
+---
+
+Every Arcton app starts the same way — call `Arcton()` and you get an object
+you register routes and behavior on:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => ({ ok: true }))
+
+app.listen()
+```
+
+Every registration method — `get`, `post`, `use`, `provide`, `parser` — returns
+the same app, so calls chain:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .use(async (ctx, next) => {
+    console.log(ctx.request.method, new URL(ctx.request.url).pathname)
+    await next()
+  })
+  .get('/health', () => ({ status: 'ok' }))
+
+app.listen()
+```
+
+## Prefixing an instance
+
+`Arcton()` takes an optional config with one field, `prefix`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const api = Arcton({ prefix: '/api' })
+
+api.get('/status', () => ({ ok: true }))
+
+api.listen()
+```
+
+`prefix` is applied to every route and `ws` route registered directly on that
+instance — here, `GET /api/status`. It must be a static path (no `:param` or
+`*wildcard` segment), and `'/'` behaves the same as leaving it out. The same
+instance you configure a prefix on is also what you mount as a module inside
+another app — see [Modules](../routing/modules.mdx).
+
+## The app surface
+
+| Member | What it does |
+|---|---|
+| `config` | the `ArctonConfig` object you passed to `Arcton()` |
+| `get` / `post` / `put` / `delete` / `patch` / `head` / `options` | register a route for that HTTP method — see [HTTP Methods](../routing/http-methods.mdx) |
+| `ws` | register a WebSocket route — see [WebSockets](../routing/websockets.mdx) |
+| `use` | add global or path-scoped middleware, or mount a module — see [Middleware](../middleware/overview.mdx) and [Modules](../routing/modules.mdx) |
+| `provide` | compose typed values onto `ctx` — see [Providers](../providers/overview.mdx) |
+| `parser` | register a body parser for a `Content-Type` — see [Body Parsers](../validation/body-parsers.mdx) |
+| `listen` | start the server — see [Listen Options](../configuration/listen-options.mdx) |
+
+Each route method accepts either a handler (with optional middleware before
+it) or an options object with `params` / `query` / `body` schemas — see
+[Validation Overview](../validation/overview.mdx). What happens between a
+request arriving and a handler running is the subject of
+[Request Lifecycle](./request-lifecycle.mdx).

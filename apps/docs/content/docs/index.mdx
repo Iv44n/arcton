@@ -1,13 +1,94 @@
 ---
-title: Hello World
-description: Your first document
+title: Arcton
+description: A TypeScript backend framework structured for real applications, with priority-based routing, typed context and a runtime-decoupled core.
 ---
 
-Welcome to the docs! You can start writing documents in `/content/docs`.
+Arcton is a backend framework for TypeScript. You write handlers that return
+values, compose behavior with middleware, and organize an application into
+modules that merge into a single route tree.
 
-## What is Next?
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => ({ message: 'Welcome to Arcton' }))
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.listen({ port: 3000 })
+```
+
+`ctx.params.id` is typed as `string` because the route literal says so — no
+generic argument, no cast. The returned object becomes a JSON response.
+
+## Start here
 
 <Cards>
-  <Card title="Learn more about Next.js" href="https://nextjs.org/docs" />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.dev" />
+  <Card
+    title="What is Arcton?"
+    description="The problem it solves and the shape of an Arcton app."
+    href="./introduction/what-is-arcton.mdx"
+  />
+  <Card
+    title="Installation"
+    description="Scaffold a project for Bun or Node.js in one command."
+    href="./getting-started/installation.mdx"
+  />
+  <Card
+    title="Your first server"
+    description="From an empty directory to a running HTTP API."
+    href="./getting-started/first-server.mdx"
+  />
+  <Card
+    title="Routing"
+    description="Static, dynamic and wildcard segments, and which one wins."
+    href="./routing/overview.mdx"
+  />
 </Cards>
+
+## Learn the model
+
+Four ideas cover most of Arcton. Read them in this order:
+
+<Cards>
+  <Card
+    title="Context"
+    description="The single object a handler receives: request, params, query, response."
+    href="./fundamentals/context.mdx"
+  />
+  <Card
+    title="Middleware"
+    description="Onion-shaped composition, and the registration order that drives it."
+    href="./middleware/overview.mdx"
+  />
+  <Card
+    title="Validation"
+    description="Standard Schema on params, query and body, with typed output."
+    href="./validation/overview.mdx"
+  />
+  <Card
+    title="Modules"
+    description="Compose an application from Arcton instances that merge at registration."
+    href="./routing/modules.mdx"
+  />
+</Cards>
+
+## Reference
+
+<Cards>
+  <Card
+    title="API Reference"
+    description="Every public export, with signatures, behavior and examples."
+    href="./api/arcton.mdx"
+  />
+  <Card
+    title="Architecture"
+    description="Why the router, the pipeline and the adapters are built this way."
+    href="./architecture/overview.mdx"
+  />
+</Cards>
+
+<Callout>
+  Arcton is pre-1.0. The API described here is the API that ships today.
+</Callout>

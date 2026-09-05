@@ -1,0 +1,130 @@
+---
+title: CORS
+description: The cors() middleware factory and its options, from @arcton/cors.
+---
+
+## Overview
+
+Add CORS headers and handle preflight requests with one global middleware:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { cors } from '@arcton/cors'
+
+const app = Arcton()
+
+app.use(
+  cors({
+    origin: ['https://app.example.com'],
+    credentials: true
+  })
+)
+
+app.get('/', () => ({ hello: 'world' }))
+
+app.listen()
+```
+
+Because `cors()` returns unscoped global middleware, it also covers `404`/`405` responses (see [Global middleware](../middleware/global.mdx)).
+
+## `cors()`
+
+**Purpose** — builds a CORS middleware from a set of options.
+
+**Signature**
+
+```ts no-check
+function cors(options?: CorsOptions): Middleware
+```
+
+**Parameters**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `options` | `CorsOptions` | Optional. See below for fields and defaults. |
+
+**Return type** — a [`Middleware`](./middleware-types.mdx), meant to be passed to `app.use()`.
+
+**Errors** — throws a `TypeError` at setup — not per-request — when `origin` is `'*'` (its default) and `credentials` is `true`:
+
+```
+CORS: credentials cannot be enabled when origin is "*"
+```
+
+A credentialed response can't use the wildcard origin; the browser rejects it.
+
+**Behavior**
+
+- A request with no `Origin` header passes straight through — it isn't a CORS request.
+- A non-wildcard allowed origin is echoed back verbatim in `Access-Control-Allow-Origin`, and `Vary: Origin` is appended.
+- A disallowed origin: the request continues normally and no CORS headers are added — Arcton doesn't block it server-side; the browser enforces CORS policy client-side.
+- A real preflight (an `OPTIONS` request carrying `Access-Control-Request-Method`) short-circuits with `204` and the computed CORS headers. With `methods`/`allowedHeaders` omitted, the response echoes back the request's own `Access-Control-Request-Method` / `Access-Control-Request-Headers`.
+- `preflight: false` disables the automatic `204` short-circuit — a real preflight then reaches `next()` like any other request — but CORS headers are still added to whatever the route eventually returns.
+- `credentials: true` adds `Access-Control-Allow-Credentials: true`.
+- A non-empty `exposedHeaders` sets `Access-Control-Expose-Headers`, joined with `, `.
+
+## `CorsOptions`
+
+**Purpose** — the options object accepted by `cors()`.
+
+**Signature**
+
+```ts no-check
+interface CorsOptions {
+  origin?: CorsOrigin
+  methods?: string[]
+  allowedHeaders?: string[]
+  exposedHeaders?: string[]
+  credentials?: boolean
+  maxAge?: number
+  preflight?: boolean
+}
+```
+
+**Fields**
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `origin` | `CorsOrigin` | `'*'` | Which origins are allowed. See `CorsOrigin` below. |
+| `methods` | `string[]` | — | Sent as `Access-Control-Allow-Methods` on a preflight. When omitted, the preflight echoes the request's own `Access-Control-Request-Method`. |
+| `allowedHeaders` | `string[]` | — | Sent as `Access-Control-Allow-Headers` on a preflight. When omitted, the preflight echoes the request's own `Access-Control-Request-Headers`. |
+| `exposedHeaders` | `string[]` | — | Sent as `Access-Control-Expose-Headers` on the actual response. |
+| `credentials` | `boolean` | `false` | Adds `Access-Control-Allow-Credentials: true`. Cannot be combined with `origin: '*'`. |
+| `maxAge` | `number` | — | Sent as `Access-Control-Max-Age` on a preflight. |
+| `preflight` | `boolean` | `true` | Whether a real preflight is automatically answered with `204`. |
+
+## `CorsOrigin`
+
+**Purpose** — the shape `CorsOptions.origin` accepts.
+
+**Signature**
+
+```ts
+type CorsOrigin =
+  | '*'
+  | string
+  | string[]
+  | ((origin: string, request: Request) => boolean)
+```
+
+**Behavior** — `'*'` allows any origin (and cannot be combined with `credentials: true`). A `string` allows exactly that origin. A `string[]` allows any origin in the list. A function receives the request's `Origin` header value and the `Request` itself, and returns whether it's allowed — evaluated per request.
+
+**Example**
+
+```ts
+import { Arcton } from '@arcton/core'
+import { cors } from '@arcton/cors'
+
+const app = Arcton()
+
+app.use(
+  cors({
+    origin: (origin, request) =>
+      origin.endsWith('.example.com') || request.headers.has('x-internal')
+  })
+)
+
+app.get('/status', () => ({ ok: true }))
+
+app.listen()
+```

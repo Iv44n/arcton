@@ -1,0 +1,105 @@
+---
+title: Router Internals
+description: Why Arcton stores routes in a tree with three slots per node, and how matching and backtracking follow from that shape.
+---
+
+The router answers one question: given a method and a pathname, which handler
+runs and what are its parameters?
+
+## Why a tree
+
+The obvious implementation is a list of patterns tested in order. It is simple,
+but the cost of a request grows with the number of routes, and the answer
+depends on registration order — which means adding a route can silently change
+which handler an existing request reaches.
+
+Arcton stores routes in a tree instead, one node per path segment. Matching
+walks the request's segments and descends. Cost tracks the *depth* of the path,
+not the *number* of routes, and the shape of the tree is the same no matter
+what order routes were registered in.
+
+## Three slots per node
+
+Each node holds exactly three things a child can be reached through:
+
+```text
+node
+├── static:   Map<string, node>     "users" → node
+├── dynamic:  { name, node }        ":id"
+└── wildcard: { name, node }        "*path"
+```
+
+A `Map` for the static children makes the common case a hash lookup instead of
+a scan. The dynamic and wildcard slots are single because a node can only have
+one of each: two routes that use different parameter names in the same position
+would make `ctx.params` ambiguous, so that conflict is rejected at registration
+rather than resolved arbitrarily at match time.
+
+Having the three kinds as separate slots also means priority needs no sorting
+step. Static, then dynamic, then wildcard is simply the order the three checks
+are written in — the data structure encodes the precedence rule.
+
+## Matching and backtracking
+
+Matching descends greedily and reverses when a branch fails:
+
+```text
+at each node, for the current segment:
+  1. a static child with that exact text?   → descend; if it fails, continue
+  2. a dynamic slot?                        → capture, descend; if it fails,
+                                              discard the capture and continue
+  3. a wildcard slot?                       → capture the remainder, decide here
+  otherwise                                 → fail, let the caller backtrack
+```
+
+Backtracking matters because a more specific branch can match for several
+segments and then dead-end. Given `/a/:b/c` and `/a/*rest`, the request
+`/a/x/y` follows `:b`, fails at `c`, backs out, and lands on the wildcard.
+Parameters captured on the abandoned path are removed on the way back, so a
+handler never sees a parameter from a branch that did not match.
+
+## Why a method mismatch does not backtrack
+
+When matching reaches a node that has handlers but none for this method, it
+stops and reports `405` with that node's methods. It does not keep searching
+for another pattern that would accept the method.
+
+The alternative — continuing until some pattern accepts the method — would mean
+that `POST /users/me` could be served by `/users/:id` while
+`GET /users/me` is served by `/users/me`. One path would resolve to different
+routes depending on the verb, which is harder to reason about than a `405`. The
+rule Arcton picked is that the most specific matching path owns the URL, for
+every method. [Precedence](../routing/precedence.mdx) shows what that looks
+like from the outside.
+
+## Normalization and decoding
+
+Empty segments are discarded before matching, so `/users`, `/users/` and
+`/users//` are the same path. That removes trailing-slash configuration as a
+concept.
+
+Only captured parameter values are percent-decoded, and only after the path has
+matched. Decoding first would let an encoded `%2F` invent a segment boundary
+that the client never sent. A value whose escape sequence is malformed is
+passed through raw rather than failing the request, since a bad escape in one
+parameter is not a reason to reject a route that otherwise matched.
+
+## Validation at registration
+
+Route paths are parsed and checked when they are registered: the leading slash,
+the absence of `//`, parameter naming, a wildcard being last, duplicate
+parameter names, static segments that survive a round trip through `URL`, and
+duplicate method-and-path pairs.
+
+Doing this at registration means the process fails at startup with a message
+naming the route, instead of serving a route that can never match. See
+[Registration errors](../errors/registration-errors.mdx).
+
+## What the router does not know
+
+The router stores a handler per method per node, and nothing else. It has never
+heard of middleware, scopes, providers or validation: by the time a handler
+reaches the tree, its entire chain is already baked into it. That is what keeps
+matching to a walk and a lookup, and it is why a scope can exist as a
+registration-time concept without the matcher gaining a second pattern
+language. See [Pipeline](./pipeline.mdx).

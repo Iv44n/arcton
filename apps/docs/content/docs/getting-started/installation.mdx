@@ -1,0 +1,47 @@
+---
+title: Installation
+description: Scaffold a new Arcton project with the CLI and choose a runtime and package manager.
+---
+
+The fastest way to start an Arcton project is the interactive scaffolder. Pick
+whichever command matches the package manager you already have:
+
+```bash
+bun create arcton
+```
+
+```bash
+npm create arcton
+```
+
+```bash
+pnpm create arcton
+```
+
+You can also run it through the `arcton` CLI directly:
+
+```bash
+bunx arcton create my-arcton-app
+```
+
+Passing a name (`my-arcton-app` above) skips the project-name prompt.
+
+## What the scaffold asks
+
+The CLI walks through a short set of prompts:
+
+- **Project name** — used for the folder and the generated `package.json`.
+- **Runtime** — Bun or Node.js. This picks which template gets copied and
+  whether `@arcton/adapter-node` is added as a dependency.
+- **Package manager** — bun, pnpm or npm, used only to pick the install
+  command it offers to run for you.
+- **Install dependencies now?** — optional; you can always install later.
+
+When it finishes, it prints the next commands to run (`cd` into the project,
+install if you skipped that step, then the dev script).
+
+## Next steps
+
+See [Project Structure](./project-structure.mdx) for what got generated,
+[Your First Server](./first-server.mdx) to see the code that's already there,
+and [Development](./development.mdx) to run it.

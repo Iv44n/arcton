@@ -1,0 +1,68 @@
+---
+title: Validation Overview
+description: Validate params, query and body with a Standard Schema, and read the coerced result straight off `ctx`.
+---
+
+Any HTTP method also accepts an options object instead of a plain handler,
+letting you attach a schema to `params`, `query` and/or `body`:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/users/:id/orders', {
+  params: v.object({
+    id: v.pipe(v.string(), v.transform(Number), v.number())
+  }),
+  query: v.object({
+    notify: v.optional(
+      v.pipe(
+        v.string(),
+        v.transform(s => s === 'true'),
+        v.boolean()
+      )
+    )
+  }),
+  body: v.object({
+    item: v.pipe(v.string(), v.minLength(1)),
+    quantity: v.pipe(v.number(), v.integer(), v.minValue(1))
+  }),
+  handler: ctx => ({
+    userId: ctx.params.id,
+    notify: ctx.query.notify ?? false,
+    order: ctx.body
+  })
+})
+
+app.listen()
+```
+
+`ctx.params.id` is a `number` here, not a `string` — validation replaces
+`ctx.params`, `ctx.query` and `ctx.body` with the schema's output, so
+coercions and transforms are what the handler actually sees.
+
+## Any Standard Schema works
+
+`params`, `query` and `body` each accept any
+[Standard Schema](https://standardschema.dev/) — Zod 3.24+, Valibot and
+ArkType all implement it, so any of them work here. The examples across this
+section use Valibot; stay consistent within whichever schema library you pick
+for a project.
+
+## Order and short-circuiting
+
+Validation runs **params → query → body**, in that order. The first schema
+that fails responds immediately with `400` and nothing downstream — route
+middleware, the handler — runs. See
+[Validation Errors](./validation-errors.mdx) for the exact response shape.
+
+Body validation only runs for a route that declared a `body` schema, and only
+after the request body has been parsed according to its `Content-Type` — see
+[Body Parsers](./body-parsers.mdx). Global middleware runs before any of this,
+so it always sees the raw, un-coerced `ctx.params` / `ctx.query` — see
+[Execution Order](../middleware/execution-order.mdx).
+
+For the deeper look at each piece, see
+[Params and Query](./params-and-query.mdx) and [Body](./body.mdx).

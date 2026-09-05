@@ -1,0 +1,79 @@
+---
+title: When to Use Arcton
+description: The kinds of projects Arcton fits, and how it compares conceptually to Express, Hono, Elysia and NestJS.
+---
+
+Arcton is aimed at TypeScript HTTP services where the shape of a request
+matters: typed parameters, validated input, and an application that grows into
+modules without turning into a pile of routers.
+
+## Good fits
+
+**JSON APIs.** Handlers return values and Arcton serializes them, so a CRUD
+endpoint is a function that returns an object.
+
+**Services with validated input.** Params, query and body each take a
+[Standard Schema](https://standardschema.dev/), and the validated output is
+what reaches the handler, already coerced and typed.
+
+**Applications organized by domain.** Each area of the app is a module with its
+own prefix, developed in its own file and mounted into the parent — see
+[Modules](../routing/modules.mdx).
+
+**Projects that care about the request path.** The route tree, the resolved
+per-route pipeline and the lazy query parsing all move work to registration
+time.
+
+**Code that should run on more than one runtime.** The application is written
+against Arcton; Bun or Node.js is an argument to `listen()`.
+
+**Realtime alongside HTTP.** `app.ws()` registers WebSocket routes on the same
+server as the HTTP routes.
+
+## Conceptual comparisons
+
+These are analogies to orient you, not compatibility claims. Arcton has its own
+API, and code does not port over unchanged.
+
+**Coming from Express.** Middleware will feel familiar: a function that
+receives the request context and a `next` it can await, with code after
+`await next()` running on the way out. Two things differ. Handlers return a
+value instead of calling a `res` method, and `use()` applies to the routes
+registered after it rather than to everything in the file. See
+[Execution order](../middleware/execution-order.mdx).
+
+**Coming from Hono or Elysia.** The value-returning handler and the
+runtime-adapter model will look familiar. Arcton derives `ctx.params` from the
+route literal in the same spirit, keeps provided values flat on the context
+through [`provide()`](../providers/overview.mdx), and merges modules into a
+single route tree at registration.
+
+**Coming from NestJS.** The unit of organization is a module here too, but it
+is a plain `Arcton()` instance rather than a class with decorators, and
+`provide()` composes typed context per request instead of resolving a
+dependency graph. If you want constructor injection and decorators, that is a
+different model than the one Arcton offers.
+
+**Coming from Fastify.** Schema-driven validation will feel natural.
+Arcton accepts any Standard Schema library rather than a specific one, and the
+schema's output type flows into the handler.
+
+## What to expect from pre-1.0
+
+Arcton is pre-1.0 and the API can change between releases. Pin your
+dependencies and read the release notes before upgrading.
+
+## Next
+
+<Cards>
+  <Card
+    title="Installation"
+    description="Scaffold a project for Bun or Node.js."
+    href="../getting-started/installation.mdx"
+  />
+  <Card
+    title="Philosophy"
+    description="The principles behind the API you are about to use."
+    href="./philosophy.mdx"
+  />
+</Cards>

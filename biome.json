@@ -1,12 +1,25 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.11/schema.json",
+  "root": true,
+  "$schema": "https://biomejs.dev/schemas/2.5.12/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": false
+    "ignoreUnknown": true,
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/build",
+      "!**/.turbo",
+      "!**/.next",
+      "!**/.source",
+      "!**/coverage",
+      "!**/*.tsbuildinfo",
+      "!packages/cli/template"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -45,17 +58,5 @@
         "organizeImports": "on"
       }
     }
-  },
-  "overrides": [
-    {
-      "includes": ["**/public/**"],
-      "linter": {
-        "rules": {
-          "a11y": {
-            "noSvgWithoutTitle": "off"
-          }
-        }
-      }
-    }
-  ]
+  }
 }

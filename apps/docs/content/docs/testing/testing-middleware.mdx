@@ -1,0 +1,133 @@
+---
+title: Testing Middleware
+description: Unit-test a Middleware in isolation with a hand-built ctx and a fake next.
+---
+
+A [`Middleware`](../api/middleware-types.mdx) is nothing more than a `(ctx, next) => ...` function. That means it can be tested directly, without a server or a route — build a minimal `ctx` by hand, pass a fake `next`, and assert on what the middleware did.
+
+## A `makeCtx` helper
+
+```ts
+import type { Context } from '@arcton/contracts'
+
+function makeCtx(request: Request): Context {
+  return {
+    request,
+    params: {},
+    query: {},
+    response: { headers: new Headers() }
+  }
+}
+```
+
+This builds the minimum `Context` a middleware needs: the incoming `request`, empty `params`/`query`, and a fresh `response` with empty `Headers`. Reuse it for any middleware under test, not just one specific to your app.
+
+## Testing a middleware that calls `next()`
+
+```ts
+import { expect, test } from 'bun:test'
+import type { Context } from '@arcton/contracts'
+import { cors } from '@arcton/cors'
+
+function makeCtx(request: Request): Context {
+  return {
+    request,
+    params: {},
+    query: {},
+    response: { headers: new Headers() }
+  }
+}
+
+test('cors adds Access-Control-Allow-Origin for an allowed origin', async () => {
+  const middleware = cors({ origin: 'https://app.example.com' })
+  const ctx = makeCtx(
+    new Request('http://localhost/', {
+      headers: { origin: 'https://app.example.com' }
+    })
+  )
+
+  await middleware(ctx, async () => {})
+
+  expect(ctx.response.headers.get('Access-Control-Allow-Origin')).toBe(
+    'https://app.example.com'
+  )
+})
+```
+
+## Testing a middleware that short-circuits
+
+A middleware that returns a value without calling `next()` short-circuits the pipeline. Assert that `next` was never invoked and inspect the returned value directly:
+
+```ts
+import { expect, test } from 'bun:test'
+import type { Context } from '@arcton/contracts'
+import { cors } from '@arcton/cors'
+
+function makeCtx(request: Request): Context {
+  return {
+    request,
+    params: {},
+    query: {},
+    response: { headers: new Headers() }
+  }
+}
+
+test('a real preflight short-circuits with a 204 Response', async () => {
+  const middleware = cors({ origin: 'https://app.example.com' })
+  const ctx = makeCtx(
+    new Request('http://localhost/users', {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://app.example.com',
+        'access-control-request-method': 'POST'
+      }
+    })
+  )
+  let nextCalled = false
+
+  const result = await middleware(ctx, async () => {
+    nextCalled = true
+  })
+
+  expect(nextCalled).toBe(false)
+  expect(result).toBeInstanceOf(Response)
+  expect((result as Response).status).toBe(204)
+})
+```
+
+## Testing your own middleware
+
+The same technique applies to any middleware you write, not just a built-in one:
+
+```ts
+import { expect, test } from 'bun:test'
+import type { Context, Middleware } from '@arcton/contracts'
+
+function makeCtx(request: Request): Context {
+  return {
+    request,
+    params: {},
+    query: {},
+    response: { headers: new Headers() }
+  }
+}
+
+const withRequestId: Middleware = async (ctx, next) => {
+  ctx.response.headers.set('X-Request-Id', 'test-id')
+  await next()
+}
+
+test('withRequestId sets a header before calling next', async () => {
+  const ctx = makeCtx(new Request('http://localhost/'))
+  let nextCalled = false
+
+  await withRequestId(ctx, async () => {
+    nextCalled = true
+  })
+
+  expect(nextCalled).toBe(true)
+  expect(ctx.response.headers.get('X-Request-Id')).toBe('test-id')
+})
+```
+
+`Context` is imported as a type from `@arcton/contracts`. This tests the middleware function in isolation, decoupled from routing and the rest of the pipeline — for an end-to-end test that runs a middleware as part of a real request, see [Testing routes](./testing-routes.mdx).

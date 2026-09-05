@@ -1,0 +1,11 @@
+{
+  "title": "Validation",
+  "icon": "ShieldCheck",
+  "pages": [
+    "overview",
+    "params-and-query",
+    "body",
+    "body-parsers",
+    "validation-errors"
+  ]
+}

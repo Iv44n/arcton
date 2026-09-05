@@ -1,0 +1,111 @@
+---
+title: Pipeline
+description: Why middleware, providers and validation share one ordered sequence, and why each route keeps its own copy of it.
+---
+
+Everything that happens between matching a route and calling its handler is one
+list of steps. There are three kinds:
+
+| Step | Behavior |
+|---|---|
+| middleware | full onion: receives `next`, can short-circuit, runs code on the way out |
+| provider | merges its result into the context and continues, with no `next` of its own |
+| validation | validates params, query and body, replacing them with the validated output |
+
+They live in a single sequence in registration order, and the pipeline walks it
+in that order.
+
+## Why one sequence
+
+The alternative is a phase per concern: run all providers, then all
+validations, then all middleware. That reads well in a diagram and is wrong in
+practice, because a provider often depends on something a middleware did, or
+another provider did.
+
+Keeping one list means the order you wrote is the order that runs. It also
+means there is exactly one rule to learn instead of a precedence table between
+concerns.
+
+The three step kinds still differ where they must: a provider has no `next`
+because "run the rest of the chain" is not a decision it should be making —
+that distinction is the whole difference between
+[providers and middleware](../providers/providers-vs-middleware.mdx).
+
+## Why the sequence is snapshotted per route
+
+When a route is registered, the current list of steps is copied and stored with
+that route. Requests never read a shared, mutable list.
+
+This is what makes registration order meaningful: a route runs the steps that
+existed when it was created, and nothing registered afterwards can reach it.
+The alternative — reading a live list at request time — would mean a `use()`
+call at the bottom of a file silently changing routes at the top, and it would
+break the correspondence with the type system.
+
+That correspondence is the real payoff. `ctx` is typed from the providers
+registered before the handler, and those are exactly the providers that run,
+because the type-level accumulation and the runtime array are the same
+sequence read the same way. There is no conservative approximation on either
+side.
+
+Two consequences fall out of the snapshot:
+
+- Path scopes are resolved here, not in the router. When a route is registered,
+  scoped middleware whose path the route sits under is kept and the rest is
+  dropped. The matcher never learns scopes exist — see
+  [Router](./router.mdx).
+- A route with no steps at all skips the pipeline entirely and calls the
+  handler directly, so a plain route costs no more than the function it wraps.
+
+## Where validation sits
+
+Validation is inserted after the global steps and before route middleware. That
+position is deliberate:
+
+- Global middleware runs first, so cross-cutting concerns like CORS and logging
+  apply even to requests that fail validation.
+- Route middleware runs after, so it sees the validated, converted values —
+  a route middleware that reads `ctx.body` gets the parsed and typed body, not
+  a raw one.
+
+A failing schema short-circuits by the same mechanism a middleware uses when it
+returns without calling `next()`. There is one short-circuit path, not a
+special case for validation.
+
+## Materializing the response
+
+`ctx.response` starts as a plain object holding a status and headers. The
+moment a body finalizes at any layer, Arcton maps it into a real `Response` and
+stores that back on `ctx.response`.
+
+Materializing at each layer, rather than once at the very end, is what lets a
+middleware mutate headers after `await next()` and have the change survive —
+including when an inner layer returned a raw `Response`, which would otherwise
+have discarded everything accumulated around it.
+
+The trade-off is visible in the API: a real `Response` exposes mutable headers
+but a read-only status, so a status can only be set before the body finalizes.
+That is a real constraint the design accepts rather than hides — see
+[Modifying responses](../middleware/modifying-responses.mdx).
+
+## 404 and 405
+
+Those responses have no matched route, so there is no per-route snapshot to
+use. Arcton collects the unscoped global middleware once, when `listen()` is
+called, and runs the same pipeline machinery against a fallback handler.
+
+Scoped middleware, route middleware and providers are excluded because each of
+them belongs to a route that, by definition, did not match. Global middleware
+is included because the concerns that live there — CORS, logging, request ids —
+have to cover every HTTP response to be correct at all. See
+[Execution order](../middleware/execution-order.mdx).
+
+## What the pipeline costs
+
+Per request, on a route with steps: one walk of a prepared array, one context
+object, and one mapping of the returned value. Per request on a route without
+steps: the handler call and the mapping.
+
+The work that is not there is the point. No lookup of which middleware applies,
+no scope matching, no per-request composition of the chain — all of it happened
+once, at registration.

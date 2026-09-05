@@ -1,0 +1,67 @@
+---
+title: Deployment
+description: Compile a Bun binary or build and run the Node.js template for production.
+---
+
+Deploying an Arcton app comes down to running one build command and then
+starting the result — which command depends on which template you scaffolded.
+
+## Bun: compile a standalone binary
+
+The Bun template's `compile` script bundles your app and the Bun runtime into
+a single executable:
+
+```bash
+bun run compile
+```
+
+which runs:
+
+```bash
+bun build --compile --minify --sourcemap ./src/index.ts --outfile arcton-app
+```
+
+The result is a self-contained binary — no `node_modules`, no separate runtime
+install on the target machine:
+
+```bash
+./arcton-app
+```
+
+If you'd rather run the source directly without compiling, the template's
+`start` script does that instead:
+
+```bash
+bun run start
+```
+
+## Node.js: build then run
+
+The Node.js template's `build` script type-checks and emits JavaScript:
+
+```bash
+npm run build
+```
+
+which runs:
+
+```bash
+tsc --build
+```
+
+Then start the compiled output with the `start` script:
+
+```bash
+npm run start
+```
+
+which runs:
+
+```bash
+node dist/index.js
+```
+
+## Labeling the environment
+
+Pass `env` to `listen()` to label the startup banner for the environment
+you're deploying to — see [Environment](../configuration/environment.mdx).

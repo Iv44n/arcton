@@ -1,0 +1,124 @@
+---
+title: Middleware Types
+description: The function types behind global, scoped, and route middleware, plus the router's internal matching types
+---
+
+A [`Middleware`](#middleware) is a plain function — no class, no decorator, nothing beyond passing it to [`app.use()`](./arcton-app.mdx#use) or a route:
+
+```ts
+import type { Middleware } from '@arcton/contracts'
+import { Arcton } from '@arcton/core'
+
+const logger: Middleware = async (ctx, next) => {
+  console.log(ctx.request.method, ctx.request.url)
+  await next()
+}
+
+const app = Arcton()
+
+app.use(logger)
+app.get('/', () => 'ok')
+
+app.listen()
+```
+
+## Middleware
+
+**Purpose:** the shape of every global, scoped, and route middleware function.
+
+**Signature**
+```ts
+import type { Body, Context, NextFunction, QueryParams, RouteParams } from '@arcton/contracts'
+
+type Middleware<P = RouteParams, Q = QueryParams, TBody = {}, TProvided = {}> = (
+  ctx: Context<P, Q, TBody, TProvided>,
+  next: NextFunction
+) => Promise<Body | void> | Body | void
+```
+
+**Behavior:** the generic parameter order — `P, Q, TBody, TProvided` — is load-bearing: it matches [`Context`](./context.mdx)'s own order. Code before `await next()` runs on the way in; code after runs on the way out. Returning a value without calling `next()` short-circuits the pipeline — nothing downstream runs. See [Execution order](../middleware/execution-order.mdx).
+
+## NextFunction
+
+**Purpose:** advances the pipeline to the next step.
+
+**Signature**
+```ts
+type NextFunction = () => Promise<void>
+```
+
+**Behavior:** calls the next middleware (or the handler, if there is none left) and resolves once everything downstream has finished.
+
+## RouteHandler
+
+**Purpose:** the shape of a route's final handler.
+
+**Signature**
+```ts
+import type { Body, Context, QueryParams, RouteParams } from '@arcton/contracts'
+
+type RouteHandler<P = RouteParams, Q = QueryParams, TBody = {}, TProvided = {}> = (
+  ctx: Context<P, Q, TBody, TProvided>
+) => (Body | void) | Promise<Body | void>
+```
+
+**Behavior:** the same shape as [`Middleware`](#middleware), minus `next` — a handler always runs last, so it has nothing to call. This is the type of the trailing argument to `get`/`post`/etc. and of `RouteOptions.handler`.
+
+## MatchResult
+
+**Purpose:** the result of matching a method and path against the route tree.
+
+**Signature**
+```ts
+import type { HttpMethod, RouteHandler, RouteParams } from '@arcton/contracts'
+
+type MatchResult =
+  | { matched: true; handler: RouteHandler; params: RouteParams }
+  | { notFound: true }
+  | { methodNotAllowed: true; allowed: HttpMethod[] }
+```
+
+**Behavior:** `Router.match()`'s return value, described next. Application code doesn't construct or read this directly — it's exposed for anyone implementing a custom [`RuntimeAdapter`](./runtime-types.mdx).
+
+## Router
+
+**Purpose:** the internal interface `ArctonApp` uses to resolve a request to a handler.
+
+**Signature**
+```ts
+import type { HttpMethod, MatchResult } from '@arcton/contracts'
+
+interface Router {
+  match(method: HttpMethod, url: string): MatchResult
+}
+```
+
+**Behavior:** see [Precedence](../routing/precedence.mdx) for the matching rules — static beats dynamic beats wildcard, with backtracking.
+
+## ReservedKeys
+
+**Purpose:** the keys [`provide()`](./arcton-app.mdx#provide) refuses to add.
+
+**Signature**
+```ts
+import type { BaseContext } from '@arcton/contracts'
+
+type ReservedKeys<TProvided> = keyof BaseContext | 'body' | keyof TProvided
+```
+
+**Behavior:** covers the base `Context` fields (`request`/`params`/`query`/`response`), `'body'`, and any key already provided earlier in the chain. Re-providing one of these is a compile error, not a runtime one.
+
+## ProvideFn
+
+**Purpose:** the function shape passed to [`app.provide()`](./arcton-app.mdx#provide).
+
+**Signature**
+```ts
+import type { Context, QueryParams, RouteParams } from '@arcton/contracts'
+
+type ProvideFn<TProvided, R extends Record<string, unknown>> = (
+  ctx: Context<RouteParams, QueryParams, {}, TProvided>
+) => R | Promise<R>
+```
+
+**Behavior:** runs before route-level validation, so it only ever sees the raw `params`/`query` defaults — never a route's schema output. Its return value, `R`, is merged flat onto `ctx`. See [Providers](../providers/overview.mdx).
