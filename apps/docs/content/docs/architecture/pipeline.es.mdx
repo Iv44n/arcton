@@ -1,0 +1,123 @@
+---
+title: Pipeline
+description: Por qué middleware, providers y validation comparten una única secuencia ordenada, y por qué cada ruta guarda su propia copia de ella.
+---
+
+Todo lo que pasa entre matchear una ruta y llamar a su handler es una
+sola lista de steps. Hay tres tipos:
+
+| Step | Comportamiento |
+|---|---|
+| middleware | onion completo: recibe `next`, puede cortar la cadena, corre código a la salida |
+| provider | fusiona su resultado en el context y continúa, sin `next` propio |
+| validation | valida params, query y body, reemplazándolos con la salida validada |
+
+Viven en una única secuencia en orden de registro, y el pipeline la
+recorre en ese orden.
+
+## Por qué una sola secuencia
+
+La alternativa es una fase por cada cosa: correr todos los providers,
+después todas las validations, después todo el middleware. Eso se ve
+bien en un diagrama y está mal en la práctica, porque un provider
+seguido depende de algo que hizo un middleware, o de algo que hizo
+otro provider.
+
+Mantener una sola lista significa que el orden en que escribiste algo
+es el orden en que corre. También significa que hay exactamente una
+regla que aprender en vez de una tabla de precedencia entre distintas
+cosas.
+
+Los tres tipos de step igual difieren donde tienen que hacerlo: un
+provider no tiene `next` porque "correr el resto de la cadena" no es
+una decisión que le corresponda tomar — esa distinción es toda la
+diferencia entre [providers y middleware](../providers/providers-vs-middleware.mdx).
+
+## Por qué la secuencia se saca como snapshot por ruta
+
+Cuando se registra una ruta, la lista actual de steps se copia y se
+guarda junto con esa ruta. Los requests nunca leen una lista
+compartida y mutable.
+
+Esto es lo que hace que el orden de registro tenga sentido: una ruta
+corre los steps que existían cuando se creó, y nada registrado después
+puede alcanzarla. La alternativa — leer una lista en vivo en tiempo de
+request — significaría que una llamada a `use()` al final de un
+archivo cambiaría silenciosamente rutas del principio, y rompería la
+correspondencia con el sistema de tipos.
+
+Esa correspondencia es la ganancia real. `ctx` se tipa a partir de los
+providers registrados antes del handler, y esos son exactamente los
+providers que corren, porque la acumulación a nivel de tipos y el
+array en runtime son la misma secuencia leída de la misma manera. No
+hay ninguna aproximación conservadora de ningún lado.
+
+De este snapshot se siguen dos consecuencias:
+
+- Los scopes de path se resuelven acá, no en el router. Cuando se
+  registra una ruta, se conserva el middleware con scope bajo cuyo
+  path está esa ruta, y se descarta el resto. El matcher nunca se
+  entera de que los scopes existen — ver [Router](./router.mdx).
+- Una ruta sin ningún step directamente se salta el pipeline y llama
+  al handler, así que una ruta simple no cuesta más que la función que
+  envuelve.
+
+## Dónde se ubica la validation
+
+La validation se inserta después de los steps globales y antes del
+middleware de ruta. Esa posición es deliberada:
+
+- El middleware global corre primero, así que las cosas transversales
+  como CORS y logging aplican incluso a requests que fallan la
+  validation.
+- El middleware de ruta corre después, así que ve los valores ya
+  validados y convertidos — un middleware de ruta que lee `ctx.body`
+  recibe el body ya parseado y tipado, no uno crudo.
+
+Un schema que falla corta la cadena por el mismo mecanismo que usa un
+middleware cuando retorna sin llamar a `next()`. Hay un solo camino de
+corte de cadena, no un caso especial para la validation.
+
+## Materializar la respuesta
+
+`ctx.response` empieza como un objeto simple que guarda un status y
+headers. En el momento en que un body se finaliza en cualquier capa,
+Arcton lo mapea a un `Response` real y lo guarda de vuelta en
+`ctx.response`.
+
+Materializar en cada capa, en vez de una sola vez al final, es lo que
+le permite a un middleware mutar headers después de `await next()` y
+que el cambio sobreviva — incluso cuando una capa interior retornó un
+`Response` crudo, que de otro modo hubiera descartado todo lo
+acumulado a su alrededor.
+
+El trade-off es visible en la API: un `Response` real expone headers
+mutables pero un status de solo lectura, así que un status solo puede
+asignarse antes de que el body se finalice. Esa es una restricción
+real que el diseño acepta en vez de esconder — ver
+[Modifying responses](../middleware/modifying-responses.mdx).
+
+## 404 y 405
+
+Esas respuestas no tienen ninguna ruta matcheada, así que no hay
+ningún snapshot por ruta que usar. Arcton junta el middleware global
+sin scope una sola vez, cuando se llama a `listen()`, y corre la misma
+maquinaria del pipeline contra un handler de fallback.
+
+El middleware con scope, el middleware de ruta y los providers quedan
+excluidos porque cada uno de ellos pertenece a una ruta que, por
+definición, no matcheó. El middleware global sí se incluye porque las
+cosas que viven ahí — CORS, logging, request ids — tienen que cubrir
+cada respuesta HTTP para ser correctas en absoluto. Ver
+[Execution order](../middleware/execution-order.mdx).
+
+## Qué cuesta el pipeline
+
+Por request, en una ruta con steps: un recorrido de un array ya
+preparado, un objeto de context, y un mapeo del valor retornado. Por
+request en una ruta sin steps: la llamada al handler y el mapeo.
+
+El trabajo que no está ahí es justamente el punto. Ninguna búsqueda de
+qué middleware aplica, ningún matching de scopes, ninguna composición
+de la cadena por request — todo eso ya pasó una sola vez, al
+registrarse.

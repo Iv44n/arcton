@@ -1,0 +1,203 @@
+---
+title: Design Decisions
+description: Un índice de las decisiones que le dan forma a la API de Arcton, cada una con el razonamiento detrás.
+---
+
+Cada entrada acá es una decisión que razonablemente podría haber ido
+de otra manera. Esta página dice qué se eligió y por qué; la página
+enlazada tiene el detalle.
+
+## El orden de registro decide el pipeline de una ruta
+
+Una ruta corre el middleware y los providers registrados antes que
+ella, capturados como un snapshot cuando se crea la ruta.
+
+La alternativa — aplicar cada `use()` a cada ruta sin importar la
+posición — era el comportamiento original, y se volvió inconsistente
+apenas `provide()` introdujo contexto tipado, porque el tipo de `ctx`
+depende necesariamente de lo que vino antes. En vez de mantener dos
+reglas de orden distintas, una para los tipos y otra para el runtime,
+ambas se convirtieron en la misma regla.
+
+→ [Execution order](../middleware/execution-order.mdx)
+
+## El middleware global sigue corriendo en 404 y 405
+
+La regla del snapshot es relativa a una ruta, y esas respuestas no
+tienen ninguna ruta. Como las cosas que viven en el middleware global
+— CORS, logging, request ids — solo son correctas si cubren cada
+respuesta, el middleware sin scope aplica ahí sin importar dónde se
+registró.
+
+→ [Global middleware](../middleware/global.mdx)
+
+## El path más específico es dueño de la URL, para cada método
+
+Cuando el matching llega a un nodo con handlers pero ninguno para el
+método del request, responde `405` en vez de seguir buscando otro
+patrón que lo aceptara. De lo contrario, una misma URL podría resolver
+a rutas distintas según el verbo.
+
+→ [Precedence](../routing/precedence.mdx)
+
+## Las rutas viven en un árbol con tres slots fijos
+
+Hijos static en un map, un slot dynamic, un slot wildcard. La
+prioridad está codificada en la estructura en vez de en un
+ordenamiento, las búsquedas no escalan con la cantidad de rutas, y el
+resultado nunca depende del orden de registro.
+
+→ [Router](./router.mdx)
+
+## Montar fusiona árboles al registrarse
+
+Un router anidado cuesta una pasada de matching por nivel en cada
+request. Fusionar cuesta un solo injerto al arrancar y nada después, y
+hace que los conflictos salgan a la luz de inmediato.
+
+→ [Module composition](./module-composition.mdx)
+
+## Un módulo es una aplicación
+
+En vez de un tipo `Router` separado, un módulo es una instancia de
+`Arcton()` con un prefix. Una sola API que aprender, y un módulo se
+puede correr de forma independiente durante el desarrollo.
+
+→ [Modules](../routing/modules.mdx)
+
+## Middleware, providers y validation comparten una secuencia
+
+Una sola lista ordenada en vez de fases por cada cosa, así que el
+orden en que escribes algo es el orden en que corre, y no hay ninguna
+tabla de precedencia entre tipos de step.
+
+→ [Pipeline](./pipeline.mdx)
+
+## Los providers no tienen `next`
+
+Un provider calcula un valor y continúa. Decidir si el resto de la
+cadena corre es trabajo de un middleware, y mantener las dos cosas
+separadas hace que un provider no pueda convertirse accidentalmente en
+control de flujo.
+
+→ [Providers vs middleware](../providers/providers-vs-middleware.mdx)
+
+## Los valores provistos quedan planos sobre el context
+
+Los valores de un provider caen directamente sobre el context, así que
+un handler lee `ctx.user`. Agruparlos bajo un namespace agregaría un
+nivel de anidamiento a cada acceso a cambio de evitar colisiones — y
+las colisiones ya se previenen en tiempo de compilación, ya que
+volver a proveer una key existente o uno de los campos base del
+context no pasa el chequeo de tipos.
+
+→ [Typed context](../providers/typed-context.mdx)
+
+## Los handlers retornan valores
+
+Un valor retornado se mapea a un `Response`, así que un handler se
+mantiene como una función ordinaria que retorna datos: fácil de
+testear, imposible de enviar dos veces. Retornar un `Response` sigue
+disponible para tener control total.
+
+→ [Response](../fundamentals/response.mdx)
+
+## `ctx.response` es mutable hasta que el body se finaliza
+
+El middleware necesita asignar headers después de que el handler ya
+corrió, y un `Response` real no se puede mutar de esa forma. El
+pipeline mantiene un objeto mutable de staging y lo materializa apenas
+un body existe en cualquier capa, que es lo que hace que los cambios
+de headers post-`next()` se mantengan.
+
+El costo aceptado es que el status queda fijo desde ese punto en
+adelante, ya que un `Response` real lo expone como solo lectura.
+
+→ [Modifying responses](../middleware/modifying-responses.mdx)
+
+## Un `Response` crudo gana sin condiciones
+
+Cuando un handler o un middleware retorna un `Response`, se usa tal
+cual — sin fusionar los headers o el status acumulados. Fusionar
+haría que el resultado dependiera de capas que el autor de ese
+`Response` no puede ver; pasarlo directo mantiene predecible la
+válvula de escape.
+
+→ [Response](../fundamentals/response.mdx)
+
+## La validation habla Standard Schema
+
+Aceptar cualquier librería que implemente
+[Standard Schema](https://standardschema.dev/) significa que Arcton
+nunca depende de un validador ni impone uno, mientras que el tipo de
+salida del schema igual fluye hacia el handler.
+
+→ [Validación](../validation/overview.mdx)
+
+## El body parsing está separado de la validation
+
+Un schema valida un valor que ya está en memoria y no sabe nada de
+HTTP. Convertir bytes en ese valor, según el `Content-Type`, es una
+cosa separada con su propio punto de extensión en `app.parser()`.
+
+→ [Body parsers](../validation/body-parsers.mdx)
+
+## Los parsers son una tabla plana, no steps del pipeline
+
+`app.parser()` mapea un media type a un parser. Registrar el mismo
+tipo de nuevo lo reemplaza. Los parsers no tienen semántica de orden
+ni de snapshot porque no hay ninguna composición que expresar:
+exactamente un parser maneja un `Content-Type` dado.
+
+→ [Body parsers](../validation/body-parsers.mdx)
+
+## Los scopes de path deben ser static
+
+Un scope se compara contra el path de una ruta como una relación
+simple entre dos paths. Permitir segmentos `:param` convertiría al
+matching de scopes en un segundo sistema de pattern-matching corriendo
+al lado del router.
+
+→ [Scoped middleware](../middleware/scoped.mdx)
+
+## Los prefixes también deben ser static
+
+Un prefix dinámico haría que los parámetros de un módulo dependieran
+de dónde se lo montó, rompiendo la inferencia de `ctx.params` a partir
+del literal de la ruta.
+
+→ [Modules](../routing/modules.mdx)
+
+## El soporte de runtime es una interfaz, no un target de build
+
+`RuntimeAdapter` es una interfaz pública en un paquete solo-tipos, así
+que el core se escribe una vez y cada runtime es una capa de
+traducción delgada elegida en `listen()`.
+
+→ [Adapters](./adapters.mdx)
+
+## Las capabilities se verifican en `listen()`
+
+Un módulo montado después de una llamada a `ws()` todavía puede
+agregar rutas WebSocket, así que `listen()` es el primer punto donde
+se conoce el conjunto final — y arrancar es donde un desajuste
+debería salir a la luz.
+
+→ [WebSockets](../routing/websockets.mdx)
+
+## Los conflictos tiran un error al registrarse
+
+Rutas duplicadas, nombres de parámetro en conflicto, paths inválidos,
+scopes y prefixes no static, todos tiran un error al registrarse.
+Arrancar es el lugar más barato posible para encontrarlos, y el
+mensaje puede nombrar la ruta.
+
+→ [Registration errors](../errors/registration-errors.mdx)
+
+## El trabajo pasa al registrarse, no por request
+
+El hilo conductor de casi todo lo anterior. Un request matchea un
+path, corre una cadena ya preparada, y mapea un valor — todo lo demás
+ya se decidió cuando se construyó la aplicación.
+
+→ [Overview](./overview.mdx)

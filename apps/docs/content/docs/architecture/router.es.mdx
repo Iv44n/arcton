@@ -1,0 +1,118 @@
+---
+title: Router Internals
+description: Por qué Arcton guarda las rutas en un árbol con tres slots por nodo, y cómo el matching y el backtracking se derivan de esa forma.
+---
+
+El router responde una sola pregunta: dado un método y un pathname,
+¿qué handler corre y cuáles son sus parámetros?
+
+## Por qué un árbol
+
+La implementación obvia es una lista de patrones probados en orden. Es
+simple, pero el costo de un request crece con la cantidad de rutas, y
+la respuesta depende del orden de registro — lo que significa que
+agregar una ruta puede cambiar silenciosamente qué handler alcanza un
+request existente.
+
+Arcton guarda las rutas en un árbol en su lugar, un nodo por segmento
+de path. El matching recorre los segmentos del request y desciende. El
+costo sigue la *profundidad* del path, no la *cantidad* de rutas, y la
+forma del árbol es la misma sin importar en qué orden se registraron
+las rutas.
+
+## Tres slots por nodo
+
+Cada nodo tiene exactamente tres cosas por las que se puede alcanzar
+un hijo:
+
+```text
+node
+├── static:   Map<string, node>     "users" → node
+├── dynamic:  { name, node }        ":id"
+└── wildcard: { name, node }        "*path"
+```
+
+Un `Map` para los hijos static hace que el caso común sea una búsqueda
+por hash en vez de un escaneo. Los slots dynamic y wildcard son
+únicos porque un nodo solo puede tener uno de cada uno: dos rutas que
+usan nombres de parámetro distintos en la misma posición harían que
+`ctx.params` fuera ambiguo, así que ese conflicto se rechaza al
+registrarse en vez de resolverse arbitrariamente en tiempo de
+matching.
+
+Tener los tres tipos como slots separados también significa que la
+prioridad no necesita ningún paso de ordenamiento. Static, después
+dynamic, después wildcard es simplemente el orden en que están
+escritas las tres verificaciones — la estructura de datos codifica la
+regla de precedencia.
+
+## Matching y backtracking
+
+El matching desciende de forma greedy y retrocede cuando una rama
+falla:
+
+```text
+  1. ¿hay un hijo static con ese texto exacto?   → desciende; si falla, continúa
+  2. ¿hay un slot dynamic?                       → captura, desciende; si falla,
+                                                 descarta la captura y continúa
+  3. ¿hay un slot wildcard?                      → captura el resto, decide acá
+  si no                                          → falla, deja que retroceda quien llamó
+```
+
+El backtracking importa porque una rama más específica puede matchear
+durante varios segmentos y después llegar a un callejón sin salida.
+Dado `/a/:b/c` y `/a/*rest`, el request `/a/x/y` sigue `:b`, falla en
+`c`, retrocede, y termina en el wildcard. Los parámetros capturados en
+el path abandonado se eliminan al retroceder, así que un handler nunca
+ve un parámetro de una rama que no matcheó.
+
+## Por qué un método que no coincide no hace backtracking
+
+Cuando el matching llega a un nodo que tiene handlers pero ninguno
+para este método, se detiene y reporta `405` con los métodos de ese
+nodo. No sigue buscando otro patrón que aceptara el método.
+
+La alternativa — seguir buscando hasta que algún patrón acepte el
+método — significaría que `POST /users/me` podría ser servido por
+`/users/:id` mientras que `GET /users/me` es servido por `/users/me`.
+Un mismo path resolvería a rutas distintas según el verbo, lo cual es
+más difícil de razonar que un `405`. La regla que eligió Arcton es que
+el path matcheado más específico es dueño de la URL, para cada método.
+[Precedence](../routing/precedence.mdx) muestra cómo se ve eso desde
+afuera.
+
+## Normalización y decodificación
+
+Los segmentos vacíos se descartan antes de matchear, así que
+`/users`, `/users/` y `/users//` son el mismo path. Eso elimina la
+configuración de slash final como concepto.
+
+Solo los valores de parámetro capturados se decodean con
+percent-decoding, y solo después de que el path ya matcheó. Decodear
+primero le permitiría a un `%2F` codificado inventar un límite de
+segmento que el cliente nunca envió. Un valor cuya secuencia de escape
+es inválida se pasa crudo en vez de fallar el request, ya que un
+escape inválido en un parámetro no es motivo para rechazar una ruta
+que por lo demás matcheó.
+
+## Validation al registrarse
+
+Los paths de las rutas se parsean y verifican cuando se registran: el
+slash inicial, la ausencia de `//`, el nombrado de parámetros, que un
+wildcard sea el último, nombres de parámetro duplicados, segmentos
+static que sobreviven un round trip por `URL`, y pares de método y
+path duplicados.
+
+Hacer esto al registrarse hace que el proceso falle al arrancar con un
+mensaje que nombra la ruta, en vez de servir una ruta que nunca puede
+matchear. Ver [Registration errors](../errors/registration-errors.mdx).
+
+## Lo que el router no sabe
+
+El router guarda un handler por método por nodo, y nada más. Nunca
+escuchó hablar de middleware, scopes, providers o validation: para
+cuando un handler llega al árbol, toda su cadena ya está incorporada
+en él. Eso es lo que mantiene el matching como un recorrido y una
+búsqueda, y es por qué un scope puede existir como un concepto de
+tiempo de registro sin que el matcher gane un segundo lenguaje de
+patrones. Ver [Pipeline](./pipeline.mdx).

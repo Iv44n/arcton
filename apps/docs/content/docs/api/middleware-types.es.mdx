@@ -1,0 +1,124 @@
+---
+title: Tipos de middleware
+description: Los tipos de función detrás del middleware global, del middleware con scope y del route middleware, más los tipos internos de matching del router
+---
+
+Un [`Middleware`](#middleware) es simplemente una función — sin clase, sin decorador, nada más que pasarla a [`app.use()`](./arcton-app.mdx#use) o a una ruta:
+
+```ts
+import type { Middleware } from '@arcton/contracts'
+import { Arcton } from '@arcton/core'
+
+const logger: Middleware = async (ctx, next) => {
+  console.log(ctx.request.method, ctx.request.url)
+  await next()
+}
+
+const app = Arcton()
+
+app.use(logger)
+app.get('/', () => 'ok')
+
+app.listen()
+```
+
+## Middleware
+
+**Propósito:** la forma de toda función de middleware — global, con scope, o route middleware.
+
+**Firma**
+```ts
+import type { Body, Context, NextFunction, QueryParams, RouteParams } from '@arcton/contracts'
+
+type Middleware<P = RouteParams, Q = QueryParams, TBody = {}, TProvided = {}> = (
+  ctx: Context<P, Q, TBody, TProvided>,
+  next: NextFunction
+) => Promise<Body | void> | Body | void
+```
+
+**Comportamiento:** el orden de los parámetros genéricos — `P, Q, TBody, TProvided` — es estructural: coincide con el propio orden de [`Context`](./context.mdx). El código antes de `await next()` corre de ida; el código después corre de vuelta. Retornar un valor sin llamar a `next()` corta la cadena del pipeline — nada más abajo se ejecuta. Ver [Orden de ejecución](../middleware/execution-order.mdx).
+
+## NextFunction
+
+**Propósito:** avanza el pipeline al siguiente step.
+
+**Firma**
+```ts
+type NextFunction = () => Promise<void>
+```
+
+**Comportamiento:** llama al siguiente middleware (o al handler, si no queda ninguno) y se resuelve una vez que todo lo que sigue haya terminado.
+
+## RouteHandler
+
+**Propósito:** la forma del handler final de una ruta.
+
+**Firma**
+```ts
+import type { Body, Context, QueryParams, RouteParams } from '@arcton/contracts'
+
+type RouteHandler<P = RouteParams, Q = QueryParams, TBody = {}, TProvided = {}> = (
+  ctx: Context<P, Q, TBody, TProvided>
+) => (Body | void) | Promise<Body | void>
+```
+
+**Comportamiento:** la misma forma que [`Middleware`](#middleware), sin `next` — un handler siempre corre al final, así que no tiene nada que llamar. Este es el tipo del argumento final de `get`/`post`/etc. y de `RouteOptions.handler`.
+
+## MatchResult
+
+**Propósito:** el resultado de hacer match entre un método y un path contra el árbol de rutas.
+
+**Firma**
+```ts
+import type { HttpMethod, RouteHandler, RouteParams } from '@arcton/contracts'
+
+type MatchResult =
+  | { matched: true; handler: RouteHandler; params: RouteParams }
+  | { notFound: true }
+  | { methodNotAllowed: true; allowed: HttpMethod[] }
+```
+
+**Comportamiento:** el valor de retorno de `Router.match()`, descrito a continuación. El código de la aplicación no construye ni lee esto directamente — se expone para quien implemente un [`RuntimeAdapter`](./runtime-types.mdx) personalizado.
+
+## Router
+
+**Propósito:** la interfaz interna que usa `ArctonApp` para resolver una request a un handler.
+
+**Firma**
+```ts
+import type { HttpMethod, MatchResult } from '@arcton/contracts'
+
+interface Router {
+  match(method: HttpMethod, url: string): MatchResult
+}
+```
+
+**Comportamiento:** ver [Precedencia](../routing/precedence.mdx) para las reglas de matching — static le gana a dynamic, que le gana a wildcard, con backtracking.
+
+## ReservedKeys
+
+**Propósito:** las keys que [`provide()`](./arcton-app.mdx#provide) rechaza agregar.
+
+**Firma**
+```ts
+import type { BaseContext } from '@arcton/contracts'
+
+type ReservedKeys<TProvided> = keyof BaseContext | 'body' | keyof TProvided
+```
+
+**Comportamiento:** cubre los campos base de `Context` (`request`/`params`/`query`/`response`), `'body'`, y cualquier key ya provista antes en la cadena. Volver a proveer una de estas es un error de compilación, no uno de runtime.
+
+## ProvideFn
+
+**Propósito:** la forma de función que se pasa a [`app.provide()`](./arcton-app.mdx#provide).
+
+**Firma**
+```ts
+import type { Context, QueryParams, RouteParams } from '@arcton/contracts'
+
+type ProvideFn<TProvided, R extends Record<string, unknown>> = (
+  ctx: Context<RouteParams, QueryParams, {}, TProvided>
+) => R | Promise<R>
+```
+
+**Comportamiento:** corre antes de la validación a nivel de ruta, así que solo ve los valores por defecto crudos de `params`/`query` — nunca el output del schema de una ruta. Su valor de retorno, `R`, se fusiona de forma plana sobre `ctx`. Ver [Providers](../providers/overview.mdx).

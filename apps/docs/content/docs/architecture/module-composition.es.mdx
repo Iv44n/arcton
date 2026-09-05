@@ -1,0 +1,96 @@
+---
+title: Module Composition
+description: Por qué montar un módulo fusiona árboles de rutas al registrarse en vez de delegar a un router anidado en tiempo de request.
+---
+
+`app.use(module)` toma el árbol de rutas del módulo y lo injerta en el
+árbol del padre, justo en esa llamada. Después hay un solo árbol, y
+nada registra que un módulo alguna vez estuvo involucrado.
+
+## La alternativa que Arcton no tomó
+
+El enfoque común es un router anidado: el padre guarda una referencia
+al hijo y, cuando llega un request con un prefix que coincide, se lo
+delega. Eso es simple de implementar y cuesta algo en cada request —
+un match en el padre, después un match en el hijo, y otra vez por cada
+nivel de anidamiento. Una estructura de tres niveles significa tres
+pasadas de matching por request, para siempre.
+
+Fusionar paga ese costo una sola vez, al arrancar. Un request contra
+un módulo anidado profundamente cuesta exactamente lo mismo que una
+ruta de nivel superior, porque para cuando llegan los requests ya no
+queda ningún anidamiento — solo un árbol.
+
+## Qué hace la fusión en realidad
+
+El injerto recorre el árbol del módulo e inserta cada ruta en el árbol
+del padre bajo el prefix combinado, usando las mismas primitivas de
+get-or-create y de conflicto que usa un `app.get()` directo. De
+reusar esas primitivas en vez de duplicarlas se siguen dos cosas:
+
+- Una colisión producida al montar tira el mismo error, con el mismo
+  mensaje, que registrar una ruta duplicada a mano. No hay una segunda
+  clase de conflicto que aprender.
+- Un conflicto de nombre de parámetro entre una ruta montada y una
+  existente se captura de la misma forma, en el mismo momento.
+
+El propio árbol del módulo queda intacto, así que el mismo módulo se
+puede montar en más de un padre.
+
+## Envolver, una sola vez
+
+Cada handler montado se envuelve con los steps globales del padre tal
+como existían en el momento del montaje — la misma regla de snapshot
+que gobierna a una ruta registrada directamente.
+
+El envoltorio pasa una sola vez por handler, en tiempo de montaje, no
+por request. Un handler que llegó a través de dos niveles de montaje
+tiene el middleware de ambos padres incorporado en él, en el orden
+correcto, sin ninguna composición en tiempo de request.
+
+El middleware con scope del padre queda excluido a propósito. Un
+scope es una afirmación sobre el propio path de una ruta, y un módulo
+llega como un subárbol entero sin un único path contra el cual
+comparar — así que no hay nada sólido contra qué compararlo. En vez de
+adivinar, montar descarta los steps con scope, y el módulo conserva su
+propio middleware con scope, que se compara contra los paths locales
+del módulo. El mismo razonamiento gobierna qué corre en
+[404 y 405](../middleware/execution-order.mdx).
+
+## Por qué un módulo es simplemente una aplicación
+
+No hay ningún tipo `Router` que aprender. Un módulo es una instancia
+de `Arcton()`, lo que significa que tiene la API completa: su propio
+middleware, sus propios providers, su propia validation, sus propios
+módulos.
+
+Eso tiene una ganancia práctica. Un módulo se puede desarrollar y
+correr por su cuenta — llamar a `listen()` sobre él directamente
+durante el desarrollo, montarlo en el padre en producción — porque
+nunca hubo nada distinto en él.
+
+## Qué te cuesta la fusión
+
+Fusionar al registrarse significa que el árbol se construye a partir
+de lo que existe en ese momento, lo que produce una regla que vale la
+pena recordar: las rutas agregadas a un módulo *después* de haber sido
+montado no aparecen en el padre. Monta un módulo una vez que ya está
+completamente construido.
+
+A cambio, la forma de la aplicación queda fija una vez que se llama a
+`listen()`. Nada del routing puede cambiar entre requests, es
+imposible introducir conflictos en runtime, y la tabla de rutas se
+conoce desde que arranca.
+
+## Prefixes
+
+Un prefix se guarda en la instancia y se aplica cuando se registra una
+ruta sobre ella — así que las rutas de un módulo ya tienen prefix para
+cuando algo lo monta, y montar simplemente agrega encima el prefix del
+padre.
+
+Los prefixes deben ser paths static. Un prefix dinámico haría que los
+parámetros de las rutas montadas dependieran de dónde se montaron, y
+`ctx.params` dejaría de poder derivarse del literal de la ruta que
+escribió el módulo. Mantener los prefixes static conserva intacta esa
+inferencia en cada nivel de anidamiento.

@@ -1,0 +1,129 @@
+---
+title: listen()
+description: Comienza a atender requests y devuelve un handle al servidor en ejecución
+---
+
+`listen()` es la última llamada en una aplicación Arcton:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+const server = app.listen({ port: 3000 })
+
+console.log(`Listening on ${server.url}`)
+```
+
+Ver [Opciones de listen](../configuration/listen-options.mdx) para la guía orientada al uso.
+
+## listen
+
+**Propósito:** inicia el servidor a través del [adapter](./adapters.mdx) elegido.
+
+**Firma**
+```ts
+import type { ArctonListenOptions } from '@arcton/core'
+import type { RuntimeServer } from '@arcton/contracts'
+
+declare function listen(options?: ArctonListenOptions): RuntimeServer
+```
+
+**Parámetros:** un `ArctonListenOptions` opcional, documentado más abajo.
+
+**Tipo de retorno:** [`RuntimeServer`](#runtimeserver).
+
+**Comportamiento:** imprime un banner de arranque — el logo figlet de Arcton, la versión de Arcton, el nombre y versión del runtime, el `env`, y la URL de escucha — y luego devuelve un `RuntimeServer`. Las rutas, y las llamadas a `use()` y `provide()` hechas después de `listen()`, no afectan a las requests que ya fluyen a través de rutas registradas antes, ya que el pipeline de cada ruta queda fijado en un snapshot al momento del registro.
+
+**Errores:** si se registró alguna ruta [`ws()`](./arcton-app.mdx#ws) y el `capabilities.websocket` del adapter elegido es `false`, `listen()` lanza `Runtime "<adapter.name>" does not support WebSocket routes.`. Ambos adapters incluidos — [`bunAdapter` y `nodeAdapter`](./adapters.mdx) — soportan WebSockets, así que esto solo importa con un adapter personalizado.
+
+## ArctonListenOptions
+
+**Propósito:** el objeto de opciones aceptado por `listen()`.
+
+**Firma**
+```ts
+import type { RuntimeAdapter } from '@arcton/contracts'
+
+interface ArctonListenOptions {
+  port?: number
+  hostname?: string
+  adapter?: RuntimeAdapter
+  env?: string
+}
+```
+
+**Parámetros**
+
+<TypeTable
+  type={{
+    port: {
+      description: 'Puerto en el que escuchar. 0 elige un puerto libre — lee el real desde server.port/server.url.',
+      type: 'number',
+      default: '3000'
+    },
+    hostname: {
+      description: 'Hostname al que hacer bind.',
+      type: 'string'
+    },
+    adapter: {
+      description: 'El RuntimeAdapter usado para atender requests.',
+      type: 'RuntimeAdapter',
+      default: 'bunAdapter'
+    },
+    env: {
+      description: "Etiqueta la línea Environment del banner de arranque. Nada más la lee.",
+      type: 'string',
+      default: "process.env.NODE_ENV ?? 'development'"
+    }
+  }}
+/>
+
+**Comportamiento:** ver [Entorno](../configuration/environment.mdx) para lo que hace `env` (y solo eso), [Tipos de runtime](./runtime-types.mdx) para la interfaz `RuntimeAdapter`, y [Adapters](./adapters.mdx) para los valores `bunAdapter`/`nodeAdapter`.
+
+## RuntimeServer
+
+**Propósito:** el handle que devuelve `listen()` para el servidor en ejecución.
+
+**Firma**
+```ts
+interface RuntimeServer {
+  readonly port: number
+  readonly url: URL
+  stop(closeActiveConnections?: boolean): void | Promise<void>
+}
+```
+
+**Parámetros**
+
+<TypeTable
+  type={{
+    port: { description: 'El puerto vinculado.', type: 'number' },
+    url: { description: 'La URL completa de escucha.', type: 'URL' },
+    closeActiveConnections: {
+      description: "Se pasa a stop() — fuerza el cierre de las conexiones en curso en vez de esperarlas.",
+      type: 'boolean',
+      default: 'false'
+    }
+  }}
+/>
+
+**Comportamiento:** `port` y `url` reflejan la dirección realmente vinculada — útil cuando `port: 0` eligió una libre. `stop()` apaga el servidor; devuelve `void` en el [adapter de Bun](./adapters.mdx) y una `Promise<void>` en el [adapter de Node](./adapters.mdx). Este es el tipo que se usa en toda la sección de [Testing](../testing/overview.mdx) para levantar un servidor en `port: 0`, ejercitarlo con llamadas `fetch` reales, y luego apagarlo.
+
+**Ejemplo**
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'ok')
+
+const server = app.listen({ port: 0 })
+
+const res = await fetch(server.url)
+console.log(res.status, server.port)
+
+await server.stop()
+```

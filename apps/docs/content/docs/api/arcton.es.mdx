@@ -1,0 +1,83 @@
+---
+title: Arcton
+description: La función factory que crea una instancia de aplicación
+---
+
+Toda aplicación Arcton comienza con una sola llamada a esta función:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen()
+```
+
+## Arcton()
+
+**Propósito:** crea una nueva instancia de aplicación — un [`ArctonApp`](./arcton-app.mdx) — sobre la que registras rutas, middleware y providers.
+
+**Firma**
+```ts
+import type { ArctonApp, ArctonConfig } from '@arcton/core'
+
+declare function Arcton(config?: ArctonConfig): ArctonApp<{}>
+```
+
+**Parámetros**
+
+<TypeTable
+  type={{
+    config: {
+      description: 'Configuración opcional para esta instancia.',
+      type: 'ArctonConfig',
+      default: '{}'
+    }
+  }}
+/>
+
+**Tipo de retorno:** un [`ArctonApp<{}>`](./arcton-app.mdx) sin contexto provisto todavía — [`provide()`](./arcton-app.mdx#provide) lo hace crecer a medida que registras providers.
+
+**Comportamiento:** cada llamada a `Arcton()` crea una instancia independiente, con su propio árbol de rutas, middleware global y body parsers. Llamarla más de una vez — por ejemplo, para construir un [module](../routing/modules.mdx) que luego se monta con `app.use(module)` — es la forma normal de componer una aplicación a partir de piezas más pequeñas.
+
+**Errores:** ninguno directamente. Un `config.prefix` que no sea una ruta estática lanza una excepción en el momento de la construcción — ver `ArctonConfig` más abajo.
+
+## ArctonConfig
+
+**Propósito:** el objeto de configuración que se pasa a `Arcton()`.
+
+**Firma**
+```ts
+interface ArctonConfig {
+  prefix?: string
+}
+```
+
+**Parámetros**
+
+<TypeTable
+  type={{
+    prefix: {
+      description: "Una ruta estática que se antepone a cada ruta y cada ruta ws registrada directamente en esta instancia.",
+      type: 'string',
+      default: 'undefined'
+    }
+  }}
+/>
+
+**Comportamiento:** `prefix` debe ser una ruta estática — un segmento `:param` o `*wildcard` lanza una excepción al crear la instancia. `'/'` y un `prefix` omitido equivalen a no tener prefix. Ver [Configuración de la app](../configuration/app-config.mdx) para la guía completa, incluyendo cómo se componen los prefixes entre modules montados.
+
+**Errores:** un prefix no estático lanza `Prefix "<value>" must be a static path — dynamic/wildcard segments aren't supported (e.g. app.use('/api', mw), not app.use('/api/:id', mw))`. Ver [Errores de registro](../errors/registration-errors.mdx).
+
+**Ejemplo**
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton({ prefix: '/api' })
+
+app.get('/users', () => [])
+
+app.listen()
+```

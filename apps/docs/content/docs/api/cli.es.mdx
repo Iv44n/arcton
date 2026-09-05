@@ -1,0 +1,125 @@
+---
+title: CLI
+description: Scaffoldea un nuevo proyecto de Arcton con arcton create y sus dos templates de runtime.
+---
+
+## Resumen
+
+Scaffoldea un nuevo proyecto de forma interactiva:
+
+```bash
+bunx arcton create my-app
+```
+
+o mediante la convención de scaffolding del package manager, que resuelve al mismo flujo a través del paquete separado `create-arcton`:
+
+```bash
+bun create arcton my-app
+npm create arcton my-app
+pnpm create arcton my-app
+```
+
+Pasar el nombre como argumento (como arriba) se salta el prompt del nombre; corriéndolo sin uno lo pregunta interactivamente.
+
+## `arcton create`
+
+**Propósito** — scaffoldea interactivamente un nuevo proyecto de Arcton: elegir un nombre de proyecto, un runtime, y un package manager, y luego opcionalmente instalar las dependencias.
+
+**Firma**
+
+```bash
+arcton create [name]
+```
+
+**Parámetros**
+
+| Parámetro | Tipo | Descripción |
+|---|---|---|
+| `name` | `string` (opcional) | Nombre del directorio del proyecto. Debe contener solo letras, dígitos, puntos, guiones y guiones bajos. Se pregunta interactivamente si se omite. |
+
+**Comportamiento** — el flujo, en orden:
+
+1. Pregunta por un nombre de proyecto (se salta si se pasó como argumento).
+2. Pregunta por un runtime: Bun o Node.js.
+3. Pregunta por un package manager: `bun`, `pnpm`, o `npm` (por defecto `bun` si el runtime elegido es Bun, si no `npm`).
+4. Si el directorio destino ya existe y no está vacío, pide confirmar si sobrescribirlo.
+5. Copia el template del runtime elegido al directorio destino y setea el `name` del proyecto en su `package.json`.
+6. Pregunta si instalar las dependencias ahora (por defecto sí), y corre el comando de instalación correspondiente si la respuesta es afirmativa.
+7. Imprime los próximos pasos a seguir.
+
+Esto se expone tanto como el subcomando `arcton create` (desde el subpath export `arcton/create` del paquete `arcton`) como, de forma independiente, `create-arcton` — un paquete cuyo único trabajo es satisfacer la convención `create-<name>` de la que dependen `npm create arcton` / `pnpm create arcton` / `bun create arcton`, re-exportando la misma implementación.
+
+**Ejemplo**
+
+```bash
+bunx arcton create my-app
+```
+
+```bash
+cd my-app
+bun install
+bun run dev
+```
+
+## Templates
+
+Hay dos templates de runtime disponibles; ambos scaffoldean un proyecto que depende de `@arcton/core`.
+
+### Template de Bun
+
+Scripts de `package.json`:
+
+```json
+{
+  "scripts": {
+    "dev": "bun --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "compile": "bun build --compile --minify --sourcemap ./src/index.ts --outfile arcton-app"
+  }
+}
+```
+
+`src/index.ts`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => {
+  return 'Hello, Arcton!'
+})
+
+app.listen()
+```
+
+### Template de Node
+
+Scripts de `package.json`:
+
+```json
+{
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc --build",
+    "start": "node dist/index.js"
+  }
+}
+```
+
+`src/index.ts`:
+
+```ts
+import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => {
+  return 'Hello, Arcton!'
+})
+
+app.listen({ adapter: nodeAdapter })
+```
+
+Ver [Installation](../getting-started/installation.mdx) para los prerequisitos y [Development](../getting-started/development.mdx) para el uso diario de estos scripts.
