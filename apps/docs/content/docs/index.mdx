@@ -24,6 +24,8 @@ generic argument, no cast. The returned object becomes a JSON response.
 
 ## Start here
 
+A straight line from zero to a running server:
+
 <Cards>
   <Card
     title="What is Arcton?"
@@ -41,21 +43,26 @@ generic argument, no cast. The returned object becomes a JSON response.
     href="./getting-started/first-server.mdx"
   />
   <Card
-    title="Routing"
-    description="Static, dynamic and wildcard segments, and which one wins."
-    href="./routing/overview.mdx"
+    title="Project structure"
+    description="What the scaffold gives you, and where your code goes."
+    href="./getting-started/project-structure.mdx"
   />
 </Cards>
 
-## Learn the model
+## Core concepts
 
-Four ideas cover most of Arcton. Read them in this order:
+The ideas that show up everywhere else in Arcton:
 
 <Cards>
   <Card
     title="Context"
     description="The single object a handler receives: request, params, query, response."
     href="./fundamentals/context.mdx"
+  />
+  <Card
+    title="Routing"
+    description="Static, dynamic and wildcard segments, and which one wins."
+    href="./routing/overview.mdx"
   />
   <Card
     title="Middleware"
@@ -68,9 +75,34 @@ Four ideas cover most of Arcton. Read them in this order:
     href="./validation/overview.mdx"
   />
   <Card
+    title="Providers"
+    description="Compose typed values onto ctx with provide(), available to everything after it."
+    href="./providers/overview.mdx"
+  />
+  <Card
     title="Modules"
     description="Compose an application from Arcton instances that merge at registration."
     href="./routing/modules.mdx"
+  />
+</Cards>
+
+## Running an app for real
+
+<Cards>
+  <Card
+    title="Errors"
+    description="How a mistake, yours or the caller's, turns into a response."
+    href="./errors/overview.mdx"
+  />
+  <Card
+    title="Configuration"
+    description="What ArctonConfig and listen() actually control — and what env only labels."
+    href="./configuration/app-config.mdx"
+  />
+  <Card
+    title="Testing"
+    description="Testing routes and middleware with bun:test, no mocking required."
+    href="./testing/overview.mdx"
   />
 </Cards>
 

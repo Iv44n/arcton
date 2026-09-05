@@ -23,7 +23,9 @@ app.listen({ port: 3000 })
 dice — sin argumento genérico, sin cast. El objeto retornado se convierte en
 una respuesta JSON.
 
-## Empezá acá
+## Empieza acá
+
+Una línea recta de cero a un servidor corriendo:
 
 <Cards>
   <Card
@@ -42,21 +44,26 @@ una respuesta JSON.
     href="./getting-started/first-server.mdx"
   />
   <Card
-    title="Enrutamiento"
-    description="Segmentos estáticos, dinámicos y wildcard, y cuál gana."
-    href="./routing/overview.mdx"
+    title="Estructura del proyecto"
+    description="Qué te da el scaffold, y dónde va tu código."
+    href="./getting-started/project-structure.mdx"
   />
 </Cards>
 
-## Aprendé el modelo
+## Conceptos centrales
 
-Cuatro ideas cubren la mayor parte de Arcton. Leelas en este orden:
+Las ideas que aparecen en todo lo demás de Arcton:
 
 <Cards>
   <Card
     title="Context"
     description="El único objeto que recibe un handler: request, params, query, response."
     href="./fundamentals/context.mdx"
+  />
+  <Card
+    title="Enrutamiento"
+    description="Segmentos estáticos, dinámicos y wildcard, y cuál gana."
+    href="./routing/overview.mdx"
   />
   <Card
     title="Middleware"
@@ -69,9 +76,34 @@ Cuatro ideas cubren la mayor parte de Arcton. Leelas en este orden:
     href="./validation/overview.mdx"
   />
   <Card
+    title="Providers"
+    description="Compone valores tipados sobre ctx con provide(), disponibles para todo lo que sigue."
+    href="./providers/overview.mdx"
+  />
+  <Card
     title="Módulos"
-    description="Componé una aplicación a partir de instancias de Arcton que se fusionan al registrarse."
+    description="Compone una aplicación a partir de instancias de Arcton que se fusionan al registrarse."
     href="./routing/modules.mdx"
+  />
+</Cards>
+
+## Correr una app de verdad
+
+<Cards>
+  <Card
+    title="Errors"
+    description="Cómo un error, tuyo o de quien llama, se convierte en una respuesta."
+    href="./errors/overview.mdx"
+  />
+  <Card
+    title="Configuration"
+    description="Qué controlan de verdad ArctonConfig y listen() — y qué es lo único que etiqueta env."
+    href="./configuration/app-config.mdx"
+  />
+  <Card
+    title="Testing"
+    description="Testear rutas y middleware con bun:test, sin necesitar mocks."
+    href="./testing/overview.mdx"
   />
 </Cards>
 
