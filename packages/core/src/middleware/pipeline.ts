@@ -89,7 +89,20 @@ export function runPipeline(
         return next()
       })
     }
-    return Promise.resolve(step.fn(ctx, next)).then(result => {
+    // A fresh, single-use wrapper per 'use' step — calling it a second time
+    // rejects instead of silently re-running everything downstream again.
+    let calledNext = false
+    const guardedNext = (): Promise<void> => {
+      if (calledNext) {
+        return Promise.reject(
+          new Error('next() was already called by this middleware')
+        )
+      }
+      calledNext = true
+      return next()
+    }
+
+    return Promise.resolve(step.fn(ctx, guardedNext)).then(result => {
       if (result !== undefined) {
         body = result
         materialize(result)

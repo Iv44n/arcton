@@ -340,7 +340,7 @@ test('use-only: mw skips next() entirely → resolves void, body left unset', as
   expect(body).toBeUndefined()
 })
 
-test('use-only: next() called twice (current behavior, not a guaranteed API) — downstream runs twice', async () => {
+test('use-only: next() called twice by the same middleware rejects instead of re-running downstream', async () => {
   let handlerCalls = 0
   const steps: Step[] = [
     {
@@ -355,9 +355,10 @@ test('use-only: next() called twice (current behavior, not a guaranteed API) —
     handlerCalls++
   }
 
-  await runPipeline(steps, handler, makeCtx())
-
-  expect(handlerCalls).toBe(2)
+  await expect(runPipeline(steps, handler, makeCtx())).rejects.toThrow(
+    'next() was already called by this middleware'
+  )
+  expect(handlerCalls).toBe(1)
 })
 
 test('provide → handler: handler sees what was provided', async () => {

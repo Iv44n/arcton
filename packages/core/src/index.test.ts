@@ -559,6 +559,45 @@ test('app.use: short-circuit middleware returning an object skips the handler', 
   expect(await res.json()).toEqual({ blocked: true })
 })
 
+test('app.use: middleware never calling next() (and returning nothing) resolves 200 with an empty body — handler never runs', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  let handlerCalled = false
+
+  app.use(async () => {})
+  app.get('/', () => {
+    handlerCalled = true
+    return { ok: true }
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/'))
+  expect(handlerCalled).toBe(false)
+  expect(res.status).toBe(200)
+  expect(await res.text()).toBe('')
+})
+
+test('app.use: middleware calling next() twice surfaces as an uncaught error, not a double-executed handler', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  let handlerCalls = 0
+
+  app.use(async (_ctx, next) => {
+    await next()
+    await next()
+  })
+  app.get('/', () => {
+    handlerCalls++
+    return { ok: true }
+  })
+  app.listen({ port: 0, adapter })
+
+  await expect(call(handler, new Request('http://localhost/'))).rejects.toThrow(
+    'next() was already called by this middleware'
+  )
+  expect(handlerCalls).toBe(1)
+})
+
 test('app.use: global middleware runs on 404, e.g. to set CORS headers on it', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
   const app = Arcton()
