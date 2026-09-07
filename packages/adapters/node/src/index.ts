@@ -156,6 +156,14 @@ export const nodeAdapter: RuntimeAdapter = {
 
     server.listen(options.port, options.hostname)
 
+    // Memoized on the first call — `server.close()` rejects with
+    // ERR_SERVER_NOT_RUNNING if the server is already closed, and an
+    // unhandled rejection from a second, uncaught `stop()` call crashes the
+    // whole Node process (default `--unhandled-rejections=throw` since
+    // Node 15). Returning the same settled promise to every caller makes a
+    // repeated `stop()` a safe no-op instead, matching the Bun adapter.
+    let stopped: Promise<void> | undefined
+
     return {
       get port() {
         const address = server.address()
@@ -170,13 +178,15 @@ export const nodeAdapter: RuntimeAdapter = {
         return new URL(`http://${options.hostname ?? 'localhost'}:${port}/`)
       },
       stop(closeActiveConnections) {
-        return new Promise<void>((resolve, reject) => {
+        if (stopped) return stopped
+        stopped = new Promise<void>((resolve, reject) => {
           if (closeActiveConnections) {
             for (const client of wss.clients) client.terminate()
             server.closeAllConnections()
           }
           server.close(error => (error ? reject(error) : resolve()))
         })
+        return stopped
       }
     }
   }

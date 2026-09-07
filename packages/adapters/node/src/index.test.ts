@@ -14,6 +14,28 @@ test('nodeAdapter serves the fetch handler and exposes url/port', async () => {
   await server.stop()
 })
 
+test('nodeAdapter: calling stop() again after it already resolved is a no-op, not a rejection', async () => {
+  const server = nodeAdapter.serve({
+    port: 0,
+    fetch: () => new Response('ok')
+  })
+
+  await server.stop()
+  await expect(server.stop()).resolves.toBeUndefined()
+})
+
+test('nodeAdapter: overlapping concurrent stop() calls both resolve instead of one rejecting', async () => {
+  const server = nodeAdapter.serve({
+    port: 0,
+    fetch: () => new Response('ok')
+  })
+
+  await expect(Promise.all([server.stop(), server.stop()])).resolves.toEqual([
+    undefined,
+    undefined
+  ])
+})
+
 test('nodeAdapter has no HTTP routing of its own — every request goes straight to fetch', async () => {
   const server = nodeAdapter.serve({
     port: 0,
