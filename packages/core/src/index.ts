@@ -93,6 +93,12 @@ export interface ArctonApp<TProvided = {}> {
   patch: RouteMethod<TProvided>
   head: RouteMethod<TProvided>
   options: RouteMethod<TProvided>
+  /**
+   * Registers a WebSocket route. Bypasses the HTTP pipeline entirely —
+   * `use()`/`provide()`/validation never run for it, so auth, logging or
+   * rate-limiting registered globally do not apply here; handle it inside
+   * this handler (typically in `open`).
+   */
   ws(path: string, handler: RuntimeWebSocketHandler): ArctonApp<TProvided>
   /**
    * Global middleware — composes behavior. Doesn't grow `TProvided`; see

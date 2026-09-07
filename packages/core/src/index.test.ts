@@ -106,6 +106,36 @@ test('app.get/app.ws register routes served by listen()', async () => {
   server.stop()
 })
 
+test('.ws() bypasses the HTTP pipeline entirely — global use()/provide() never run for it', async () => {
+  const app = Arcton().provide(() => ({ user: { id: 'u1' } }))
+  let middlewareRan = false
+
+  app.use(async (_ctx, next) => {
+    middlewareRan = true
+    await next()
+  })
+  app.ws('/chat', {
+    open(ws) {
+      ws.send('connected')
+    },
+    message() {}
+  })
+
+  const server = app.listen({ port: 0 })
+  const wsUrl = new URL('/chat', server.url)
+  wsUrl.protocol = 'ws:'
+  const ws = new WebSocket(wsUrl)
+
+  const opened = new Promise<string>(resolve => {
+    ws.addEventListener('message', event => resolve(event.data as string))
+  })
+  expect(await opened).toBe('connected')
+  expect(middlewareRan).toBe(false)
+
+  ws.close()
+  server.stop()
+})
+
 test('a handler returning a plain value is auto-mapped to JSON, a Response is passed through', async () => {
   const app = Arcton()
 
