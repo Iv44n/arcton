@@ -1,0 +1,14 @@
+{
+  "name": "@arcton/adapter-contract-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@arcton/adapter-bun": "workspace:*",
+    "@arcton/adapter-node": "workspace:*",
+    "@arcton/contracts": "workspace:*",
+    "@types/bun": "latest"
+  }
+}
