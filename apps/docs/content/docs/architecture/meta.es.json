@@ -1,3 +1,13 @@
 {
-  "title": "Arquitectura"
+  "title": "Arquitectura",
+  "icon": "Blocks",
+  "pages": [
+    "overview",
+    "router",
+    "pipeline",
+    "adapters",
+    "runtime-abstraction",
+    "module-composition",
+    "design-decisions"
+  ]
 }

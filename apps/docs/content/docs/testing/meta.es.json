@@ -1,1 +1,5 @@
-{"title": "Testing"}
+{
+  "title": "Testing",
+  "icon": "FlaskConical",
+  "pages": ["overview", "testing-routes", "testing-middleware"]
+}

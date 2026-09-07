@@ -1,3 +1,5 @@
 {
-  "title": "Providers"
+  "title": "Providers",
+  "icon": "Plug",
+  "pages": ["overview", "typed-context", "providers-vs-middleware"]
 }

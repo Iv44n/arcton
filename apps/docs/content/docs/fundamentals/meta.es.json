@@ -1,3 +1,11 @@
 {
-  "title": "Fundamentos"
+  "title": "Fundamentos",
+  "icon": "Boxes",
+  "pages": [
+    "application",
+    "request-lifecycle",
+    "context",
+    "request",
+    "response"
+  ]
 }

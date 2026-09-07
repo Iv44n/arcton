@@ -1,3 +1,16 @@
 {
-  "title": "Referencia de la API"
+  "title": "Referencia de la API",
+  "icon": "Braces",
+  "pages": [
+    "arcton",
+    "arcton-app",
+    "listen",
+    "context",
+    "middleware-types",
+    "validation-types",
+    "runtime-types",
+    "adapters",
+    "cors",
+    "cli"
+  ]
 }

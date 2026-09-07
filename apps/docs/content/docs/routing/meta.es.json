@@ -1,3 +1,13 @@
 {
-  "title": "Enrutamiento"
+  "title": "Enrutamiento",
+  "icon": "Route",
+  "pages": [
+    "overview",
+    "path-parameters",
+    "query-parameters",
+    "precedence",
+    "http-methods",
+    "modules",
+    "websockets"
+  ]
 }
