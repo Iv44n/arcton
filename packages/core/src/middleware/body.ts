@@ -1,5 +1,56 @@
 import type { BodyParser } from '@arcton/contracts'
 
+// Matches Bun.serve's own default — the Node adapter otherwise buffers a
+// request body with no limit at all.
+export const DEFAULT_MAX_BODY_SIZE = 128 * 1024 * 1024
+
+// Content-Length is authoritative when present, so this rejects an
+// oversized declared body without reading any of it.
+export function contentLengthExceeds(
+  request: Request,
+  maxBytes: number
+): boolean {
+  const contentLength = request.headers.get('content-length')
+  if (contentLength === null) return false
+  const declared = Number(contentLength)
+  return Number.isFinite(declared) && declared > maxBytes
+}
+
+// Counts bytes as a chunked/streamed body (no Content-Length) arrives,
+// aborting once the running total exceeds the limit. No-op for GET/HEAD.
+export function limitBodySize(request: Request, maxBytes: number): Request {
+  if (!request.body) return request
+
+  const source = request.body
+  let total = 0
+  const limited = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const reader = source.getReader()
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          total += value.byteLength
+          if (total > maxBytes) {
+            controller.error(
+              new Error(
+                `Request body exceeds the configured limit of ${maxBytes} bytes`
+              )
+            )
+            return
+          }
+          controller.enqueue(value)
+        }
+        controller.close()
+      } catch (err) {
+        controller.error(err)
+      }
+    }
+  })
+
+  return new Request(request, { body: limited, duplex: 'half' } as RequestInit)
+}
+
 // Reads and parses a request body according to Content-Type — separate from
 // validation on purpose: Standard Schema validates a value already in
 // memory, it has no notion of HTTP or Content-Type. This is the only piece

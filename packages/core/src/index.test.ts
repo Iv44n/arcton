@@ -1522,3 +1522,69 @@ test('app.parser(): a throwing custom parser propagates uncaught', async () => {
     )
   ).rejects.toBe(err)
 })
+
+// ── maxBodySize ──────────────────────────────────────────────────────────
+
+test('maxBodySize: a declared Content-Length over the limit is rejected with 413, handler never runs', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  let handlerCalled = false
+  app.post('/upload', () => {
+    handlerCalled = true
+  })
+  app.listen({ port: 0, adapter, maxBodySize: 10 })
+
+  const res = await call(
+    handler,
+    new Request('http://localhost/upload', {
+      method: 'POST',
+      headers: { 'content-length': '20' },
+      body: 'x'.repeat(20)
+    })
+  )
+
+  expect(res.status).toBe(413)
+  expect(handlerCalled).toBe(false)
+})
+
+test('maxBodySize: a streamed body with no Content-Length exceeding the limit fails once read', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/upload', async ctx => {
+    await ctx.request.text()
+    return { ok: true }
+  })
+  app.listen({ port: 0, adapter, maxBodySize: 10 })
+
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('x'.repeat(20)))
+      controller.close()
+    }
+  })
+
+  await expect(
+    call(
+      handler,
+      new Request('http://localhost/upload', {
+        method: 'POST',
+        body: stream,
+        duplex: 'half'
+      } as RequestInit)
+    )
+  ).rejects.toThrow(/exceeds the configured limit/)
+})
+
+test('maxBodySize: a body under the default limit is unaffected', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/upload', async ctx => ({ received: await ctx.request.text() }))
+  app.listen({ port: 0, adapter })
+
+  const res = await call(
+    handler,
+    new Request('http://localhost/upload', { method: 'POST', body: 'hello' })
+  )
+
+  expect(await res.json()).toEqual({ received: 'hello' })
+})

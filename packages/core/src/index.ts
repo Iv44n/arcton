@@ -16,7 +16,12 @@ import type {
   StandardSchemaV1
 } from '@arcton/contracts'
 import pkg from '../package.json' with { type: 'json' }
-import { normalizeMediaType } from './middleware/body'
+import {
+  contentLengthExceeds,
+  DEFAULT_MAX_BODY_SIZE,
+  limitBodySize,
+  normalizeMediaType
+} from './middleware/body'
 import { runPipeline, type Step } from './middleware/pipeline'
 import { parse, type Segment } from './router/parse'
 import { createRouter } from './router/router'
@@ -42,6 +47,8 @@ export interface ArctonListenOptions {
   adapter?: RuntimeAdapter
   /** Defaults to `process.env.NODE_ENV`, falling back to `'development'`. */
   env?: string
+  /** Max request body size in bytes. Defaults to 128MB (Bun.serve's own default). */
+  maxBodySize?: number
 }
 
 // `Route` infers as the literal passed for `path`, so `ctx.params` comes
@@ -451,6 +458,7 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     listen(options = {}) {
       const adapter = options.adapter ?? bunAdapter
       const environment = options.env ?? process.env.NODE_ENV ?? 'development'
+      const maxBodySize = options.maxBodySize ?? DEFAULT_MAX_BODY_SIZE
 
       // Checked here, not at ws()/mount time — this is the earliest point
       // the final set of ws routes (including any merged in via mountApp)
@@ -478,6 +486,11 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
         hostname: options.hostname,
         websocket: websocketRoutes,
         async fetch(request) {
+          if (contentLengthExceeds(request, maxBodySize)) {
+            return new Response(null, { status: 413 })
+          }
+          request = limitBodySize(request, maxBodySize)
+
           const method = request.method as HttpMethod
           // Parsed once and reused for both matching (pathname) and query
           // (searchParams) — router.matchPathname skips the URL parse
