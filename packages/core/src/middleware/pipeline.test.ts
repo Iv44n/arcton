@@ -361,6 +361,151 @@ test('use-only: next() called twice by the same middleware rejects instead of re
   expect(handlerCalls).toBe(1)
 })
 
+// ── next() microtask-ordering contract (PIPELINE-006) ───────────────────────
+//
+// A middleware must link its own completion to next()'s — via `await`,
+// `return next()`, or `return await next()` — not call it and move on. The
+// three patterns below are the legitimate ways to do that; each must reach
+// the real, async handler and materialize its result normally. The fourth
+// (fire-and-forget) must be rejected instead of racing the response.
+
+function asyncHandler(order: string[], delayMs = 5) {
+  return async () => {
+    await new Promise(resolve => setTimeout(resolve, delayMs))
+    order.push('handler-done')
+    return { fromHandler: true }
+  }
+}
+
+test('next() contract: await next() — waits for the real async handler, no false positive', async () => {
+  const order: string[] = []
+  const steps: Step[] = [
+    {
+      kind: 'use',
+      fn: async (_ctx, next) => {
+        order.push('mw-pre')
+        await next()
+        order.push('mw-post')
+      }
+    }
+  ]
+
+  const body = await runPipeline(steps, asyncHandler(order), makeCtx())
+
+  expect(order).toEqual(['mw-pre', 'handler-done', 'mw-post'])
+  expect(body).toEqual({ fromHandler: true })
+})
+
+test('next() contract: return next() (no await, but chained) — no false positive', async () => {
+  const order: string[] = []
+  const steps: Step[] = [{ kind: 'use', fn: (_ctx, next) => next() }]
+
+  const body = await runPipeline(steps, asyncHandler(order), makeCtx())
+
+  expect(order).toEqual(['handler-done'])
+  expect(body).toEqual({ fromHandler: true })
+})
+
+test('next() contract: await next(); return undefined — identical to no return, no false positive', async () => {
+  const order: string[] = []
+  const steps: Step[] = [
+    {
+      kind: 'use',
+      fn: async (_ctx, next) => {
+        await next()
+        return undefined
+      }
+    }
+  ]
+
+  const body = await runPipeline(steps, asyncHandler(order), makeCtx())
+
+  expect(order).toEqual(['handler-done'])
+  expect(body).toEqual({ fromHandler: true })
+})
+
+test('next() contract: fire-and-forget (next() called, neither awaited nor returned) rejects instead of racing the response', async () => {
+  const order: string[] = []
+  const steps: Step[] = [
+    {
+      kind: 'use',
+      fn: (_ctx, next) => {
+        order.push('mw-start')
+        next() // deliberately not awaited/returned
+        order.push('mw-returns-immediately')
+      }
+    }
+  ]
+  const ctx = makeCtx()
+
+  await expect(runPipeline(steps, asyncHandler(order), ctx)).rejects.toThrow(
+    'Middleware returned before its own next() call finished — did you forget to await it?'
+  )
+  // The pipeline already rejected before the orphaned handler had a chance to run.
+  expect(order).toEqual(['mw-start', 'mw-returns-immediately'])
+
+  await new Promise(resolve => setTimeout(resolve, 20))
+  // The orphaned chain does still complete in the background afterwards —
+  // detecting the bug doesn't cancel it, it only stops it from silently
+  // racing the response that already went out.
+  expect(order).toEqual(['mw-start', 'mw-returns-immediately', 'handler-done'])
+})
+
+test('next() contract: a fire-and-forget next() that later rejects does not crash the process (no unhandled rejection)', async () => {
+  const unhandled: unknown[] = []
+  const onUnhandled = (reason: unknown) => unhandled.push(reason)
+  process.on('unhandledRejection', onUnhandled)
+
+  try {
+    const steps: Step[] = [{ kind: 'use', fn: (_ctx, next) => void next() }]
+    const failingHandler = async () => {
+      await new Promise(resolve => setTimeout(resolve, 5))
+      throw new Error('downstream boom, after the middleware already returned')
+    }
+
+    await expect(runPipeline(steps, failingHandler, makeCtx())).rejects.toThrow(
+      'Middleware returned before its own next() call finished — did you forget to await it?'
+    )
+
+    // Give the orphaned chain time to actually reject in the background.
+    await new Promise(resolve => setTimeout(resolve, 20))
+  } finally {
+    process.off('unhandledRejection', onUnhandled)
+  }
+
+  expect(unhandled).toEqual([])
+})
+
+test('next() contract: calling next() twice, both fire-and-forget, does not crash the process either', async () => {
+  const unhandled: unknown[] = []
+  const onUnhandled = (reason: unknown) => unhandled.push(reason)
+  process.on('unhandledRejection', onUnhandled)
+
+  try {
+    const steps: Step[] = [
+      {
+        kind: 'use',
+        fn: (_ctx, next) => {
+          next() // 1st call, fire-and-forget
+          next() // 2nd call, also fire-and-forget — rejects immediately
+        }
+      }
+    ]
+
+    await expect(
+      runPipeline(steps, () => ({ ok: true }), makeCtx())
+    ).rejects.toThrow(
+      'Middleware returned before its own next() call finished — did you forget to await it?'
+    )
+
+    await new Promise(resolve => setTimeout(resolve, 10))
+  } finally {
+    process.off('unhandledRejection', onUnhandled)
+  }
+
+  expect(unhandled).toEqual([])
+})
+
 test('provide → handler: handler sees what was provided', async () => {
   const steps: Step[] = [
     { kind: 'provide', fn: () => ({ user: { id: 'u1' } }) }

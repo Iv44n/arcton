@@ -91,24 +91,71 @@ export function runPipeline(
     }
     // A fresh, single-use wrapper per 'use' step — calling it a second time
     // rejects instead of silently re-running everything downstream again.
+    // `nextSettled` tracks whether that one call has resolved/rejected by
+    // the time *this* middleware's own function returns — attached here,
+    // before the promise is handed back, so it fires regardless of whether
+    // the middleware ever awaits it (a fire-and-forget `next()` call, with
+    // no `await`/`return`, otherwise races the downstream chain against the
+    // response this step is about to produce).
     let calledNext = false
+    let nextSettled = false
+    let outerChecked = false
     const guardedNext = (): Promise<void> => {
       if (calledNext) {
-        return Promise.reject(
+        const rejected = Promise.reject(
           new Error('next() was already called by this middleware')
         )
+        rejected.catch(() => {}) // don't let an unobserved 2nd call crash the process too
+        return rejected
       }
       calledNext = true
-      return next()
+      let pending: Promise<void>
+      try {
+        pending = next()
+      } catch (err) {
+        // next() can throw synchronously (e.g. a handler that throws
+        // synchronously rather than rejecting a promise) — settled right
+        // then, by definition, since there was never an async gap for a
+        // fire-and-forget race to happen in.
+        nextSettled = true
+        const rejected = Promise.reject(err)
+        rejected.catch(() => {}) // don't let an unobserved caller crash the process too
+        return rejected
+      }
+      pending.then(
+        () => {
+          nextSettled = true
+        },
+        err => {
+          nextSettled = true
+          // Only the fire-and-forget path reaches here after outerChecked
+          // is already true — a properly awaited/returned next() always
+          // settles first, so this never fires for correct middleware.
+          if (outerChecked) {
+            console.error(
+              "Arcton: a middleware's next() call rejected after the " +
+                'middleware itself had already returned (fire-and-forget):',
+              err
+            )
+          }
+        }
+      )
+      return pending
     }
 
     return Promise.resolve(step.fn(ctx, guardedNext)).then(result => {
+      outerChecked = true
       // Every middleware either calls next() (continue) or returns a body/
       // Response (short-circuit) — neither is a state the pipeline contract
       // has a meaning for, so it's always a bug, never a legitimate no-op.
       if (!calledNext && result === undefined) {
         throw new Error(
           'Middleware completed without calling next() or returning a response'
+        )
+      }
+      if (calledNext && !nextSettled) {
+        throw new Error(
+          'Middleware returned before its own next() call finished — did you forget to await it?'
         )
       }
       if (result !== undefined) {
