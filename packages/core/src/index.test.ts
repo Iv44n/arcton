@@ -348,6 +348,20 @@ test('mapResponse: ctx.response.status outside [200, 599] throws a descriptive e
   )
 })
 
+test("mapResponse: a non-integer status (e.g. NaN) throws Arcton's own descriptive error", async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.get('/', ctx => {
+    ctx.response.status = Number.NaN
+    return { ok: true }
+  })
+  app.listen({ port: 0, adapter })
+
+  await expect(call(handler, new Request('http://localhost/'))).rejects.toThrow(
+    /Invalid response status NaN/
+  )
+})
+
 test('mapResponse: ctx.response.headers merge on top of the inferred headers', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
   const app = Arcton()

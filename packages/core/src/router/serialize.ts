@@ -22,9 +22,9 @@ export function mapResponse(
   }
 
   const status = responseContext.status ?? 200
-  if (status < 200 || status > 599) {
+  if (!Number.isInteger(status) || status < 200 || status > 599) {
     throw new Error(
-      `Invalid response status ${status}: must be between 200 and 599`
+      `Invalid response status ${status}: must be an integer between 200 and 599`
     )
   }
 
