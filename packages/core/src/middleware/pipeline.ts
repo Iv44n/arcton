@@ -103,6 +103,14 @@ export function runPipeline(
     }
 
     return Promise.resolve(step.fn(ctx, guardedNext)).then(result => {
+      // Every middleware either calls next() (continue) or returns a body/
+      // Response (short-circuit) — neither is a state the pipeline contract
+      // has a meaning for, so it's always a bug, never a legitimate no-op.
+      if (!calledNext && result === undefined) {
+        throw new Error(
+          'Middleware completed without calling next() or returning a response'
+        )
+      }
       if (result !== undefined) {
         body = result
         materialize(result)

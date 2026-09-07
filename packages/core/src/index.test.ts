@@ -589,7 +589,7 @@ test('app.use: short-circuit middleware returning an object skips the handler', 
   expect(await res.json()).toEqual({ blocked: true })
 })
 
-test('app.use: middleware never calling next() (and returning nothing) resolves 200 with an empty body — handler never runs', async () => {
+test('app.use: middleware never calling next() and returning nothing rejects — handler never runs', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
   const app = Arcton()
   let handlerCalled = false
@@ -601,10 +601,10 @@ test('app.use: middleware never calling next() (and returning nothing) resolves 
   })
   app.listen({ port: 0, adapter })
 
-  const res = await call(handler, new Request('http://localhost/'))
+  await expect(call(handler, new Request('http://localhost/'))).rejects.toThrow(
+    'Middleware completed without calling next() or returning a response'
+  )
   expect(handlerCalled).toBe(false)
-  expect(res.status).toBe(200)
-  expect(await res.text()).toBe('')
 })
 
 test('app.use: middleware calling next() twice surfaces as an uncaught error, not a double-executed handler', async () => {
@@ -970,8 +970,9 @@ test('use(scope, mw): only runs for routes under that scope', async () => {
   const app = Arcton()
   let authRan = false
 
-  app.use('/api', () => {
+  app.use('/api', (_ctx, next) => {
     authRan = true
+    return next()
   })
   app.get('/api/users', () => ({ ok: true }))
   app.get('/health', () => ({ ok: true }))
@@ -989,8 +990,9 @@ test('use(scope, mw): matches the scope itself and nested paths, not a mere stri
   const app = Arcton()
   const ran: string[] = []
 
-  app.use('/api', () => {
+  app.use('/api', (_ctx, next) => {
     ran.push('auth')
+    return next()
   })
   app.get('/api', () => ({ ok: true }))
   app.get('/api/users/:id', () => ({ ok: true }))
@@ -1013,8 +1015,9 @@ test('use(scope, mw): registration-order semantics — only applies to routes re
     authRan = false
     return { ok: true }
   })
-  app.use('/api', () => {
+  app.use('/api', (_ctx, next) => {
     authRan = true
+    return next()
   })
   app.get('/api/orders', () => {
     return { ok: true }
@@ -1195,8 +1198,9 @@ test('use(scope, mw) inside a prefixed instance compares against the module-loca
   const app = Arcton({ prefix: '/api' })
   let ran = false
 
-  app.use('/users', () => {
+  app.use('/users', (_ctx, next) => {
     ran = true
+    return next()
   })
   app.get('/users', () => ({ ok: true }))
   app.get('/health', () => ({ ok: true }))
@@ -1295,8 +1299,9 @@ test("a module's own use(scope, mw) still applies correctly after being mounted"
   let ran = false
 
   const users = Arcton({ prefix: '/users' })
-  users.use('/settings', () => {
+  users.use('/settings', (_ctx, next) => {
     ran = true
+    return next()
   })
   users.get('/', () => ({ list: true }))
   users.get('/settings', () => ({ settings: true }))

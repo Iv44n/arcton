@@ -326,7 +326,7 @@ test('use-only: two middleware both return a Body → the outermost one wins', a
   expect(body).toEqual({ from: 'mw1' })
 })
 
-test('use-only: mw skips next() entirely → resolves void, body left unset', async () => {
+test('use-only: mw skips next() entirely and returns nothing → rejects, handler never runs', async () => {
   let handlerCalled = false
   const steps: Step[] = [{ kind: 'use', fn: () => {} }]
   const handler = () => {
@@ -334,10 +334,10 @@ test('use-only: mw skips next() entirely → resolves void, body left unset', as
     return { fromHandler: true }
   }
 
-  const body = await runPipeline(steps, handler, makeCtx())
-
+  await expect(runPipeline(steps, handler, makeCtx())).rejects.toThrow(
+    'Middleware completed without calling next() or returning a response'
+  )
   expect(handlerCalled).toBe(false)
-  expect(body).toBeUndefined()
 })
 
 test('use-only: next() called twice by the same middleware rejects instead of re-running downstream', async () => {
