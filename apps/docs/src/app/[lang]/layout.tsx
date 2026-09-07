@@ -1,9 +1,15 @@
 import type { TranslationsAPI } from 'fumadocs-core/i18n'
 import { i18nProvider } from 'fumadocs-ui/i18n'
 import { RootProvider } from 'fumadocs-ui/provider/next'
+import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { translations } from '@/lib/layout.shared'
+import { siteUrl } from '@/lib/shared'
 import '../global.css'
+
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl)
+}
 
 const inter = Inter({
   subsets: ['latin']
@@ -22,7 +28,10 @@ export default async function Layout({
             the translations we actually add) — safe at runtime, since those are
             exactly the keys the UI ever looks up. */}
         <RootProvider
-          i18n={i18nProvider(translations as TranslationsAPI<'en' | 'es'>, lang)}
+          i18n={i18nProvider(
+            translations as TranslationsAPI<'en' | 'es'>,
+            lang
+          )}
         >
           {children}
         </RootProvider>

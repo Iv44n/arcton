@@ -1,6 +1,6 @@
-import { DynamicLink } from 'fumadocs-core/dynamic-link'
 import { DynamicCodeBlock } from 'fumadocs-ui/components/dynamic-codeblock'
 import { ArrowRight } from 'lucide-react'
+import Link from 'next/link'
 import { docsRoute } from '@/lib/shared'
 import { CopyCommand } from './copy-command'
 
@@ -85,13 +85,13 @@ export function Hero({ locale }: { locale: string }) {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <DynamicLink
-              href={`/[lang]${docsRoute}`}
+            <Link
+              href={`/${locale}${docsRoute}`}
               className="inline-flex items-center gap-2 rounded-full bg-red-500 px-5 py-2.5 font-medium text-white transition-colors hover:bg-red-600"
             >
               {t.cta}
               <ArrowRight className="size-4" />
-            </DynamicLink>
+            </Link>
             <CopyCommand command="bun create arcton" />
           </div>
         </div>
