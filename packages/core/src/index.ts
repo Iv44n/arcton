@@ -382,6 +382,11 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
   ): ArctonApp<never> {
     if (args.length === 1 && isRouteOptions(args[0])) {
       const { params, query, body, middleware, handler } = args[0]
+      if (typeof handler !== 'function') {
+        throw new Error(
+          `${method} "${path}": RouteOptions requires a "handler" function`
+        )
+      }
       return insertRoute(method, path, middleware ?? [], handler, {
         params,
         query,

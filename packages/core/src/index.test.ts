@@ -785,6 +785,15 @@ test('route-level middleware: a global middleware returning a Body after next() 
   expect(await res.json()).toEqual({ from: 'global' })
 })
 
+test('a RouteOptions object with no handler throws at registration, not at request time', () => {
+  const app = Arcton()
+
+  expect(() =>
+    // @ts-expect-error deliberately missing `handler`
+    app.get('/x', {})
+  ).toThrow(/requires a "handler" function/)
+})
+
 test('route-level middleware: duplicate route registration still throws', () => {
   const app = Arcton()
   app.get(
