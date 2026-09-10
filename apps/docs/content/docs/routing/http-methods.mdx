@@ -48,6 +48,36 @@ app.listen()
 Registering the same method and path twice throws at registration — see
 [Registration errors](../errors/registration-errors.mdx).
 
+## Every method on one path
+
+`app.all()` registers the same handler for all seven methods above in one
+call. It's mainly for delegating a whole path — often a wildcard subtree — to
+an external Request/Response handler, e.g. mounting a library like
+[better-auth](https://www.better-auth.com):
+
+```ts
+import { Arcton } from '@arcton/core'
+import { auth } from './auth'
+
+const app = Arcton()
+
+app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+
+app.listen()
+```
+
+`all` isn't a wildcard for arbitrary or non-standard HTTP verbs — it expands
+to exactly the same seven methods `get`/`post`/etc. answer. A request with
+some other verb still gets `405` (if the path matches something else) or
+`404`.
+
+Because it shares the same handler across all seven methods, registering
+`all()` and then a specific method on the same path — in either order —
+throws the same "Duplicate route" error as registering that method twice;
+see [Registration errors](../errors/registration-errors.mdx). And like a
+wildcard segment anywhere else, `/api/auth/*path` needs at least one segment
+to match — a bare `/api/auth` needs its own registration too, if you need it.
+
 ## Method not allowed
 
 When a request's path matches but its method has no handler, Arcton answers

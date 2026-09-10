@@ -184,6 +184,120 @@ test('end-to-end: dynamic route params + 405 with Allow', async () => {
   expect(del.headers.get('Allow')).toBe('GET, POST')
 })
 
+// ── app.all() ────────────────────────────────────────────────────────────
+
+test('app.all(): a single registration answers every HTTP method Arcton supports', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+
+  app.all('/api/auth/*path', ctx => ({ path: ctx.params.path }))
+  app.listen({ port: 0, adapter })
+
+  for (const method of [
+    'GET',
+    'POST',
+    'PUT',
+    'DELETE',
+    'PATCH',
+    'OPTIONS'
+  ] as const) {
+    const res = await call(
+      handler,
+      new Request('http://localhost/api/auth/session', { method })
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ path: 'session' })
+  }
+
+  // HEAD mirrors GET but Bun/undici strip the body — only the status is
+  // meaningful here.
+  const head = await call(
+    handler,
+    new Request('http://localhost/api/auth/session', { method: 'HEAD' })
+  )
+  expect(head.status).toBe(200)
+})
+
+test('app.all(): a wildcard needs a segment — the bare prefix alone still 404s unless registered separately', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+
+  app.all('/api/auth/*path', () => ({ ok: true }))
+  app.listen({ port: 0, adapter })
+
+  const bare = await call(handler, new Request('http://localhost/api/auth'))
+  expect(bare.status).toBe(404)
+})
+
+test('app.all(): registering a specific method on the same path afterwards throws, same as registering that method twice', () => {
+  const app = Arcton()
+  app.all('/webhook', () => ({ ok: true }))
+
+  expect(() => app.post('/webhook', () => ({ ok: true }))).toThrow(
+    'Duplicate route: POST /webhook is already registered'
+  )
+})
+
+test('app.all(): registering it on a path that already has a specific method throws without partially registering the rest', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+
+  app.put('/webhook', () => ({ updated: true }))
+  expect(() => app.all('/webhook', () => ({ ok: true }))).toThrow(
+    'Duplicate route: PUT /webhook is already registered'
+  )
+
+  app.listen({ port: 0, adapter })
+
+  // GET/POST/etc. were earlier in ALL_METHODS than the conflicting PUT —
+  // none of them should have been registered by the failed app.all() call,
+  // so the node still only knows about the original PUT (405, not matched).
+  const get = await call(handler, new Request('http://localhost/webhook'))
+  expect(get.status).toBe(405)
+  expect(get.headers.get('Allow')).toBe('PUT')
+
+  const put = await call(
+    handler,
+    new Request('http://localhost/webhook', { method: 'PUT' })
+  )
+  expect(put.status).toBe(200)
+  expect(await put.json()).toEqual({ updated: true })
+})
+
+test('app.all(): composes with provide()/route-level middleware exactly like get()/post() — the better-auth mount pattern', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton().provide(ctx => ({
+    user:
+      ctx.request.headers.get('authorization') === 'secret' ? { id: 1 } : null
+  }))
+
+  app.all(
+    '/api/auth/*path',
+    async (ctx, next) => {
+      if (!ctx.user) return new Response('Unauthorized', { status: 401 })
+      await next()
+    },
+    ctx => ({ userId: ctx.user!.id, path: ctx.params.path })
+  )
+  app.listen({ port: 0, adapter })
+
+  const unauthorized = await call(
+    handler,
+    new Request('http://localhost/api/auth/session', { method: 'POST' })
+  )
+  expect(unauthorized.status).toBe(401)
+
+  const authorized = await call(
+    handler,
+    new Request('http://localhost/api/auth/session', {
+      method: 'POST',
+      headers: { authorization: 'secret' }
+    })
+  )
+  expect(authorized.status).toBe(200)
+  expect(await authorized.json()).toEqual({ userId: 1, path: 'session' })
+})
+
 test('mapResponse: null/undefined/void → empty body, status 200', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
   const app = Arcton()

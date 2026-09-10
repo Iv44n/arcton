@@ -142,6 +142,51 @@ test('same path, same dynamic name, different methods → OK, no conflict', () =
   expect(idNode?.handlers.size).toBe(3)
 })
 
+// ── insert() with a method list — app.all() ─────────────────────────────
+
+test('insert() with a method list (app.all()) registers the same handler under every method', () => {
+  const root = createRouteNode()
+  insert(
+    root,
+    parse('/api/auth/*path'),
+    ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'],
+    noop
+  )
+
+  const node = root.static.get('api')?.static.get('auth')?.wildcard?.node
+  expect(node?.handlers.size).toBe(7)
+  for (const method of [
+    'GET',
+    'POST',
+    'PUT',
+    'DELETE',
+    'PATCH',
+    'HEAD',
+    'OPTIONS'
+  ] as const) {
+    expect(node?.handlers.get(method)).toBe(noop)
+  }
+})
+
+test('insert() with a method list validates every method before mutating any of them (atomic)', () => {
+  const root = createRouteNode()
+  insert(root, parse('/users'), 'PUT', noop)
+
+  expect(() =>
+    insert(root, parse('/users'), ['GET', 'POST', 'PUT', 'DELETE'], noop)
+  ).toThrow('Duplicate route: PUT /users is already registered')
+
+  // GET/POST come before the conflicting PUT in the list — a naive
+  // validate-then-mutate-per-method loop would have already registered
+  // them before reaching PUT and throwing.
+  const node = root.static.get('users')
+  expect(node?.handlers.has('GET')).toBe(false)
+  expect(node?.handlers.has('POST')).toBe(false)
+  expect(node?.handlers.has('DELETE')).toBe(false)
+  expect(node?.handlers.get('PUT')).toBe(noop)
+  expect(node?.handlers.size).toBe(1)
+})
+
 // ── graftTree — module composition ──────────────────────────────────────
 //
 // `wrap` below is intentionally visible (not the identity function), so

@@ -84,10 +84,14 @@ function assertNoHandlerConflict(
   }
 }
 
+// `method` accepts a single method (the common get()/post()/etc. case) or a
+// list (app.all() passing all seven at once) — validated against the node
+// in full before any mutation, so a conflict partway through the list (e.g.
+// the 4th of 7 methods) leaves the node exactly as it was, not half-written.
 export function insert(
   root: RouteNode,
   parsed: ParsedRoute,
-  method: HttpMethod,
+  method: HttpMethod | readonly HttpMethod[],
   handler: RouteHandler
 ): void {
   let node = root
@@ -102,8 +106,9 @@ export function insert(
     }
   }
 
-  assertNoHandlerConflict(node, method, parsed.segments)
-  node.handlers.set(method, handler)
+  const methods = Array.isArray(method) ? method : [method]
+  for (const m of methods) assertNoHandlerConflict(node, m, parsed.segments)
+  for (const m of methods) node.handlers.set(m, handler)
 }
 
 // `source` is left untouched (grafting doesn't consume it — it can be

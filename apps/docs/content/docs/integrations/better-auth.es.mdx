@@ -1,0 +1,201 @@
+---
+title: Better Auth
+description: Monta el handler de better-auth en una app de Arcton y protege rutas con datos de sesión, usando app.all() y provide().
+---
+
+[better-auth](https://www.better-auth.com) expone un único handler estándar
+de la Web — `auth.handler(request: Request): Promise<Response>` — más un
+método programático `auth.api.getSession({ headers })` para leer la sesión
+actual fuera de ese handler. Arcton no tiene un concepto de `mount()`/`macro()`
+pensado para una librería en particular; ambas piezas se conectan con
+primitivas que ya conocés:
+[`app.all()`](../routing/http-methods.mdx#every-method-on-one-path) para
+delegar todas las rutas de auth de una vez, y
+[`provide()`](../providers/overview.mdx) para adjuntar `user`/`session` a
+`ctx` en las rutas que protegés.
+
+Esta guía asume que ya tenés una app de Arcton y una instancia de better-auth
+configurada — mirá la propia
+[guía de instalación](https://www.better-auth.com/docs/installation) de
+better-auth para configurar su adapter de base de datos y providers. Lo que
+sigue es el lado de Arcton para conectarlo.
+
+## Instalar
+
+```bash
+bun add better-auth
+```
+
+```bash
+npm install better-auth
+```
+
+```bash
+pnpm add better-auth
+```
+
+## Montar el handler
+
+Registrá una sola ruta con
+[`app.all()`](../routing/http-methods.mdx#every-method-on-one-path) y reenviá
+`ctx.request` directamente a `auth.handler`:
+
+```ts title="index.ts"
+import { Arcton } from '@arcton/core'
+import { auth } from './auth'
+
+const app = Arcton()
+
+app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+
+app.listen()
+```
+
+`auth.handler` retorna un `Response`, y un `Response` que retorna un handler
+se pasa tal cual, sin tocarlo — ver [Response](../fundamentals/response.mdx)
+— así que todas las rutas que expone better-auth (`/api/auth/get-session`,
+`/api/auth/sign-in/email`, `/api/auth/sign-out`, etc.) ahora responden a
+través de esta única ruta, en `GET`, `POST` y cualquier otro método que
+Arcton soporte.
+
+<Callout>
+  `*path` es un [segmento wildcard](../routing/path-parameters.mdx) y
+  necesita al menos un segmento para matchear — un request a `/api/auth` a
+  secas da 404. Esto no es problema para el cliente de better-auth, que
+  siempre llama a un subpath, pero si necesitás que `/api/auth` a secas
+  también responda, registralo aparte: `app.all('/api/auth', ctx =>
+  auth.handler(ctx.request))`.
+</Callout>
+
+<Callout type="warn">
+  `all()` comparte un mismo handler entre todos los métodos de ese path.
+  Registrar un método específico en `/api/auth/*path` después — o antes —
+  tira el mismo error de "Duplicate route" que registrar ese método dos
+  veces; ver [Registration errors](../errors/registration-errors.mdx#duplicate-route).
+  Mantené las rutas de auth en su propio path y nada más va a chocar con
+  ellas.
+</Callout>
+
+## CORS
+
+Si tu frontend se sirve desde un origen distinto al de la API, agregá
+[`@arcton/cors`](../middleware/cors.mdx) antes de la ruta de auth, con
+`credentials: true` para que la cookie de sesión se permita entre orígenes, y
+avisale a better-auth de ese origen también, con su propia opción
+`trustedOrigins`:
+
+```ts title="index.ts"
+import { Arcton } from '@arcton/core'
+import { cors } from '@arcton/cors'
+import { auth } from './auth'
+
+const app = Arcton()
+
+app.use(
+  cors({
+    origin: 'http://localhost:3001',
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization']
+  })
+)
+
+app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+
+app.listen()
+```
+
+Ver [CORS](../middleware/cors.mdx) para el resto de las opciones, y
+[Global middleware](../middleware/global.mdx) para entender por qué
+`cors()` tiene que registrarse antes de las rutas que debe cubrir.
+
+## Leer la sesión en rutas protegidas
+
+`auth.api.getSession({ headers })` de better-auth es una función async común
+— llamala desde un [`provide()`](../providers/overview.mdx) para adjuntar un
+`user`/`session` tipado a `ctx`, y rechazá con un
+[middleware de ruta](../middleware/route-level.mdx) cuando no hay sesión.
+Es la misma separación que describe
+[Providers vs Middleware](../providers/providers-vs-middleware.mdx):
+`provide()` no puede cortar la cadena, así que el rechazo en sí vive en un
+middleware puesto en las rutas que lo necesitan.
+
+```ts title="index.ts"
+import { Arcton } from '@arcton/core'
+import { auth } from './auth'
+
+const app = Arcton()
+  .provide(async ctx => {
+    const session = await auth.api.getSession({ headers: ctx.request.headers })
+    return { user: session?.user ?? null, session: session?.session ?? null }
+  })
+
+app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+
+app.get(
+  '/me',
+  async (ctx, next) => {
+    if (!ctx.user) return new Response('Unauthorized', { status: 401 })
+    await next()
+  },
+  ctx => ({ user: ctx.user })
+)
+
+app.listen()
+```
+
+El guard se pasa como middleware de ruta — una función inline, no un `const`
+aparte — así su `ctx` se infiere del propio overload de `app.get()` en vez de
+necesitar una anotación de tipo propia; ver
+[Middleware de ruta](../middleware/route-level.mdx). `ctx.user` y
+`ctx.session` quedan disponibles, planos y tipados, en toda ruta registrada
+después del `provide()` — incluidas las que no tienen ningún guard, donde
+simplemente son `null` para un request sin sesión. Solo `/me` rechaza de
+verdad un request no autenticado; una ruta registrada sin el guard sigue
+siendo pública aunque `ctx.user` esté disponible ahí también.
+
+<Callout>
+  Aplicá el guard por ruta, o con un
+  [`use()` scoped](../middleware/scoped.mdx) sobre toda una sección — no hay
+  un flag booleano tipo `{ auth: true }` para activarlo. Pasar el middleware
+  explícitamente es el opt-in.
+</Callout>
+
+## Uniendo todo
+
+```ts title="index.ts"
+import { Arcton } from '@arcton/core'
+import { cors } from '@arcton/cors'
+import { auth } from './auth'
+
+const app = Arcton()
+  .use(
+    cors({
+      origin: 'http://localhost:3001',
+      credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization']
+    })
+  )
+  .provide(async ctx => {
+    const session = await auth.api.getSession({ headers: ctx.request.headers })
+    return { user: session?.user ?? null, session: session?.session ?? null }
+  })
+
+app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+
+app.get(
+  '/me',
+  async (ctx, next) => {
+    if (!ctx.user) return new Response('Unauthorized', { status: 401 })
+    await next()
+  },
+  ctx => ({ user: ctx.user })
+)
+app.get('/posts', ctx => ({ posts: [], viewer: ctx.user }))
+
+app.listen()
+```
+
+Nada de esto depende de `@arcton/adapter-bun` o `@arcton/adapter-node` en
+particular — los dos le pasan al handler el mismo `Request` estándar, con el
+mismo stream de body sin tocar, así que esta integración se comporta igual
+en cualquiera de los dos runtimes.

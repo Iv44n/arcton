@@ -226,6 +226,14 @@ Arcton().post('/users/:id', {
 // @ts-expect-error
 Arcton().get('/x', { handler: () => {} }, () => {})
 
+// ── all(): same RouteMethod<TProvided> shape as get/post/etc. ───────────────
+
+// Wildcard params + TProvided both flow through exactly like get()/post().
+withAuth.all('/api/auth/*path', ctx => {
+  ctx.params.path satisfies string
+  ctx.user.id satisfies string
+})
+
 // ── ArctonConfig / ArctonListenOptions ──────────────────────────────────────
 
 // `port` moved to ArctonListenOptions — ArctonConfig no longer accepts it.

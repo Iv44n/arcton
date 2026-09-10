@@ -12,7 +12,11 @@ import { parse } from './parse'
 import { createRouteNode, insert as insertRoute, type RouteNode } from './tree'
 
 export function createRouter(): Router & {
-  insert(method: HttpMethod, path: string, handler: RouteHandler): void
+  insert(
+    method: HttpMethod | readonly HttpMethod[],
+    path: string,
+    handler: RouteHandler
+  ): void
   // Skips the URL parse `match(method, url)` does internally, for callers
   // that already have a `pathname` on hand (e.g. from a URL they parsed for
   // their own purposes, like reading `searchParams`) and would otherwise

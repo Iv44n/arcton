@@ -41,6 +41,19 @@ export { Http, HttpError } from './errors'
 // resolve into a response.
 const notFoundError = Http.NotFound()
 
+// Single source of truth for what app.all() expands to — every HttpMethod
+// Arcton's router knows about, not a distinct "ANY" concept in the tree
+// itself (see insertRoute/tree.insert: a plain list of concrete methods).
+const ALL_METHODS: readonly HttpMethod[] = [
+  'GET',
+  'POST',
+  'PUT',
+  'DELETE',
+  'PATCH',
+  'HEAD',
+  'OPTIONS'
+]
+
 export interface ArctonConfig {
   /**
    * Where this instance's routes live within a mounting app's tree, e.g.
@@ -105,6 +118,17 @@ export interface ArctonApp<TProvided = {}> {
   patch: RouteMethod<TProvided>
   head: RouteMethod<TProvided>
   options: RouteMethod<TProvided>
+  /**
+   * Registers a route matched by every HTTP method Arcton supports — the
+   * same seven as `get`/`post`/etc., not a wildcard for arbitrary/non-
+   * standard verbs. Useful for delegating a whole path (or wildcard
+   * subtree) to an external Request/Response handler, e.g. mounting a
+   * library like better-auth: `app.all('/api/auth/*path', ctx =>
+   * auth.handler(ctx.request))`. Registering `all()` and then a specific
+   * method on the same path (in either order) throws the same "Duplicate
+   * route" error as registering that method twice.
+   */
+  all: RouteMethod<TProvided>
   /**
    * Registers a WebSocket route. Bypasses the HTTP pipeline entirely —
    * `use()`/`provide()`/validation never run for it, so auth, logging or
@@ -318,7 +342,7 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
   // `validation` is undefined for the plain-handler call shape, so no
   // 'validate' step gets added.
   function insertRoute<Route extends string>(
-    method: HttpMethod,
+    method: HttpMethod | readonly HttpMethod[],
     path: Route,
     routeMiddleware: Middleware[],
     handler: RouteHandler,
@@ -394,15 +418,16 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
   }
 
   function registerRoute<Route extends string>(
-    method: HttpMethod,
+    method: HttpMethod | readonly HttpMethod[],
     path: Route,
     args: unknown[]
   ): ArctonApp<never> {
     if (args.length === 1 && isRouteOptions(args[0])) {
       const { params, query, body, middleware, handler } = args[0]
       if (typeof handler !== 'function') {
+        const label = Array.isArray(method) ? 'ALL' : method
         throw new Error(
-          `${method} "${path}": RouteOptions requires a "handler" function`
+          `${label} "${path}": RouteOptions requires a "handler" function`
         )
       }
       return insertRoute(method, path, middleware ?? [], handler, {
@@ -439,6 +464,9 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     },
     options<Route extends string>(path: Route, ...args: unknown[]) {
       return registerRoute('OPTIONS', path, args)
+    },
+    all<Route extends string>(path: Route, ...args: unknown[]) {
+      return registerRoute(ALL_METHODS, path, args)
     },
     ws(path: string, handler: RuntimeWebSocketHandler) {
       websocketRoutes.push({ path: joinPrefix(prefix, path), handler })

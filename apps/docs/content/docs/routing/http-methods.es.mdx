@@ -48,6 +48,37 @@ app.listen()
 Registrar el mismo método y path dos veces tira un error al registrarse
 — ver [Registration errors](../errors/registration-errors.mdx).
 
+## Todos los métodos en un mismo path
+
+`app.all()` registra el mismo handler para los siete métodos anteriores en
+una sola llamada. Sirve sobre todo para delegar un path completo — muchas
+veces un subárbol wildcard — a un handler externo de Request/Response, por
+ejemplo montar una librería como [better-auth](https://www.better-auth.com):
+
+```ts
+import { Arcton } from '@arcton/core'
+import { auth } from './auth'
+
+const app = Arcton()
+
+app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+
+app.listen()
+```
+
+`all` no es un comodín para verbos HTTP arbitrarios o no estándar — expande
+exactamente a los mismos siete métodos que responden `get`/`post`/etc. Un
+request con otro verbo sigue recibiendo `405` (si el path matchea otra cosa)
+o `404`.
+
+Como comparte el mismo handler entre los siete métodos, registrar `all()` y
+luego un método específico en el mismo path — en cualquier orden — tira el
+mismo error de "Duplicate route" que registrar ese método dos veces; ver
+[Registration errors](../errors/registration-errors.mdx). Y como cualquier
+segmento wildcard, `/api/auth/*path` necesita al menos un segmento para
+matchear — si necesitas que `/api/auth` a secas también responda, hace falta
+registrarlo aparte.
+
 ## Method not allowed
 
 Cuando el path de un request matchea pero su método no tiene handler,

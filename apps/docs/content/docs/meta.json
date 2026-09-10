@@ -8,6 +8,7 @@
     "middleware",
     "validation",
     "providers",
+    "integrations",
     "errors",
     "configuration",
     "testing",
