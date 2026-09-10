@@ -30,7 +30,9 @@ Esa misma idea cubre tres situaciones que pueden surgir:
 
 - **Algo que el cliente hizo mal** — un header faltante, un id inválido, un
   body de request que falla la validación. Se responde con un `Response` 4xx
-  (manualmente, o mediante la propia validación de Arcton). Ver
+  (manualmente, mediante la propia validación de Arcton, o lanzando uno de
+  los `HttpError` ya armados de `@arcton/core`, ver
+  [HTTP errors](../api/http-errors.mdx)). Ver
   [Respondiendo con errores](./responding-with-errors.mdx).
 - **Algo que no se manejó** — una excepción lanzada en un handler, un
   provider, o un body parser personalizado. Ver

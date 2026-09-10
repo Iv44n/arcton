@@ -10,6 +10,7 @@
     "validation-types",
     "runtime-types",
     "adapters",
+    "http-errors",
     "cors",
     "cli"
   ]

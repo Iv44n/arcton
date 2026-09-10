@@ -29,6 +29,8 @@ import { mapResponse } from './router/serialize'
 import { graftTree, type RouteNode } from './router/tree'
 import type { ExtractParams } from './router/types'
 
+export { Http, HttpError } from './errors'
+
 export interface ArctonConfig {
   /**
    * Where this instance's routes live within a mounting app's tree, e.g.

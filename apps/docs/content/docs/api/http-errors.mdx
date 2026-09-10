@@ -1,0 +1,108 @@
+---
+title: HTTP Errors
+description: HttpError and the ready-to-throw Http status factories, from @arcton/core.
+---
+
+## Overview
+
+Throw a ready-made error instead of hand-rolling `ctx.response.status = ...; return {...}` at every place a request can fail:
+
+```ts
+import { Arcton, Http } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/orders/:id', ctx => {
+  const order = findOrder(ctx.params.id)
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
+  return order
+})
+
+app.listen()
+```
+
+On its own this is still an uncaught error — turning it into a response is on you, the same way as any other throw. See [Responding with errors](../errors/responding-with-errors.mdx#throw-a-ready-made-httperror-instead-of-hand-rolling-one) for the try/catch pattern that maps `HttpError`'s `status`/`code`/`body` onto `ctx.response`.
+
+## `HttpError`
+
+**Purpose** — the error class every `Http` factory below returns; construct it directly for a status with no named factory.
+
+**Signature**
+
+```ts no-check
+class HttpError extends Error {
+  constructor(status: number, code: string, message: string, body?: unknown)
+  readonly status: number
+  readonly code: string
+  readonly body?: unknown
+}
+```
+
+**Parameters**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `status` | `number` | The HTTP status code, e.g. `451`. |
+| `code` | `string` | A stable, machine-readable tag, e.g. `'UNAVAILABLE_FOR_LEGAL_REASONS'`. Safe for a client to switch on, unlike `message`. |
+| `message` | `string` | Passed to `Error`'s own `message`. |
+| `body` | `unknown` | Optional. The exact value a catch handler should send back instead of a default `{ code, message }` shape. |
+
+**Behavior** — `HttpError` carries these fields but does nothing with them by itself; nothing in Arcton's pipeline catches an `HttpError` automatically (see [Uncaught errors](../errors/uncaught-errors.mdx)).
+
+**Example**
+
+```ts
+throw new HttpError(451, 'UNAVAILABLE_FOR_LEGAL_REASONS', 'Unavailable For Legal Reasons')
+```
+
+## `Http`
+
+**Purpose** — a namespace of ready-to-throw shortcuts, one per common status. Each one is a plain function — call it, don't `new` it — and returns an `HttpError`.
+
+**Signature**
+
+```ts no-check
+type StatusErrorFactory = (message?: string, body?: unknown) => HttpError
+
+const Http: Record<string, StatusErrorFactory>
+```
+
+**Parameters**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `message` | `string` | Optional. Defaults to the status's reason phrase (see the table below). |
+| `body` | `unknown` | Optional. The exact value a catch handler should send back instead of a default `{ code, message }` shape. |
+
+**Return type** — an [`HttpError`](#httperror).
+
+**Factories**
+
+| Factory | Status | `code` | Default `message` |
+|---|---|---|---|
+| `Http.BadRequest` | `400` | `'BAD_REQUEST'` | Bad Request |
+| `Http.Unauthorized` | `401` | `'UNAUTHORIZED'` | Unauthorized |
+| `Http.Forbidden` | `403` | `'FORBIDDEN'` | Forbidden |
+| `Http.NotFound` | `404` | `'NOT_FOUND'` | Not Found |
+| `Http.MethodNotAllowed` | `405` | `'METHOD_NOT_ALLOWED'` | Method Not Allowed |
+| `Http.Conflict` | `409` | `'CONFLICT'` | Conflict |
+| `Http.Gone` | `410` | `'GONE'` | Gone |
+| `Http.UnprocessableEntity` | `422` | `'UNPROCESSABLE_ENTITY'` | Unprocessable Entity |
+| `Http.TooManyRequests` | `429` | `'TOO_MANY_REQUESTS'` | Too Many Requests |
+| `Http.InternalServerError` | `500` | `'INTERNAL_SERVER_ERROR'` | Internal Server Error |
+| `Http.ServiceUnavailable` | `503` | `'SERVICE_UNAVAILABLE'` | Service Unavailable |
+
+<Callout type="warn">
+`throw Http.NotFound` — the bare function reference, with no `()` — throws
+the function itself, not an `HttpError`. A catch block checking
+`instanceof HttpError` won't recognize it, and it reaches the adapter as an
+undifferentiated `500` instead. Always call the factory.
+</Callout>
+
+**Example**
+
+```ts
+import { Http } from '@arcton/core'
+
+throw Http.Conflict('Email already registered', { field: 'email' })
+```

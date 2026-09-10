@@ -1,0 +1,108 @@
+---
+title: HTTP Errors
+description: HttpError y las factories de status Http listas para lanzar, de @arcton/core.
+---
+
+## Resumen
+
+Lanzá un error ya armado en vez de construir a mano `ctx.response.status = ...; return {...}` en cada lugar donde una request puede fallar:
+
+```ts
+import { Arcton, Http } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/orders/:id', ctx => {
+  const order = findOrder(ctx.params.id)
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
+  return order
+})
+
+app.listen()
+```
+
+Por sí solo esto sigue siendo un error no capturado — convertirlo en una respuesta queda de tu lado, igual que con cualquier otro throw. Ver [Respondiendo con errores](../errors/responding-with-errors.mdx#lanzar-un-httperror-ya-armado-en-lugar-de-construirlo-a-mano) para el patrón try/catch que mapea `status`/`code`/`body` de `HttpError` sobre `ctx.response`.
+
+## `HttpError`
+
+**Propósito** — la clase de error que retorna cada factory de `Http` de abajo; se instancia directamente para un status sin factory con nombre.
+
+**Firma**
+
+```ts no-check
+class HttpError extends Error {
+  constructor(status: number, code: string, message: string, body?: unknown)
+  readonly status: number
+  readonly code: string
+  readonly body?: unknown
+}
+```
+
+**Parámetros**
+
+| Parámetro | Tipo | Descripción |
+|---|---|---|
+| `status` | `number` | El status HTTP, por ejemplo `451`. |
+| `code` | `string` | Una etiqueta estable y legible por máquina, por ejemplo `'UNAVAILABLE_FOR_LEGAL_REASONS'`. Segura para que un cliente haga switch sobre ella, a diferencia de `message`. |
+| `message` | `string` | Se pasa al `message` propio de `Error`. |
+| `body` | `unknown` | Opcional. El valor exacto que un catch debería devolver en vez del shape default `{ code, message }`. |
+
+**Comportamiento** — `HttpError` lleva estos campos pero no hace nada con ellos por sí sola; nada en el pipeline de Arcton captura un `HttpError` automáticamente (ver [Errores no capturados](../errors/uncaught-errors.mdx)).
+
+**Ejemplo**
+
+```ts
+throw new HttpError(451, 'UNAVAILABLE_FOR_LEGAL_REASONS', 'Unavailable For Legal Reasons')
+```
+
+## `Http`
+
+**Propósito** — un namespace de atajos listos para lanzar, uno por cada status común. Cada uno es una función simple — se llama, no se instancia con `new` — y retorna un `HttpError`.
+
+**Firma**
+
+```ts no-check
+type StatusErrorFactory = (message?: string, body?: unknown) => HttpError
+
+const Http: Record<string, StatusErrorFactory>
+```
+
+**Parámetros**
+
+| Parámetro | Tipo | Descripción |
+|---|---|---|
+| `message` | `string` | Opcional. Por default usa la frase de razón del status (ver la tabla de abajo). |
+| `body` | `unknown` | Opcional. El valor exacto que un catch debería devolver en vez del shape default `{ code, message }`. |
+
+**Tipo de retorno** — un [`HttpError`](#httperror).
+
+**Factories**
+
+| Factory | Status | `code` | `message` por default |
+|---|---|---|---|
+| `Http.BadRequest` | `400` | `'BAD_REQUEST'` | Bad Request |
+| `Http.Unauthorized` | `401` | `'UNAUTHORIZED'` | Unauthorized |
+| `Http.Forbidden` | `403` | `'FORBIDDEN'` | Forbidden |
+| `Http.NotFound` | `404` | `'NOT_FOUND'` | Not Found |
+| `Http.MethodNotAllowed` | `405` | `'METHOD_NOT_ALLOWED'` | Method Not Allowed |
+| `Http.Conflict` | `409` | `'CONFLICT'` | Conflict |
+| `Http.Gone` | `410` | `'GONE'` | Gone |
+| `Http.UnprocessableEntity` | `422` | `'UNPROCESSABLE_ENTITY'` | Unprocessable Entity |
+| `Http.TooManyRequests` | `429` | `'TOO_MANY_REQUESTS'` | Too Many Requests |
+| `Http.InternalServerError` | `500` | `'INTERNAL_SERVER_ERROR'` | Internal Server Error |
+| `Http.ServiceUnavailable` | `503` | `'SERVICE_UNAVAILABLE'` | Service Unavailable |
+
+<Callout type="warn">
+`throw Http.NotFound` — la referencia a la función pelada, sin `()` — lanza
+la función misma, no un `HttpError`. Un bloque catch que chequea
+`instanceof HttpError` no la va a reconocer, y llega al adapter como un
+`500` sin diferenciar. Siempre hay que llamar a la factory.
+</Callout>
+
+**Ejemplo**
+
+```ts
+import { Http } from '@arcton/core'
+
+throw Http.Conflict('Email already registered', { field: 'email' })
+```

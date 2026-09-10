@@ -112,6 +112,95 @@ Como el throw ocurre antes de que el valor de retorno del propio handler
 finalice la respuesta, `ctx.response.status` todavía se puede escribir
 cuando se ejecuta el bloque `catch`.
 
+## Lanzar un HttpError ya armado en lugar de construirlo a mano
+
+Repetir `ctx.response.status = ...; return {...}` en cada lugar donde una
+request puede fallar se acumula rápido. `@arcton/core` exporta `HttpError`
+más un namespace `Http` con una factory por cada status común —
+`Http.BadRequest`, `Http.Unauthorized`, `Http.Forbidden`, `Http.NotFound`,
+`Http.MethodNotAllowed`, `Http.Conflict`, `Http.Gone`,
+`Http.UnprocessableEntity`, `Http.TooManyRequests`,
+`Http.InternalServerError`, `Http.ServiceUnavailable` — así el par
+status/mensaje vive en un solo lugar en vez de en cada punto donde se
+lanza:
+
+```ts
+import { Arcton, Http } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/orders/:id', ctx => {
+  const order = findOrder(ctx.params.id)
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
+  return order
+})
+
+app.listen()
+```
+
+Cada factory es una función simple, no una clase — se llama, no se
+instancia con `new`. Retorna un `HttpError` (una subclase de `Error`) que
+lleva:
+
+- `status` — el status HTTP (`404` para `Http.NotFound`)
+- `code` — una etiqueta estable y legible por máquina (`'NOT_FOUND'`), segura
+  para que un cliente haga switch sobre ella, a diferencia de `message`
+- `message` — la frase de razón del status por default, sobreescribible como
+  primer argumento de la factory
+- `body` — un segundo argumento opcional: el valor exacto a devolver en vez
+  del default `{ code, message }`
+
+```ts
+throw Http.Conflict('Email already registered', { field: 'email' })
+```
+
+<Callout type="warn">
+`throw Http.NotFound` — la referencia a la función pelada, sin `()` — lanza
+la función misma, no un `HttpError`. Un bloque catch que chequea
+`instanceof HttpError` no la va a reconocer, y llega al adapter como un
+`500` sin diferenciar (ver [Errores no capturados](./uncaught-errors.mdx)).
+Siempre hay que llamar a la factory.
+</Callout>
+
+Por sí solo, lanzar uno de estos sigue siendo un error no capturado.
+Capturalo con el mismo patrón try/catch de arriba, chequeando
+`instanceof HttpError` para que el status y el body que trae sean los que
+arman la respuesta:
+
+```ts
+import type { Middleware } from '@arcton/contracts'
+import { Arcton, Http, HttpError } from '@arcton/core'
+
+const catchHttpErrors: Middleware = async (ctx, next) => {
+  try {
+    await next()
+  } catch (err) {
+    if (err instanceof HttpError) {
+      ctx.response.status = err.status
+      return err.body ?? { code: err.code, message: err.message }
+    }
+    throw err
+  }
+}
+
+const app = Arcton()
+
+app.use(catchHttpErrors)
+
+app.get('/orders/:id', ctx => {
+  const order = findOrder(ctx.params.id)
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
+  return order
+})
+
+app.listen()
+```
+
+Un status sin factory con nombre también funciona — construí `HttpError`
+directamente: `new HttpError(451, 'UNAVAILABLE_FOR_LEGAL_REASONS', 'Unavailable For Legal Reasons')`.
+Ver [HTTP errors](../api/http-errors.mdx) para la lista completa de
+factories y su status/code/message por default.
+
 ## Respuestas propias de Arcton
 
 Algunas respuestas vienen del propio Arcton, no del código de la aplicación:

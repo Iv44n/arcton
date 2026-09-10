@@ -30,7 +30,9 @@ That single idea covers three situations you'll run into:
 
 - **Something the caller did wrong** — a missing header, a bad id, a request
   body that fails validation. You (or Arcton's own validation) respond with a
-  4xx `Response`. See [Responding with errors](./responding-with-errors.mdx).
+  4xx `Response`, optionally by throwing one of `@arcton/core`'s ready-made
+  `HttpError`s (see [HTTP errors](../api/http-errors.mdx)). See
+  [Responding with errors](./responding-with-errors.mdx).
 - **Something you didn't handle** — a thrown exception in a handler, a
   provider, or a custom body parser. See
   [Uncaught errors](./uncaught-errors.mdx).
