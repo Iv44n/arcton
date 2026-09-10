@@ -205,7 +205,12 @@ factories y su status/code/message por default.
 
 Algunas respuestas vienen del propio Arcton, no del código de la aplicación:
 
-- Ninguna ruta coincide con la request → `404` con body vacío.
+- Ninguna ruta coincide con la request → `404` con un body JSON con forma
+  `{"code":"NOT_FOUND","message":"Not Found"}`, armado directamente a partir
+  de `Http.NotFound()` — computado una sola vez, no por request, y resuelto
+  sin lanzar nunca (a diferencia de un `throw Http.NotFound()` hecho a mano
+  en un handler, no depende de que haya un catch-all registrado para
+  convertirse en respuesta — ver [HTTP errors](../api/http-errors.mdx)).
 - Existe una ruta para el path pero no para este método → `405` con un
   header `Allow` que lista los métodos que ese node sí tiene (por ejemplo,
   `Allow: GET, POST`).

@@ -122,10 +122,11 @@ app.listen()
 
 ## Ningún match
 
-Cuando ningún path del árbol matchea, la respuesta es `404` con el
-cuerpo vacío. El middleware global igual corre sobre ella, que es como
-los headers de logging y CORS llegan a esas respuestas — ver
-[Global middleware](../middleware/global.mdx).
+Cuando ningún path del árbol matchea, la respuesta es `404` con un body
+JSON `{ code: 'NOT_FOUND', message: 'Not Found' }` — ver
+[HTTP errors](../api/http-errors.mdx). El middleware global igual corre
+sobre ella, que es como los headers de logging y CORS llegan a esas
+respuestas — ver [Global middleware](../middleware/global.mdx).
 
 ## Los wildcards necesitan algo que capturar
 

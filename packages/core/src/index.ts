@@ -16,6 +16,7 @@ import type {
   StandardSchemaV1
 } from '@arcton/contracts'
 import pkg from '../package.json' with { type: 'json' }
+import { Http } from './errors'
 import {
   contentLengthExceeds,
   DEFAULT_MAX_BODY_SIZE,
@@ -30,6 +31,15 @@ import { graftTree, type RouteNode } from './router/tree'
 import type { ExtractParams } from './router/types'
 
 export { Http, HttpError } from './errors'
+
+// Built once at module load, not per request — an unmatched route needs no
+// per-request state, so there's nothing to gain from constructing a fresh
+// HttpError for every 404. The fetch handler below reads its status/code/
+// message directly to build the Response, the same way a compiled/AOT
+// router would resolve a "not found" branch — no throw, so it never depends
+// on notFoundSteps propagating an exception through a middleware chain to
+// resolve into a response.
+const notFoundError = Http.NotFound()
 
 export interface ArctonConfig {
   /**
@@ -514,7 +524,15 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
           if ('notFound' in result || 'methodNotAllowed' in result) {
             const fallback: RouteHandler =
               'notFound' in result
-                ? () => new Response(null, { status: 404 })
+                ? ctx => {
+                    ctx.response.status = notFoundError.status
+                    return (
+                      notFoundError.body ?? {
+                        code: notFoundError.code,
+                        message: notFoundError.message
+                      }
+                    )
+                  }
                 : () =>
                     new Response(null, {
                       status: 405,

@@ -28,7 +28,7 @@ test('GET /health returns ok', async () => {
 
 ## Testeando un 404
 
-Una ruta sin match responde `404` con el cuerpo vacío — vale la pena verificarlo directamente:
+Una ruta sin match responde `404` con un body JSON `{ code: 'NOT_FOUND', message: 'Not Found' }` (ver [HTTP errors](../api/http-errors.mdx)) — vale la pena verificarlo directamente:
 
 ```ts
 import { expect, test } from 'bun:test'

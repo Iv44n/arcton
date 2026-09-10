@@ -199,7 +199,12 @@ their default status/code/message.
 
 A few responses come from Arcton itself, not from your code:
 
-- No route matches the request at all → `404` with an empty body.
+- No route matches the request at all → `404` with a JSON body shaped
+  `{"code":"NOT_FOUND","message":"Not Found"}`, built directly from
+  `Http.NotFound()` — computed once, not per request, and resolved without
+  ever throwing (unlike a handler's own `throw Http.NotFound()`, it doesn't
+  depend on a registered catch-all to become a response — see
+  [HTTP errors](../api/http-errors.mdx)).
 - A route exists for the path but not for this method → `405` with an
   `Allow` header listing the methods that node does have (e.g.
   `Allow: GET, POST`).

@@ -6,7 +6,7 @@ import type {
   RuntimeRequestContext,
   StandardSchemaV1
 } from '@arcton/contracts'
-import { Arcton } from './index'
+import { Arcton, Http } from './index'
 
 function fakeSchema<Input, Output>(
   fn: (v: Input) => Output
@@ -626,6 +626,22 @@ test('app.use: middleware calling next() twice surfaces as an uncaught error, no
     'next() was already called by this middleware'
   )
   expect(handlerCalls).toBe(1)
+})
+
+test("an unmatched route resolves directly to Http.NotFound()'s shape, without throwing or needing any registered middleware", async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.get('/exists', () => ({ ok: true }))
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/missing'))
+
+  expect(res.status).toBe(404)
+  const notFound = Http.NotFound()
+  expect(await res.json()).toEqual({
+    code: notFound.code,
+    message: notFound.message
+  })
 })
 
 test('app.use: global middleware runs on 404, e.g. to set CORS headers on it', async () => {

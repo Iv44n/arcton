@@ -119,9 +119,11 @@ app.listen()
 
 ## No match at all
 
-When no path in the tree matches, the response is `404` with an empty body.
-Global middleware still runs on it, which is how logging and CORS headers reach
-those responses — see [Global middleware](../middleware/global.mdx).
+When no path in the tree matches, the response is `404` with a
+`{ code: 'NOT_FOUND', message: 'Not Found' }` JSON body — see
+[HTTP errors](../api/http-errors.mdx). Global middleware still runs on it,
+which is how logging and CORS headers reach those responses — see
+[Global middleware](../middleware/global.mdx).
 
 ## Wildcards need something to capture
 

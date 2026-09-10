@@ -28,7 +28,7 @@ test('GET /health returns ok', async () => {
 
 ## Testing a 404
 
-A path with no matching route responds `404` with an empty body — worth asserting directly:
+A path with no matching route responds `404` with a `{ code: 'NOT_FOUND', message: 'Not Found' }` JSON body (see [HTTP errors](../api/http-errors.mdx)) — worth asserting directly:
 
 ```ts
 import { expect, test } from 'bun:test'
