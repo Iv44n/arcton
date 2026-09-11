@@ -136,7 +136,7 @@ app.listen()
 
 Registrar la ruta antes que el provider sería un error de compilación,
 porque `ctx.startedAt` todavía no sería parte del tipo del context. El
-sistema de tipos y el runtime están de acuerdo acá: leen la misma
+sistema de tipos y el runtime están de acuerdo aquí: leen la misma
 lista, en el mismo orden.
 
 ## Middleware con scope
@@ -249,7 +249,7 @@ y corre adentro del middleware del padre.
 ## Por qué funciona así
 
 Resolver la cadena una sola vez, al registrarse, hace que un request
-nunca tenga que preguntar "¿qué middleware aplica acá?" — la respuesta
+nunca tenga que preguntar "¿qué middleware aplica aquí?" — la respuesta
 ya se calculó cuando se creó la ruta. También hace honesto al sistema
 de tipos: `ctx` se tipa a partir de los providers registrados antes del
 handler, que es exactamente el conjunto que va a correr.

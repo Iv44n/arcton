@@ -1,26 +1,18 @@
 ---
 title: Better Auth
-description: Monta el handler de better-auth en una app de Arcton y protege rutas con datos de sesión, usando app.all() y provide().
+description: Registra el handler de Better Auth en Arcton y accede a la sesión actual en tus rutas.
 ---
 
-[better-auth](https://www.better-auth.com) expone un único handler estándar
-de la Web — `auth.handler(request: Request): Promise<Response>` — más un
-método programático `auth.api.getSession({ headers })` para leer la sesión
-actual fuera de ese handler. Arcton no tiene un concepto de `mount()`/`macro()`
-pensado para una librería en particular; ambas piezas se conectan con
-primitivas que ya conocés:
-[`app.all()`](../routing/http-methods.mdx#every-method-on-one-path) para
-delegar todas las rutas de auth de una vez, y
-[`provide()`](../providers/overview.mdx) para adjuntar `user`/`session` a
-`ctx` en las rutas que protegés.
+[Better Auth](https://www.better-auth.com) es una librería de autenticación
+independiente del framework. Expone un handler estándar de la Web — una
+función que recibe un `Request` y devuelve un `Response` — junto con una
+pequeña API de servidor para leer la sesión actual.
 
-Esta guía asume que ya tenés una app de Arcton y una instancia de better-auth
-configurada — mirá la propia
-[guía de instalación](https://www.better-auth.com/docs/installation) de
-better-auth para configurar su adapter de base de datos y providers. Lo que
-sigue es el lado de Arcton para conectarlo.
+Esta guía asume que ya tienes una app de Arcton y una instancia de Better
+Auth configurada. Si todavía no configuraste Better Auth, consulta su propia
+[guía de instalación](https://www.better-auth.com/docs/installation).
 
-## Instalar
+## Instalación
 
 ```bash
 bun add better-auth
@@ -34,11 +26,11 @@ npm install better-auth
 pnpm add better-auth
 ```
 
-## Montar el handler
+## Registrar el handler de Better Auth
 
-Registrá una sola ruta con
-[`app.all()`](../routing/http-methods.mdx#every-method-on-one-path) y reenviá
-`ctx.request` directamente a `auth.handler`:
+El `auth.handler` de Better Auth recibe un `Request` y devuelve un
+`Response`. Reenvía cada solicitud bajo tu ruta de autenticación con
+[`app.all()`](../routing/http-methods.mdx#every-method-on-one-path):
 
 ```ts title="index.ts"
 import { Arcton } from '@arcton/core'
@@ -51,38 +43,28 @@ app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
 app.listen()
 ```
 
-`auth.handler` retorna un `Response`, y un `Response` que retorna un handler
-se pasa tal cual, sin tocarlo — ver [Response](../fundamentals/response.mdx)
-— así que todas las rutas que expone better-auth (`/api/auth/get-session`,
-`/api/auth/sign-in/email`, `/api/auth/sign-out`, etc.) ahora responden a
-través de esta única ruta, en `GET`, `POST` y cualquier otro método que
-Arcton soporte.
+`app.all()` registra el mismo handler para todos los métodos HTTP que
+soporta Arcton, así que esta única ruta responde a `GET`, `POST` y el resto
+de métodos que necesitan las rutas de Better Auth: registro, inicio de
+sesión, cierre de sesión, consulta de sesión, y demás.
+
+Un handler puede devolver un `Response` directamente, y Arcton lo envía tal
+cual, así que la respuesta de `auth.handler` llega al cliente sin cambios.
+Consulta [Response](../fundamentals/response.mdx) para más detalles.
 
 <Callout>
-  `*path` es un [segmento wildcard](../routing/path-parameters.mdx) y
-  necesita al menos un segmento para matchear — un request a `/api/auth` a
-  secas da 404. Esto no es problema para el cliente de better-auth, que
-  siempre llama a un subpath, pero si necesitás que `/api/auth` a secas
-  también responda, registralo aparte: `app.all('/api/auth', ctx =>
-  auth.handler(ctx.request))`.
-</Callout>
-
-<Callout type="warn">
-  `all()` comparte un mismo handler entre todos los métodos de ese path.
-  Registrar un método específico en `/api/auth/*path` después — o antes —
-  tira el mismo error de "Duplicate route" que registrar ese método dos
-  veces; ver [Registration errors](../errors/registration-errors.mdx#duplicate-route).
-  Mantené las rutas de auth en su propio path y nada más va a chocar con
-  ellas.
+  `*path` es un [wildcard](../routing/path-parameters.mdx) y requiere al
+  menos un segmento, por lo que una solicitud a `/api/auth` sola no
+  coincide. Si tu aplicación necesita manejar esa ruta exacta, regístrala
+  aparte: `app.all('/api/auth', ctx => auth.handler(ctx.request))`.
 </Callout>
 
 ## CORS
 
-Si tu frontend se sirve desde un origen distinto al de la API, agregá
-[`@arcton/cors`](../middleware/cors.mdx) antes de la ruta de auth, con
-`credentials: true` para que la cookie de sesión se permita entre orígenes, y
-avisale a better-auth de ese origen también, con su propia opción
-`trustedOrigins`:
+Si tu frontend corre en otro origen, agrega
+[`@arcton/cors`](../middleware/cors.mdx) antes de la ruta de autenticación,
+con `credentials: true` para que la cookie de sesión se envíe entre
+orígenes. Agrega ese mismo origen a `trustedOrigins` de Better Auth:
 
 ```ts title="index.ts"
 import { Arcton } from '@arcton/core'
@@ -104,20 +86,15 @@ app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
 app.listen()
 ```
 
-Ver [CORS](../middleware/cors.mdx) para el resto de las opciones, y
-[Global middleware](../middleware/global.mdx) para entender por qué
-`cors()` tiene que registrarse antes de las rutas que debe cubrir.
+Consulta [CORS](../middleware/cors.mdx) para ver todas las opciones
+disponibles.
 
-## Leer la sesión en rutas protegidas
+## Acceder a la sesión en rutas protegidas
 
-`auth.api.getSession({ headers })` de better-auth es una función async común
-— llamala desde un [`provide()`](../providers/overview.mdx) para adjuntar un
-`user`/`session` tipado a `ctx`, y rechazá con un
-[middleware de ruta](../middleware/route-level.mdx) cuando no hay sesión.
-Es la misma separación que describe
-[Providers vs Middleware](../providers/providers-vs-middleware.mdx):
-`provide()` no puede cortar la cadena, así que el rechazo en sí vive en un
-middleware puesto en las rutas que lo necesitan.
+Usa `auth.api.getSession()` para leer la sesión actual a partir de los
+encabezados de la solicitud, y expón esa información con
+[`provide()`](../providers/overview.mdx) para que esté disponible en `ctx`
+en cualquier ruta registrada después:
 
 ```ts title="index.ts"
 import { Arcton } from '@arcton/core'
@@ -143,24 +120,12 @@ app.get(
 app.listen()
 ```
 
-El guard se pasa como middleware de ruta — una función inline, no un `const`
-aparte — así su `ctx` se infiere del propio overload de `app.get()` en vez de
-necesitar una anotación de tipo propia; ver
-[Middleware de ruta](../middleware/route-level.mdx). `ctx.user` y
-`ctx.session` quedan disponibles, planos y tipados, en toda ruta registrada
-después del `provide()` — incluidas las que no tienen ningún guard, donde
-simplemente son `null` para un request sin sesión. Solo `/me` rechaza de
-verdad un request no autenticado; una ruta registrada sin el guard sigue
-siendo pública aunque `ctx.user` esté disponible ahí también.
+`ctx.user` y `ctx.session` son `null` cuando no hay una sesión activa.
+Agrega un middleware como el de arriba a cualquier ruta que deba requerir
+autenticación — puedes aplicarlo por ruta, o con `use()` sobre toda una
+sección de rutas.
 
-<Callout>
-  Aplicá el guard por ruta, o con un
-  [`use()` scoped](../middleware/scoped.mdx) sobre toda una sección — no hay
-  un flag booleano tipo `{ auth: true }` para activarlo. Pasar el middleware
-  explícitamente es el opt-in.
-</Callout>
-
-## Uniendo todo
+## Ejemplo completo
 
 ```ts title="index.ts"
 import { Arcton } from '@arcton/core'
@@ -190,12 +155,11 @@ app.get(
   },
   ctx => ({ user: ctx.user })
 )
+
 app.get('/posts', ctx => ({ posts: [], viewer: ctx.user }))
 
 app.listen()
 ```
 
-Nada de esto depende de `@arcton/adapter-bun` o `@arcton/adapter-node` en
-particular — los dos le pasan al handler el mismo `Request` estándar, con el
-mismo stream de body sin tocar, así que esta integración se comporta igual
-en cualquiera de los dos runtimes.
+Esto funciona igual en Bun y en Node — Arcton entrega a `auth.handler` un
+`Request` estándar en cualquiera de los dos runtimes.

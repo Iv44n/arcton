@@ -39,7 +39,7 @@ app.post('/users/:id/orders', {
 app.listen()
 ```
 
-`ctx.params.id` acá es un `number`, no un `string` — la validación reemplaza
+`ctx.params.id` aquí es un `number`, no un `string` — la validación reemplaza
 `ctx.params`, `ctx.query` y `ctx.body` con el output del esquema, así que las
 coerciones y transformaciones son lo que el handler realmente ve.
 
@@ -47,7 +47,7 @@ coerciones y transformaciones son lo que el handler realmente ve.
 
 `params`, `query` y `body` aceptan cada uno cualquier
 [Standard Schema](https://standardschema.dev/) — Zod 3.24+, Valibot y ArkType lo
-implementan, así que cualquiera de ellos funciona acá. Los ejemplos de esta sección
+implementan, así que cualquiera de ellos funciona aquí. Los ejemplos de esta sección
 usan Valibot; mantén la consistencia con la librería de esquemas que elijas para un
 proyecto.
 

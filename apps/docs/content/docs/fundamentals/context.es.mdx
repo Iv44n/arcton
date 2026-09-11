@@ -57,7 +57,7 @@ app
 app.listen()
 ```
 
-`ctx.requestId` está disponible acá porque la llamada a `provide()` de arriba corrió
+`ctx.requestId` está disponible aquí porque la llamada a `provide()` de arriba corrió
 primero; `ctx.body` está disponible porque esta ruta declaró un esquema de `body`.
 Ninguno de los dos estaría en `ctx` — ni pasaría el type-check — sin eso. Ver
 [Providers](../providers/overview.mdx) para cómo compone `provide()`, y
