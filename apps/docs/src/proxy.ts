@@ -38,5 +38,5 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
 
 export const config = {
   // Matcher ignoring `/_next/`, `/api/` and static assets in `/public`
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)']
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|icon.svg).*)']
 }

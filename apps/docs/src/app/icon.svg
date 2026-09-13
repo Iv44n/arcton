@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <title>Arcton</title>
+  <defs>
+    <linearGradient
+      id="arcton-icon-gradient"
+      gradientUnits="userSpaceOnUse"
+      x1="14"
+      y1="14"
+      x2="86"
+      y2="86"
+    >
+      <stop offset="0%" stop-color="#ef4444" />
+      <stop offset="100%" stop-color="#fb923c" />
+    </linearGradient>
+  </defs>
+  <path
+    fill-rule="evenodd"
+    clip-rule="evenodd"
+    fill="url(#arcton-icon-gradient)"
+    d="M50 14 A36 36 0 1 1 50 86 A36 36 0 1 1 50 14 Z M56 24 A20 20 0 1 1 56 64 A20 20 0 1 1 56 24 Z"
+  />
+</svg>
