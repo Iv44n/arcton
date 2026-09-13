@@ -6,7 +6,7 @@ import type {
   RuntimeRequestContext,
   StandardSchemaV1
 } from '@arcton/contracts'
-import { Arcton, Http } from './index'
+import { Arcton, Http, HttpError } from './index'
 
 function fakeSchema<Input, Output>(
   fn: (v: Input) => Output
@@ -633,6 +633,155 @@ test('error path: mapResponse throwing propagates uncaught, unnormalized', async
 
   await expect(call(handler, new Request('http://localhost/'))).rejects.toThrow(
     /Cannot serialize handler result/
+  )
+})
+
+// ── app.onError() ────────────────────────────────────────────────────────
+
+test('app.onError(): catches an otherwise-uncaught error and answers with the handler’s response', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.get('/', () => {
+    throw new Error('boom')
+  })
+  app.onError((err, ctx) => {
+    ctx.response.status = 418
+    return { message: (err as Error).message }
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/'))
+  expect(res.status).toBe(418)
+  expect(await res.json()).toEqual({ message: 'boom' })
+})
+
+test("app.onError(): ctx.response.status defaults to 500 when the handler doesn't set one", async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.get('/', () => {
+    throw new Error('boom')
+  })
+  app.onError(() => ({ message: 'failed' }))
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/'))
+  expect(res.status).toBe(500)
+})
+
+test('app.onError(): a status set before the throw is preserved if the handler leaves it untouched', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.get('/', ctx => {
+    ctx.response.status = 202
+    throw new Error('boom')
+  })
+  app.onError(() => ({ message: 'failed' }))
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/'))
+  expect(res.status).toBe(202)
+})
+
+test('app.onError(): can narrow the error and return a raw Response directly', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.get('/', () => {
+    throw Http.Unauthorized('nope')
+  })
+  app.onError((err, ctx) => {
+    if (err instanceof HttpError) {
+      ctx.response.status = err.status
+      return new Response(err.message, { status: err.status })
+    }
+    return new Response('Internal Server Error', { status: 500 })
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/'))
+  expect(res.status).toBe(401)
+  expect(await res.text()).toBe('nope')
+})
+
+test('app.onError(): also catches an error thrown by global middleware running on the 404 fallback', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.use(async () => {
+    throw new Error('middleware boom')
+  })
+  app.onError((err, ctx) => {
+    ctx.response.status = 500
+    return { message: (err as Error).message }
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/missing'))
+  expect(res.status).toBe(500)
+  expect(await res.json()).toEqual({ message: 'middleware boom' })
+})
+
+test('app.onError(): a later call replaces an earlier one', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.get('/', () => {
+    throw new Error('boom')
+  })
+  app.onError(() => ({ from: 'first' }))
+  app.onError(() => ({ from: 'second' }))
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/'))
+  expect(await res.json()).toEqual({ from: 'second' })
+})
+
+test('app.onError(): registered on a module has no effect — only the instance whose listen() runs is consulted', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const users = Arcton()
+  users.get('/users', () => {
+    throw new Error('module boom')
+  })
+  users.onError(() => ({ from: 'module' }))
+
+  const app = Arcton()
+  app.use(users)
+  app.onError((err, ctx) => {
+    ctx.response.status = 500
+    return { from: 'app', message: (err as Error).message }
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/users'))
+  expect(res.status).toBe(500)
+  expect(await res.json()).toEqual({ from: 'app', message: 'module boom' })
+})
+
+test('app.onError(): if the handler itself throws, that error propagates uncaught rather than being re-handled', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.get('/', () => {
+    throw new Error('original boom')
+  })
+  const onErrorFailure = new Error('onError itself failed')
+  app.onError(() => {
+    throw onErrorFailure
+  })
+  app.listen({ port: 0, adapter })
+
+  await expect(call(handler, new Request('http://localhost/'))).rejects.toBe(
+    onErrorFailure
+  )
+})
+
+test('app.onError(): with none registered, an uncaught error still propagates exactly as before', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  const err = new Error('boom')
+  app.get('/', () => {
+    throw err
+  })
+  app.listen({ port: 0, adapter })
+
+  await expect(call(handler, new Request('http://localhost/'))).rejects.toBe(
+    err
   )
 })
 

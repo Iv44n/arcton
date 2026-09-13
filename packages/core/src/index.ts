@@ -2,6 +2,7 @@ import { bunAdapter } from '@arcton/adapter-bun'
 import type {
   BodyParser,
   Context,
+  ErrorHandler,
   HttpMethod,
   Middleware,
   ProvideFn,
@@ -180,6 +181,26 @@ export interface ArctonApp<TProvided = {}> {
    * a route with a `body` schema (see `route()`'s `body` option).
    */
   parser(mediaType: string, parser: BodyParser): ArctonApp<TProvided>
+  /**
+   * Registers a handler for an otherwise-uncaught error — anything thrown by
+   * a provider, a middleware, route validation, or the handler itself.
+   * Without one, an uncaught error propagates to the runtime adapter exactly
+   * as before (a bare 500) — this is opt-in, not a replacement for try/catch
+   * middleware.
+   *
+   * Only a single handler at a time (a later call replaces an earlier one),
+   * and only the instance whose `listen()` you call is ever consulted — one
+   * set on a module mounted with `use()` has no effect. For a boundary
+   * scoped to part of your app, wrap `next()` in try/catch inside a scoped
+   * `use(scope, middleware)` instead.
+   *
+   * `ctx.response.status` defaults to `500` if the handler doesn't set one
+   * itself. If the handler itself throws, that error propagates uncaught,
+   * the same as with no handler registered at all.
+   */
+  onError(
+    handler: ErrorHandler<RouteParams, QueryParams, {}, TProvided>
+  ): ArctonApp<TProvided>
   listen(options?: ArctonListenOptions): RuntimeServer
 }
 
@@ -318,6 +339,10 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
   // Not a pipeline step, so no snapshot semantics — see parser()'s doc
   // comment on ArctonApp. Read live at parse time, not per-route.
   const parsers = new Map<string, BodyParser>()
+  // Not part of InternalState — a module's own onError() (if any) is never
+  // read by mountApp/graftTree, only by the fetch this closure's own
+  // listen() builds. See onError()'s doc comment on ArctonApp.
+  let errorHandler: ErrorHandler | undefined
 
   // `handler` typechecks per call site as `RouteHandler<ExtractParams<Route>,
   // TProvided>`, but the tree stores plain `RouteHandler`s and matches by
@@ -400,6 +425,29 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
         path: joinPrefix(prefix, route.path),
         handler: route.handler
       })
+    }
+  }
+
+  // Shared by both the matched-route and 404/405 branches of fetch() below.
+  // errorHandler runs outside this function's own try — a throw from it
+  // escapes uncaught rather than being fed back in as a second error.
+  async function finalize(
+    ctx: Context,
+    produce: () => ReturnType<RouteHandler>
+  ): Promise<Response> {
+    try {
+      const body = await produce()
+      return ctx.response instanceof Response
+        ? ctx.response
+        : mapResponse(body, ctx.response)
+    } catch (err) {
+      if (!errorHandler) throw err
+      const body = await errorHandler(err, ctx)
+      if (ctx.response instanceof Response) return ctx.response
+      // Only backfilled if nothing set a status already — before the throw
+      // or in the handler itself.
+      if (ctx.response.status === undefined) ctx.response.status = 500
+      return mapResponse(body, ctx.response)
     }
   }
 
@@ -506,6 +554,10 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
       parsers.set(normalizeMediaType(mediaType), parser)
       return app
     },
+    onError(handler) {
+      errorHandler = handler as ErrorHandler
+      return app
+    },
     listen(options = {}) {
       const adapter = options.adapter ?? bunAdapter
       const environment = options.env ?? process.env.NODE_ENV ?? 'development'
@@ -580,14 +632,11 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
               response: { headers: new Headers() }
             }
 
-            const body =
+            return finalize(ctx, () =>
               notFoundSteps.length === 0
-                ? await fallback(ctx)
-                : await runPipeline(notFoundSteps, fallback, ctx)
-
-            return ctx.response instanceof Response
-              ? ctx.response
-              : mapResponse(body, ctx.response)
+                ? fallback(ctx)
+                : runPipeline(notFoundSteps, fallback, ctx)
+            )
           }
 
           const query = lazyQuery(url)
@@ -609,10 +658,7 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
           // (see runPipeline) whenever it has middleware/provide/validate
           // steps; the fast path (no steps at all) never touches it, so
           // it's built here instead.
-          const body = await result.handler(ctx)
-          return ctx.response instanceof Response
-            ? ctx.response
-            : mapResponse(body, ctx.response)
+          return finalize(ctx, () => result.handler(ctx))
         }
       })
 

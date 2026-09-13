@@ -62,6 +62,18 @@ export type RouteHandler<
   ctx: Context<P, Q, TBody, TProvided>
 ) => (Body | void) | Promise<Body | void>
 
+// `err` is `unknown`, not `Error` — a thrown value in JS isn't guaranteed to
+// be one.
+export type ErrorHandler<
+  P = RouteParams,
+  Q = QueryParams,
+  TBody = {},
+  TProvided = {}
+> = (
+  err: unknown,
+  ctx: Context<P, Q, TBody, TProvided>
+) => (Body | void) | Promise<Body | void>
+
 export type MatchResult =
   | { matched: true; handler: RouteHandler; params: RouteParams }
   | { notFound: true }

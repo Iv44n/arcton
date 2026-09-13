@@ -234,6 +234,19 @@ withAuth.all('/api/auth/*path', ctx => {
   ctx.user.id satisfies string
 })
 
+// ── onError(): TProvided flows through, err is unknown ──────────────────────
+
+withAuth.onError((err, ctx) => {
+  err satisfies unknown
+  ctx.user.id satisfies string
+})
+
+withAuth
+  .onError(() => {})
+  .get('/after-on-error', ({ user }) => {
+    user.id satisfies string
+  })
+
 // ── ArctonConfig / ArctonListenOptions ──────────────────────────────────────
 
 // `port` moved to ArctonListenOptions — ArctonConfig no longer accepts it.
