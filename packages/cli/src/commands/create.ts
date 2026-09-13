@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { cpSync, existsSync, readdirSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as p from '@clack/prompts'
 import gradient from 'gradient-string'
@@ -22,6 +22,12 @@ function findPackageRoot(startDir: string): string {
 
 type Runtime = 'bun' | 'node'
 type PackageManager = 'bun' | 'pnpm' | 'npm'
+
+const PROJECT_NAME_PATTERN = /^[a-z0-9._-]+$/i
+
+function isValidProjectName(name: string): boolean {
+  return PROJECT_NAME_PATTERN.test(name)
+}
 
 const INSTALL_COMMAND: Record<PackageManager, string> = {
   bun: 'bun install',
@@ -94,6 +100,13 @@ export async function runCreate(argv: string[]): Promise<void> {
 
   const cliArg = argv[0]
 
+  if (cliArg !== undefined && !isValidProjectName(cliArg)) {
+    p.cancel(
+      `Invalid project name "${cliArg}". Use only letters, numbers, dots, dashes and underscores.`
+    )
+    process.exit(1)
+  }
+
   const projectName =
     cliArg ??
     (await p.text({
@@ -102,7 +115,7 @@ export async function runCreate(argv: string[]): Promise<void> {
       defaultValue: 'my-arcton-app',
       validate(value) {
         const name = value || 'my-arcton-app'
-        if (!/^[a-z0-9._-]+$/i.test(name)) {
+        if (!isValidProjectName(name)) {
           return 'Use only letters, numbers, dots, dashes and underscores'
         }
       }
@@ -141,7 +154,14 @@ export async function runCreate(argv: string[]): Promise<void> {
     process.exit(0)
   }
 
-  const targetDir = resolve(process.cwd(), projectName)
+  const cwd = process.cwd()
+  const targetDir = resolve(cwd, projectName)
+
+  if (targetDir !== cwd && !targetDir.startsWith(cwd + sep)) {
+    p.cancel(`Refusing to create project outside of ${cwd}`)
+    process.exit(1)
+  }
+
   const projectDirName = basename(targetDir)
 
   if (existsSync(targetDir) && readdirSync(targetDir).length > 0) {
