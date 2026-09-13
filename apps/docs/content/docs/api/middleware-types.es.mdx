@@ -64,6 +64,22 @@ type RouteHandler<P = RouteParams, Q = QueryParams, TBody = {}, TProvided = {}> 
 
 **Comportamiento:** la misma forma que [`Middleware`](#middleware), sin `next` — un handler siempre corre al final, así que no tiene nada que llamar. Este es el tipo del argumento final de `get`/`post`/etc. y de `RouteOptions.handler`.
 
+## ErrorHandler
+
+**Propósito:** la forma del handler que recibe [`app.onError()`](./arcton-app.mdx#onerror).
+
+**Firma**
+```ts
+import type { Body, Context, QueryParams, RouteParams } from '@arcton/contracts'
+
+type ErrorHandler<P = RouteParams, Q = QueryParams, TBody = {}, TProvided = {}> = (
+  err: unknown,
+  ctx: Context<P, Q, TBody, TProvided>
+) => (Body | void) | Promise<Body | void>
+```
+
+**Comportamiento:** la misma forma que [`RouteHandler`](#routehandler), con el error capturado como primer argumento. `err` es `unknown`, no `Error` — un valor lanzado en JavaScript no tiene por qué serlo. Ver [Global error handler](../errors/global-error-handler.mdx).
+
 ## MatchResult
 
 **Propósito:** el resultado de hacer match entre un método y un path contra el árbol de rutas.

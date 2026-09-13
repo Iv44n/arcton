@@ -64,6 +64,22 @@ type RouteHandler<P = RouteParams, Q = QueryParams, TBody = {}, TProvided = {}> 
 
 **Behavior:** the same shape as [`Middleware`](#middleware), minus `next` — a handler always runs last, so it has nothing to call. This is the type of the trailing argument to `get`/`post`/etc. and of `RouteOptions.handler`.
 
+## ErrorHandler
+
+**Purpose:** the shape of the handler passed to [`app.onError()`](./arcton-app.mdx#onerror).
+
+**Signature**
+```ts
+import type { Body, Context, QueryParams, RouteParams } from '@arcton/contracts'
+
+type ErrorHandler<P = RouteParams, Q = QueryParams, TBody = {}, TProvided = {}> = (
+  err: unknown,
+  ctx: Context<P, Q, TBody, TProvided>
+) => (Body | void) | Promise<Body | void>
+```
+
+**Behavior:** the same shape as [`RouteHandler`](#routehandler), with the caught error prepended as the first argument. `err` is `unknown`, not `Error` — a thrown value in JavaScript isn't guaranteed to be one. See [Global error handler](../errors/global-error-handler.mdx).
+
 ## MatchResult
 
 **Purpose:** the result of matching a method and path against the route tree.

@@ -94,6 +94,30 @@ app.post('/users/:id/orders', {
 app.listen()
 ```
 
+## all
+
+**Purpose:** registers a route matched by every HTTP method Arcton supports — the same seven as `get`/`post`/etc. above, not a wildcard for arbitrary or non-standard verbs.
+
+**Signature:** identical to [`RouteMethod<TProvided>`](#get-post-put-delete-patch-head-options) above — same two call shapes, same generics.
+
+**Return type:** `ArctonApp<TProvided>`.
+
+**Behavior:** registers the same handler for `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, and `OPTIONS` on the given path in a single call. Useful for delegating a whole path to an external Request/Response handler. See [HTTP methods](../routing/http-methods.mdx#every-method-on-one-path).
+
+**Errors:** shares one handler across every method on that path — registering a specific method on the same path afterward (or before) throws the same "Duplicate route" error as registering that method twice. See [Registration errors](../errors/registration-errors.mdx).
+
+**Example**
+```ts
+import { Arcton } from '@arcton/core'
+import { auth } from './auth'
+
+const app = Arcton()
+
+app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+
+app.listen()
+```
+
 ## RouteOptions
 
 **Purpose:** the options object accepted by the second call shape of `get`/`post`/etc., for routes that need request validation.
@@ -309,6 +333,49 @@ const app = Arcton()
 app.parser('text/csv', async request => {
   const text = await request.text()
   return text.trim().split('\n')
+})
+
+app.listen()
+```
+
+## onError
+
+**Purpose:** registers a handler for an otherwise-uncaught error — from a provider, a middleware, validation, or the route handler itself.
+
+**Signature**
+```ts
+import type { ErrorHandler, QueryParams, RouteParams } from '@arcton/contracts'
+import type { ArctonApp } from '@arcton/core'
+
+declare function onError<TProvided>(
+  handler: ErrorHandler<RouteParams, QueryParams, {}, TProvided>
+): ArctonApp<TProvided>
+```
+
+**Parameters:** `handler` — an [`ErrorHandler`](./middleware-types.mdx#errorhandler).
+
+**Return type:** `ArctonApp<TProvided>`.
+
+**Behavior:** only one handler at a time — a later call replaces an earlier one — and only the instance whose own `listen()` ends up serving the request is ever consulted; one registered on a module mounted with `use()` has no effect. `ctx.response.status` defaults to `500` if the handler doesn't set one itself, without overriding a status a step already set before the throw. If the handler itself throws, that error propagates the same way an uncaught error would with no handler registered at all. Without `onError()`, an uncaught error still propagates to the runtime adapter exactly as described in [Uncaught errors](../errors/uncaught-errors.mdx) — this is opt-in. See [Global error handler](../errors/global-error-handler.mdx) for the full guide.
+
+**Example**
+```ts
+import { Arcton, Http, HttpError } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/orders/:id', ctx => {
+  const order = findOrder(ctx.params.id)
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
+  return order
+})
+
+app.onError((err, ctx) => {
+  if (err instanceof HttpError) {
+    ctx.response.status = err.status
+    return err.body ?? { code: err.code, message: err.message }
+  }
+  return { code: 'INTERNAL_SERVER_ERROR', message: 'Internal Server Error' }
 })
 
 app.listen()

@@ -9,7 +9,9 @@ El propio pipeline de Arcton — providers, middleware, validación, el
 handler — nunca se traga una excepción. Si un handler, un
 [provider](../providers/overview.mdx), o un body parser personalizado
 registrado con `app.parser()` lanza una excepción, ese error se propaga
-hasta llegar al runtime adapter que sirve la request.
+hasta llegar al runtime adapter que sirve la request — a menos que la app
+haya registrado un [manejador global de errores](./global-error-handler.mdx),
+que lo captura antes.
 
 ```ts
 import { Arcton } from '@arcton/core'
@@ -58,5 +60,7 @@ en [Respondiendo con errores](./responding-with-errors.mdx).
 Conviene envolver las partes de la aplicación que pueden fallar
 legítimamente — una llamada downstream, un parseo del que no se confía —
 con los patrones de
-[Respondiendo con errores](./responding-with-errors.mdx), en lugar de
-dejar que lleguen al adapter como un 500 sin más.
+[Respondiendo con errores](./responding-with-errors.mdx), o capturar todo en
+un solo lugar con un
+[manejador global de errores](./global-error-handler.mdx), en lugar de dejar
+que lleguen al adapter como un 500 sin más.

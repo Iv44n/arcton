@@ -112,6 +112,11 @@ Como el throw ocurre antes de que el valor de retorno del propio handler
 finalice la respuesta, `ctx.response.status` todavía se puede escribir
 cuando se ejecuta el bloque `catch`.
 
+<Callout>
+Para un único catch-all en lugar de un try/catch en cada middleware, ver
+[Global error handler](./global-error-handler.mdx).
+</Callout>
+
 ## Lanzar un HttpError ya armado en lugar de construirlo a mano
 
 Repetir `ctx.response.status = ...; return {...}` en cada lugar donde una
