@@ -3,7 +3,40 @@ title: CORS
 description: Agregar headers cross-origin con @arcton/cors, incluyendo el manejo de preflight y requests con credenciales.
 ---
 
-Instala `@arcton/cors` y regístralo como middleware global:
+Instala `@arcton/cors`:
+
+<Tabs items={['bun', 'npm', 'pnpm', 'yarn']}>
+<Tab value="bun">
+
+```bash
+bun add @arcton/cors
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npm install @arcton/cors
+```
+
+</Tab>
+<Tab value="pnpm">
+
+```bash
+pnpm add @arcton/cors
+```
+
+</Tab>
+<Tab value="yarn">
+
+```bash
+yarn add @arcton/cors
+```
+
+</Tab>
+</Tabs>
+
+Luego regístralo como middleware global:
 
 ```ts
 import { Arcton } from '@arcton/core'

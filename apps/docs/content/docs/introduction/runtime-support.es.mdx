@@ -36,7 +36,40 @@ app.listen({ adapter: bunAdapter })
 
 ## Node.js
 
-Instala `@arcton/adapter-node` y pásaselo a `listen()`:
+Instala `@arcton/adapter-node`:
+
+<Tabs items={['bun', 'npm', 'pnpm', 'yarn']}>
+<Tab value="bun">
+
+```bash
+bun add @arcton/adapter-node
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npm install @arcton/adapter-node
+```
+
+</Tab>
+<Tab value="pnpm">
+
+```bash
+pnpm add @arcton/adapter-node
+```
+
+</Tab>
+<Tab value="yarn">
+
+```bash
+yarn add @arcton/adapter-node
+```
+
+</Tab>
+</Tabs>
+
+Luego pásaselo a `listen()`:
 
 ```ts
 import { nodeAdapter } from '@arcton/adapter-node'
