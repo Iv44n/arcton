@@ -111,7 +111,7 @@
     },
     "packages/contracts": {
       "name": "@arcton/contracts",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "devDependencies": {
         "@types/bun": "latest",
       },
@@ -121,7 +121,7 @@
     },
     "packages/core": {
       "name": "@arcton/core",
-      "version": "0.0.11",
+      "version": "0.0.12",
       "dependencies": {
         "@arcton/adapter-bun": "workspace:*",
         "@arcton/contracts": "workspace:*",
@@ -164,7 +164,7 @@
     },
     "packages/openapi": {
       "name": "@arcton/openapi",
-      "version": "0.0.7",
+      "version": "0.0.1",
       "dependencies": {
         "@arcton/contracts": "workspace:*",
         "@scalar/client-side-rendering": "0.4.0",
