@@ -5,11 +5,14 @@ import type {
   ErrorHandler,
   HttpMethod,
   Middleware,
+  OpenAPIIntegration,
   ProvideFn,
   QueryParams,
   ReservedKeys,
+  RouteDetail,
   RouteHandler,
   RouteParams,
+  RouteRecord,
   RuntimeAdapter,
   RuntimeServer,
   RuntimeWebSocketHandler,
@@ -75,6 +78,16 @@ export interface ArctonListenOptions {
   env?: string
   /** Max request body size in bytes. Defaults to 128MB (Bun.serve's own default). */
   maxBodySize?: number
+  /**
+   * Serves an OpenAPI document and its UI, from `openapi()` in
+   * `@arcton/openapi`. Configured here rather than at `Arcton()` because
+   * `listen()` is the first point at which every module has been mounted —
+   * the route set it documents is the one about to be served.
+   *
+   * The routes it registers are plain routes: global `use()`/`provide()`
+   * steps do not apply to them.
+   */
+  openapi?: OpenAPIIntegration
 }
 
 // `Route` infers as the literal passed for `path`, so `ctx.params` comes
@@ -229,6 +242,20 @@ type BodyFor<BSchema extends StandardSchemaV1 | undefined> =
     ? { body: StandardSchemaV1.InferOutput<BSchema> }
     : {}
 
+/** A bare schema (implicitly `200`), or an explicit status → schema map. */
+export type ResponseSchemas =
+  | StandardSchemaV1
+  | Record<number, StandardSchemaV1>
+
+// A Standard Schema carries its own marker key; a status → schema map never
+// does, which is what tells the two shorthand shapes apart.
+function normalizeResponse(
+  response: ResponseSchemas | undefined
+): Record<number, StandardSchemaV1> | undefined {
+  if (!response) return undefined
+  return '~standard' in response ? { 200: response } : response
+}
+
 export interface RouteOptions<
   Route extends string,
   TProvided,
@@ -239,6 +266,17 @@ export interface RouteOptions<
   params?: PSchema
   query?: QSchema
   body?: BSchema
+  /**
+   * What this route responds with, per status code. A bare schema is
+   * shorthand for `{ 200: schema }`.
+   *
+   * Documentation only — unlike `params`/`query`/`body`, nothing validates a
+   * response against it at runtime, so it adds no per-request cost and a
+   * handler returning something else still responds normally.
+   */
+  response?: ResponseSchemas
+  /** Documentation metadata — see {@link RouteDetail}. */
+  detail?: RouteDetail
   middleware?: Middleware<
     ParamsFor<Route, PSchema>,
     QueryFor<QSchema>,
@@ -298,6 +336,7 @@ interface InternalState {
   steps: Step[]
   parsers: Map<string, BodyParser>
   prefix: string
+  records: RouteRecord[]
 }
 
 // Avoids TypeScript's excess-property check on a symbol-keyed field
@@ -336,6 +375,9 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
   const router = createRouter()
   const websocketRoutes: RuntimeWebSocketRoute[] = []
   const steps: Step[] = []
+  // What each route declared, kept because the tree stores only composed
+  // handlers. Append-only, in registration order; read through routesOf().
+  const records: RouteRecord[] = []
   // Not a pipeline step, so no snapshot semantics — see parser()'s doc
   // comment on ArctonApp. Read live at parse time, not per-route.
   const parsers = new Map<string, BodyParser>()
@@ -371,15 +413,20 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     path: Route,
     routeMiddleware: Middleware[],
     handler: RouteHandler,
-    validation?: {
-      params?: StandardSchemaV1
-      query?: StandardSchemaV1
-      body?: StandardSchemaV1
-    }
+    contract?: Omit<RouteRecord, 'method' | 'path'>
   ): ArctonApp<never> {
+    // Only params/query/body become a pipeline step — `response`/`detail`
+    // describe the route without affecting how a request runs.
     const validateStep: Step[] =
-      validation && (validation.params || validation.query || validation.body)
-        ? [{ kind: 'validate', ...validation }]
+      contract && (contract.params || contract.query || contract.body)
+        ? [
+            {
+              kind: 'validate',
+              params: contract.params,
+              query: contract.query,
+              body: contract.body
+            }
+          ]
         : []
 
     const routeSteps: Step[] = [
@@ -400,7 +447,17 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
 
     // Applied only here — scope matching above still works against `path`
     // as written to `.get()`, unprefixed (see ArctonConfig.prefix).
-    router.insert(method, joinPrefix(prefix, path), composed)
+    const finalPath = joinPrefix(prefix, path)
+    router.insert(method, finalPath, composed)
+
+    // After insert, so a rejected registration (duplicate route, conflicting
+    // parameter name) leaves no record behind. app.all() registers seven
+    // methods and so produces seven records — OpenAPI has no "any method"
+    // concept, and neither does the tree.
+    for (const m of Array.isArray(method) ? method : [method as HttpMethod]) {
+      records.push({ method: m, path: finalPath, ...contract })
+    }
+
     return app as unknown as ArctonApp<never>
   }
 
@@ -419,6 +476,14 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
         : ctx => runPipeline(parentSteps, handler, ctx, parsers)
 
     graftTree(router.root, subInternal.root, prefixSegments, wrap)
+
+    // Mirrors the graft: a module's record already carries the module's own
+    // prefix, so only this app's prefix is added. Copied, not referenced —
+    // the module stays independently mountable, and routes registered on it
+    // after this point don't appear here, same as its tree.
+    for (const record of subInternal.records) {
+      records.push({ ...record, path: joinPrefix(prefix, record.path) })
+    }
 
     for (const route of subInternal.websocketRoutes) {
       websocketRoutes.push({
@@ -459,6 +524,8 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     params?: StandardSchemaV1
     query?: StandardSchemaV1
     body?: StandardSchemaV1
+    response?: ResponseSchemas
+    detail?: RouteDetail
     middleware?: Middleware[]
     handler: RouteHandler
   } {
@@ -471,7 +538,8 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     args: unknown[]
   ): ArctonApp<never> {
     if (args.length === 1 && isRouteOptions(args[0])) {
-      const { params, query, body, middleware, handler } = args[0]
+      const { params, query, body, response, detail, middleware, handler } =
+        args[0]
       if (typeof handler !== 'function') {
         const label = Array.isArray(method) ? 'ALL' : method
         throw new Error(
@@ -481,7 +549,9 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
       return insertRoute(method, path, middleware ?? [], handler, {
         params,
         query,
-        body
+        body,
+        response: normalizeResponse(response),
+        detail
       })
     }
 
@@ -584,6 +654,18 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
           step.kind === 'use' && step.scope === undefined
       )
 
+      // Registered here, against the final record set — every module has
+      // been grafted by now, so a documented path is the path being served.
+      // Inserted straight into the router: no prefix (the configured path is
+      // absolute) and no record of their own, so they never document
+      // themselves. A path already taken throws the usual duplicate-route
+      // error.
+      if (options.openapi) {
+        for (const route of options.openapi.routes(records)) {
+          router.insert('GET', route.path, route.handler)
+        }
+      }
+
       const server = adapter.serve({
         port: options.port ?? 3000,
         hostname: options.hostname,
@@ -677,8 +759,27 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     websocketRoutes,
     steps,
     parsers,
-    prefix
+    prefix,
+    records
   })
 
   return app
+}
+
+/**
+ * Every route registered on `app`, in registration order, with the schemas
+ * and metadata each one declared and its final (prefixed) path. Routes
+ * mounted from a module are included; `ws()` routes are not, having no
+ * contract to describe.
+ *
+ * The read-only view of what would otherwise be private state — enough for
+ * `@arcton/openapi` and anything else that documents or inspects an app,
+ * without exposing the router or the pipeline.
+ */
+export function routesOf(app: ArctonApp<any>): readonly RouteRecord[] {
+  const internal = getInternal(app)
+  if (!internal) {
+    throw new Error('routesOf() expects an Arcton app')
+  }
+  return internal.records
 }

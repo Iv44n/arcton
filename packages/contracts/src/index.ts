@@ -181,6 +181,89 @@ export namespace StandardSchemaV1 {
   >['output']
 }
 
+// Standard JSON Schema (https://standardschema.dev/json-schema) — a sibling
+// spec sharing the same `~standard` key, so a schema that supports it is
+// detected by feature, not by vendor: `'jsonSchema' in schema['~standard']`.
+// Declared here rather than depending on @standard-schema/spec, same as
+// StandardSchemaV1 above. Nothing in the framework reads this; it exists so
+// packages built on Arcton (see OpenAPIIntegration) can derive documentation
+// from the very schemas already used for validation.
+export interface StandardJSONSchemaV1 {
+  readonly '~standard': StandardJSONSchemaV1.Props
+}
+
+export namespace StandardJSONSchemaV1 {
+  export interface Props {
+    readonly jsonSchema: Converter
+  }
+  // `input` and `output` differ for any schema with a transform — the value
+  // accepted by a request is not the value a handler produces. Both may throw
+  // when a schema has no JSON Schema representation (e.g. Zod's `z.date()`).
+  export interface Converter {
+    readonly input: (options: Options) => Record<string, unknown>
+    readonly output: (options: Options) => Record<string, unknown>
+  }
+  export type Target =
+    | 'draft-2020-12'
+    | 'draft-07'
+    | 'openapi-3.0'
+    | ({} & string)
+  export interface Options {
+    readonly target: Target
+    readonly libraryOptions?: Record<string, unknown> | undefined
+  }
+}
+
+// ── Route records ────────────────────────────────────────────────────────
+
+/** Documentation-only metadata carried through to an OpenAPI operation. */
+export interface RouteDetail {
+  operationId?: string
+  summary?: string
+  description?: string
+  tags?: string[]
+  deprecated?: boolean
+}
+
+// What a route declared, kept alongside the route tree — the tree itself
+// stores composed handlers only, so the schemas would otherwise be
+// unrecoverable after registration. The original Standard Schemas are kept,
+// not a converted form: what a consumer needs them for (JSON Schema, a client
+// generator, a test helper) isn't core's business to decide.
+//
+// `path` is final — the mounting prefix chain is already applied (see
+// mountApp in packages/core/src/index.ts), so a record from a module reads
+// the same as one registered on the root app.
+export interface RouteRecord {
+  method: HttpMethod
+  path: string
+  params?: StandardSchemaV1
+  query?: StandardSchemaV1
+  body?: StandardSchemaV1
+  /** Normalized from `RouteOptions.response`, always keyed by status code. */
+  response?: Record<number, StandardSchemaV1>
+  detail?: RouteDetail
+}
+
+// ── OpenAPI integration ──────────────────────────────────────────────────
+
+/** A route an integration asks `listen()` to register, always as `GET`. */
+export interface DocumentRoute {
+  path: string
+  handler: RouteHandler
+}
+
+// The single extension point `listen({ openapi })` accepts — deliberately not
+// a plugin registry. Core knows this interface and never the implementation,
+// exactly as it knows RuntimeAdapter without knowing any adapter, which keeps
+// the dependency pointing @arcton/openapi → @arcton/core.
+//
+// Called once during listen(), after every module has been grafted, so
+// `records` is the final route set.
+export interface OpenAPIIntegration {
+  routes(records: readonly RouteRecord[]): DocumentRoute[]
+}
+
 export interface RuntimeWebSocket {
   readonly data: unknown
   send(message: string | ArrayBuffer | ArrayBufferView): void
