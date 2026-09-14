@@ -22,7 +22,8 @@ const ENTRYPOINTS: Record<string, string> = {
   '@arcton/contracts': 'packages/contracts/src/index.ts',
   '@arcton/adapter-bun': 'packages/adapters/bun/src/index.ts',
   '@arcton/adapter-node': 'packages/adapters/node/src/index.ts',
-  '@arcton/cors': 'packages/cors/src/index.ts'
+  '@arcton/cors': 'packages/cors/src/index.ts',
+  '@arcton/openapi': 'packages/openapi/src/index.ts'
 }
 
 // Members of the app and context objects, documented as part of their parent

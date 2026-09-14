@@ -1,0 +1,330 @@
+---
+title: OpenAPI
+description: La factory openapi() y sus opciones, de @arcton/openapi.
+---
+
+## Resumen
+
+Sirve un documento OpenAPI 3.1 y una UI de Scalar que lo lee, generados a
+partir de `params`/`query`/`body`/`response`/`detail` propios de cada ruta:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { openapi } from '@arcton/openapi'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.listen({
+  openapi: openapi({ info: { title: 'API', version: '1.0.0' } })
+})
+```
+
+Ver [OpenAPI & Scalar](../integrations/openapi.mdx) para la guía orientada
+al uso.
+
+## `openapi()`
+
+**Propósito** — construye el [`OpenAPIIntegration`](#openapiintegration)
+que acepta `listen({ openapi })`.
+
+**Firma**
+
+```ts no-check
+import type { OpenAPIIntegration } from '@arcton/contracts'
+
+function openapi(options: OpenAPIOptions): OpenAPIIntegration
+```
+
+**Parámetros**
+
+| Parámetro | Tipo | Descripción |
+|---|---|---|
+| `options` | `OpenAPIOptions` | Requerido — como mínimo, `info`. Ver abajo cada campo. |
+
+**Tipo de retorno** — un [`OpenAPIIntegration`](#openapiintegration),
+pensado para pasarse como `listen({ openapi })`.
+
+**Comportamiento** — el documento se construye una sola vez, cuando
+`listen()` llama al `routes()` de la integración con el `RouteRecord[]`
+final de la app — no por request, y no antes de que se hayan montado todos
+los modules. Registra hasta dos rutas `GET` planas en la app: el documento
+mismo (`document.path`, por defecto `/openapi.json`) y, salvo que se pase
+`docs: false`, una página de Scalar (`docs.path`, por defecto `/docs`) que
+carga el documento por URL en vez de embeber una segunda copia.
+
+**Errores** — si alguno de los dos paths choca con una ruta ya registrada
+(o entre sí), `listen()` lanza el mismo error `Duplicate route` que
+registrar cualquier otra ruta dos veces — ver [Errores de
+registro](../errors/registration-errors.mdx).
+
+**Ejemplo**
+
+```ts
+import { Arcton } from '@arcton/core'
+import { openapi } from '@arcton/openapi'
+import * as z from 'zod'
+
+const app = Arcton()
+
+app.get('/users/:id', {
+  params: z.object({ id: z.uuid() }),
+  response: z.object({ id: z.string() }),
+  detail: { operationId: 'getUser', tags: ['Users'] },
+  handler: ctx => ({ id: ctx.params.id })
+})
+
+app.listen({
+  port: 3000,
+  openapi: openapi({
+    info: { title: 'Users API', version: '1.0.0' },
+    docs: { path: '/reference' }
+  })
+})
+```
+
+## `OpenAPIOptions`
+
+**Propósito** — el objeto de opciones que acepta `openapi()`.
+
+**Firma**
+
+```ts no-check
+interface OpenAPIOptions extends DocumentOptions {
+  document?: { path?: string }
+  docs?: (ScalarOptions & { path?: string }) | false
+}
+```
+
+**Campos**
+
+| Campo | Tipo | Default | Descripción |
+|---|---|---|---|
+| `info` | `OpenAPIInfo` | — | Requerido — ver [`DocumentOptions`](#documentoptions). |
+| `servers` | `object[]` | — | Ver [`DocumentOptions`](#documentoptions). |
+| `tags` | `object[]` | — | Ver [`DocumentOptions`](#documentoptions). |
+| `security` | `object[]` | — | Ver [`DocumentOptions`](#documentoptions). |
+| `document.path` | `string` | `'/openapi.json'` | Dónde se sirve el documento en sí. |
+| `docs` | `ScalarOptions \| false` | `{}` | Las opciones propias de Scalar — ver [`ScalarOptions`](#scalaroptions) — más `path` (default `'/docs'`). `false` sirve solo el documento, sin UI. |
+
+**Comportamiento** — `document` y `docs` se mantienen separados de
+`info`/`servers`/`tags`/`security` a propósito: un lado describe la API, el
+otro describe la UI que la lee. Ver [Configurar los
+paths](../integrations/openapi.mdx#configurando-los-paths) y [Configurar
+Scalar](../integrations/openapi.mdx#configurando-scalar).
+
+## `OpenAPIInfo`
+
+**Propósito** — el objeto `info` del documento — el único campo requerido
+de `OpenAPIOptions`.
+
+**Firma**
+
+```ts
+interface OpenAPIInfo {
+  title: string
+  version: string
+  description?: string
+  [key: string]: unknown
+}
+```
+
+**Campos**
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `title` | `string` | El nombre de la API. |
+| `version` | `string` | La versión propia de la API — no está relacionada con la versión del spec de OpenAPI (`3.1.0`, siempre asignada automáticamente). |
+| `description` | `string` | Opcional. |
+
+**Comportamiento** — cualquier otro campo de `info` de OpenAPI
+(`termsOfService`, `contact`, `license`, ...) se acepta a través del index
+signature y se pasa directo al documento, sin validar.
+
+## `DocumentOptions`
+
+**Propósito** — los campos a nivel de documento que extiende
+`OpenAPIOptions`; también lo que recibe [`buildDocument()`](#builddocument)
+por sí mismo.
+
+**Firma**
+
+```ts no-check
+interface DocumentOptions {
+  info: OpenAPIInfo
+  servers?: Record<string, unknown>[]
+  tags?: Record<string, unknown>[]
+  security?: Record<string, unknown>[]
+}
+```
+
+**Campos**
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `info` | `OpenAPIInfo` | Ver [`OpenAPIInfo`](#openapiinfo). |
+| `servers` | `object[]` | Server Objects de OpenAPI, pasados tal cual se dan. |
+| `tags` | `object[]` | Tag Objects de OpenAPI, pasados tal cual se dan. |
+| `security` | `object[]` | Security Requirement Objects de OpenAPI, pasados tal cual se dan. |
+
+**Comportamiento** — `servers`/`tags`/`security` se copian al documento tal
+cual cuando están presentes, y se omiten por completo en caso contrario —
+ninguno de los tres tiene un valor por defecto.
+
+## `ScalarOptions`
+
+**Propósito** — la configuración propia de Scalar, bajo
+`OpenAPIOptions.docs`.
+
+**Firma**
+
+```ts
+interface ScalarOptions {
+  pageTitle?: string
+  cdn?: string
+  configuration?: Record<string, unknown>
+}
+```
+
+**Campos**
+
+| Campo | Tipo | Default | Descripción |
+|---|---|---|---|
+| `pageTitle` | `string` | `'Scalar API Reference'` | El `<title>` de la página `/docs`. |
+| `cdn` | `string` | jsDelivr | Desde dónde se carga el bundle de JS de Scalar — asígnalo para apuntar a un build self-hosted. |
+| `configuration` | `object` | `{}` | El objeto de configuración propio de Scalar (theme, sidebar, auth, ...) — ver la [documentación de configuración de Scalar](https://guides.scalar.com/scalar/scalar-api-references/configuration). |
+
+**Comportamiento** — `configuration.url` siempre se asigna automáticamente,
+a partir de `OpenAPIOptions.document.path` — la página lee el documento por
+URL, así que nunca embebe una segunda copia. Cualquier `url` pasado en
+`configuration` se sobrescribe.
+
+## `buildDocument()`
+
+**Propósito** — la función de más bajo nivel que `openapi()` llama
+internamente: convierte un conjunto de route records directamente en un
+objeto de documento OpenAPI, sin integración HTTP. Útil para escribir el
+documento a un archivo en build time, o para testear qué produce un
+conjunto de rutas sin levantar un servidor.
+
+**Firma**
+
+```ts no-check
+import type { RouteRecord } from '@arcton/contracts'
+
+function buildDocument(
+  records: readonly RouteRecord[],
+  options: DocumentOptions
+): Record<string, unknown>
+```
+
+**Parámetros**
+
+| Parámetro | Tipo | Descripción |
+|---|---|---|
+| `records` | `readonly RouteRecord[]` | Típicamente el resultado de [`routesOf(app)`](./arcton-app.mdx#routesof). |
+| `options` | `DocumentOptions` | Ver [`DocumentOptions`](#documentoptions) arriba. |
+
+**Tipo de retorno** — un documento OpenAPI 3.1 plano, serializable a JSON.
+
+**Ejemplo**
+
+```ts
+import { Arcton, routesOf } from '@arcton/core'
+import { buildDocument } from '@arcton/openapi'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+const document = buildDocument(routesOf(app), {
+  info: { title: 'Users API', version: '1.0.0' }
+})
+
+await Bun.write('openapi.json', JSON.stringify(document, null, 2))
+```
+
+## `RouteRecord`
+
+**Propósito** — lo que declaró una ruta, guardado junto al árbol de rutas
+para que sobreviva después del registro — el árbol en sí solo guarda
+handlers ya compuestos. Se lee a través de
+[`routesOf(app)`](./arcton-app.mdx#routesof); es también lo que recibe el
+`routes()` de un `OpenAPIIntegration`.
+
+**Firma**
+
+```ts no-check
+import type { StandardSchemaV1 } from '@arcton/contracts'
+
+interface RouteRecord {
+  method: HttpMethod
+  path: string
+  params?: StandardSchemaV1
+  query?: StandardSchemaV1
+  body?: StandardSchemaV1
+  response?: Record<number, StandardSchemaV1>
+  detail?: RouteDetail
+}
+```
+
+**Campos**
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `method` | `HttpMethod` | Un método concreto — `app.all()` produce un record por cada método que registra, nunca un record de "cualquier método". |
+| `path` | `string` | El path final de la ruta, con todo prefijo de montaje ya aplicado. |
+| `params`/`query`/`body` | `StandardSchemaV1` | Las instancias de schema originales, no una forma convertida — ver [`StandardSchemaV1`](./validation-types.mdx#standardschemav1). |
+| `response` | `Record<number, StandardSchemaV1>` | Normalizado desde `RouteOptions.response` — siempre indexado por status, incluso cuando se dio un schema suelto. |
+| `detail` | `RouteDetail` | Ver [`RouteDetail`](./arcton-app.mdx#routedetail). |
+
+**Comportamiento** — una ruta `ws()` no produce ningún record, al no tener
+contrato que describir. Ver [`routesOf()`](./arcton-app.mdx#routesof) para
+cómo se componen los records entre modules montados.
+
+## `OpenAPIIntegration`
+
+**Propósito** — el único punto de extensión que acepta
+`listen({ openapi })`. `@arcton/core` conoce esta interfaz y nunca
+`@arcton/openapi` en sí, que es justo lo que mantiene la dependencia
+apuntando de `@arcton/openapi` hacia `@arcton/core` y no al revés.
+
+**Firma**
+
+```ts no-check
+interface OpenAPIIntegration {
+  routes(records: readonly RouteRecord[]): DocumentRoute[]
+}
+```
+
+**Comportamiento** — `listen()` llama a `routes()` una sola vez, después de
+que cada module se haya injertado en el árbol de rutas final, y registra
+cada `DocumentRoute` devuelto como una ruta `GET` plana — los pasos
+globales `use()`/`provide()` no se aplican a ellas. `openapi()` es la única
+implementación que trae Arcton; la interfaz en sí no tiene nada específico
+de OpenAPI — un paquete distinto podría implementarla para servir otro tipo
+de documentación generada a partir del mismo `RouteRecord[]`.
+
+## `DocumentRoute`
+
+**Propósito** — una ruta que un `OpenAPIIntegration` le pide a `listen()`
+que registre.
+
+**Firma**
+
+```ts
+import type { RouteHandler } from '@arcton/contracts'
+
+interface DocumentRoute {
+  path: string
+  handler: RouteHandler
+}
+```
+
+**Campos**
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `path` | `string` | Un path absoluto — no se le antepone el `ArctonConfig.prefix` propio de la app. |
+| `handler` | `RouteHandler` | Registrado como `GET`, el único método que usan las rutas propias de `openapi()`. |

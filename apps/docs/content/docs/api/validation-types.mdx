@@ -99,6 +99,58 @@ function positiveNumber(): StandardSchemaV1<unknown, number> {
 }
 ```
 
+## `StandardJSONSchemaV1`
+
+**Purpose** — a sibling to `StandardSchemaV1` ([Standard JSON Schema](https://standardschema.dev/json-schema)), implemented by a schema that can also describe itself as JSON Schema. Nothing in `@arcton/core` reads this — it exists so a package built on top of Arcton, like [`@arcton/openapi`](./openapi.mdx), can generate documentation from the very schemas a route already validates with.
+
+**Signature**
+
+```ts
+interface StandardJSONSchemaV1 {
+  readonly '~standard': StandardJSONSchemaV1.Props
+}
+
+namespace StandardJSONSchemaV1 {
+  export interface Props {
+    readonly jsonSchema: Converter
+  }
+  export interface Converter {
+    readonly input: (options: Options) => Record<string, unknown>
+    readonly output: (options: Options) => Record<string, unknown>
+  }
+  export type Target =
+    | 'draft-2020-12'
+    | 'draft-07'
+    | 'openapi-3.0'
+    | ({} & string)
+  export interface Options {
+    readonly target: Target
+    readonly libraryOptions?: Record<string, unknown> | undefined
+  }
+}
+```
+
+**Behavior** — shares the same `'~standard'` key as `StandardSchemaV1`, so a schema that supports it is detected by feature (`'jsonSchema' in schema['~standard']`), not by which library produced it. `input` and `output` are separate conversions because they can differ — a schema with a transform accepts one shape and produces another. Either may throw when a schema has no JSON Schema representation at all (a raw `Date`, for instance); a caller that wants documentation instead of an error should catch that itself. Zod 4.6+ and ArkType 2.2+ implement this out of the box; Valibot doesn't yet — wrap a schema with `toStandardJsonSchema()` from `@valibot/to-json-schema` to opt in. See [OpenAPI & Scalar](../integrations/openapi.mdx#schema-requirements).
+
+**Example**
+
+This fragment shows the interface directly, without a schema library, by implementing it by hand:
+
+```ts
+import type { StandardJSONSchemaV1 } from '@arcton/contracts'
+
+function jsonString(): StandardJSONSchemaV1 {
+  return {
+    '~standard': {
+      jsonSchema: {
+        input: () => ({ type: 'string' }),
+        output: () => ({ type: 'string' })
+      }
+    }
+  }
+}
+```
+
 ## `BodyParser`
 
 **Purpose** — the function shape registered with `app.parser(mediaType, parser)` to parse a request body for a media type, overriding or extending the built-ins. See [Application](./arcton-app.mdx) for `parser()` itself.

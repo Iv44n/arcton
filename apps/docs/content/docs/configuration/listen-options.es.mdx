@@ -40,6 +40,16 @@ Todos los campos son opcionales:
       description: 'Etiqueta que se muestra en el banner de inicio.',
       type: 'string',
       default: "process.env.NODE_ENV ?? 'development'"
+    },
+    maxBodySize: {
+      description: 'Tamaño máximo del body del request, en bytes.',
+      type: 'number',
+      default: '134217728 (128MB)'
+    },
+    openapi: {
+      description: 'Sirve un documento OpenAPI y su UI — ver openapi() más abajo.',
+      type: 'OpenAPIIntegration',
+      default: 'undefined'
     }
   }}
 />
@@ -135,3 +145,26 @@ await server.stop()
 
 Consulta [listen()](../api/listen.mdx) para la referencia completa de la
 API.
+
+## Documentar la API
+
+`openapi` activa [`@arcton/openapi`](../integrations/openapi.mdx), un
+paquete opcional del que `@arcton/core` no depende:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { openapi } from '@arcton/openapi'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen({
+  openapi: openapi({ info: { title: 'API', version: '1.0.0' } })
+})
+```
+
+Esto sirve un documento OpenAPI 3.1 en `/openapi.json`, generado a partir de
+las rutas registradas para el momento en que corre `listen()`, y una UI de
+[Scalar](https://scalar.com) que lo lee en `/docs`. Consulta
+[OpenAPI & Scalar](../integrations/openapi.mdx) para la guía completa.

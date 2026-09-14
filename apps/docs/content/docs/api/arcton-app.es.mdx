@@ -124,12 +124,15 @@ app.listen()
 
 **Firma**
 ```ts
-import type { Middleware, RouteHandler } from '@arcton/contracts'
+import type { Middleware, RouteDetail, RouteHandler } from '@arcton/contracts'
+import type { ResponseSchemas } from '@arcton/core'
 
 interface RouteOptions<Route, TProvided, PSchema, QSchema, BSchema> {
   params?: PSchema
   query?: QSchema
   body?: BSchema
+  response?: ResponseSchemas
+  detail?: RouteDetail
   middleware?: Middleware[]
   handler: RouteHandler
 }
@@ -154,6 +157,16 @@ interface RouteOptions<Route, TProvided, PSchema, QSchema, BSchema> {
       type: 'StandardSchemaV1',
       default: 'undefined'
     },
+    response: {
+      description: 'Qué responde esta ruta, por código de status. Solo documentación.',
+      type: 'ResponseSchemas',
+      default: 'undefined'
+    },
+    detail: {
+      description: 'Metadata de documentación — operationId, summary, tags, etc.',
+      type: 'RouteDetail',
+      default: 'undefined'
+    },
     middleware: {
       description: 'Route middleware, que se ejecuta después de la validación, lo más cerca posible del handler.',
       type: 'Middleware[]',
@@ -168,6 +181,8 @@ interface RouteOptions<Route, TProvided, PSchema, QSchema, BSchema> {
 
 **Comportamiento:** la validación se ejecuta en el orden params → query → body; el primer fallo corta la cadena de inmediato con un `400`. La salida del schema reemplaza el campo correspondiente de `ctx`. `ctx.body` solo existe (y solo pasa el chequeo de tipos) en una ruta que declara `body`. Ver [Tipos de validación](./validation-types.mdx) y [Errores de validación](../validation/validation-errors.mdx).
 
+`response` y `detail` son solo documentación — ver [`ResponseSchemas`](#responseschemas) y [`RouteDetail`](#routedetail) más abajo. Ninguno de los dos lo lee el pipeline de requests: un handler que devuelve algo distinto de lo que declara `response` responde exactamente igual que si `response` no existiera (ver [Response](../fundamentals/response.mdx) para lo que sí determina la respuesta). Ambos se leen a través de [`routesOf()`](#routesof) desde cualquier cosa que documente o inspeccione una app — ver [OpenAPI & Scalar](../integrations/openapi.mdx).
+
 **Ejemplo**
 ```ts
 import { Arcton } from '@arcton/core'
@@ -179,6 +194,110 @@ app.post('/users/:id/orders', {
   params: v.object({ id: v.string() }),
   body: v.object({ item: v.string() }),
   handler: ctx => ({ userId: ctx.params.id, item: ctx.body.item })
+})
+
+app.listen()
+```
+
+## `ResponseSchemas`
+
+**Propósito** — la forma que acepta `RouteOptions.response`.
+
+**Firma**
+```ts
+import type { StandardSchemaV1 } from '@arcton/contracts'
+
+type ResponseSchemas = StandardSchemaV1 | Record<number, StandardSchemaV1>
+```
+
+**Comportamiento:** un `StandardSchemaV1` suelto es un atajo para `{ 200: schema }` — ambas formas se distinguen en runtime comprobando la key `'~standard'`, ya que un mapa de status → schema nunca la tiene. En cualquier caso, se normaliza a `Record<number, StandardSchemaV1>` antes de llegar a [`RouteRecord.response`](./openapi.mdx#routerecord).
+
+**Ejemplo**
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+// atajo de { response: { 200: UserSchema } }
+app.get('/users/:id', {
+  response: v.object({ id: v.string() }),
+  handler: ctx => ({ id: ctx.params.id })
+})
+
+app.get('/orders/:id', {
+  response: {
+    200: v.object({ id: v.string() }),
+    404: v.object({ message: v.string() })
+  },
+  handler: ctx => ({ id: ctx.params.id })
+})
+
+app.listen()
+```
+
+## `RouteDetail`
+
+**Propósito** — la metadata de documentación que acepta `RouteOptions.detail`.
+
+**Firma**
+```ts
+interface RouteDetail {
+  operationId?: string
+  summary?: string
+  description?: string
+  tags?: string[]
+  deprecated?: boolean
+}
+```
+
+**Parámetros**
+
+<TypeTable
+  type={{
+    operationId: {
+      description: 'Un identificador único para la operación.',
+      type: 'string',
+      default: 'undefined'
+    },
+    summary: {
+      description: 'Un resumen breve de qué hace la ruta.',
+      type: 'string',
+      default: 'undefined'
+    },
+    description: {
+      description: 'Una descripción más larga.',
+      type: 'string',
+      default: 'undefined'
+    },
+    tags: {
+      description: 'Agrupa esta ruta con otras que comparten un tag.',
+      type: 'string[]',
+      default: 'undefined'
+    },
+    deprecated: {
+      description: 'Marca la ruta como deprecada.',
+      type: 'boolean',
+      default: 'undefined'
+    }
+  }}
+/>
+
+**Comportamiento:** cada campo es solo documentación — ninguno cambia cómo se matchea, valida o maneja un request. Los cinco se mapean directamente a los campos del mismo nombre de una operación de OpenAPI — ver [OpenAPI & Scalar](../integrations/openapi.mdx).
+
+**Ejemplo**
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', {
+  detail: {
+    operationId: 'getUser',
+    summary: 'Get user',
+    tags: ['Users']
+  },
+  handler: ctx => ({ id: ctx.params.id })
 })
 
 app.listen()
@@ -394,6 +513,44 @@ declare function listen(options?: ArctonListenOptions): RuntimeServer
 ```
 
 **Comportamiento:** ver [`listen()`](./listen.mdx) para la referencia completa, incluyendo el `RuntimeServer` devuelto.
+
+## `routesOf()`
+
+**Propósito:** la vista de solo lectura de cada ruta registrada en una app — los schemas y la metadata que declaró cada una, y su path final (con prefijo). Lo que permite que un paquete fuera de `@arcton/core` — [`@arcton/openapi`](./openapi.mdx), o cualquier otra cosa que documente o inspeccione una app — vea los contratos de las rutas sin que la app exponga directamente su router o su pipeline.
+
+**Firma**
+```ts
+import type { RouteRecord } from '@arcton/contracts'
+import type { ArctonApp } from '@arcton/core'
+
+declare function routesOf(app: ArctonApp<any>): readonly RouteRecord[]
+```
+
+**Parámetros:** `app` — cualquier instancia de `ArctonApp`, montada o no.
+
+**Tipo de retorno:** `readonly RouteRecord[]` — ver [`RouteRecord`](./openapi.mdx#routerecord).
+
+**Comportamiento:** un record por cada método bajo el que se registró una ruta — `app.all()` produce siete, nunca un record de "cualquier método" — en el orden de registro, cada uno con su path final (con todo prefijo de montaje ya aplicado). Los records propios de un module se incluyen una vez que se monta con `use()`, con el mismo prefijo que su árbol de rutas; llamar a `routesOf()` sobre el module mismo sigue devolviendo sus records solo con su propio prefijo, sin verse afectado por dónde termine montándose. Una ruta `ws()` no produce ningún record, al no tener contrato que describir. Las rutas que un `OpenAPIIntegration` registra a través de `listen({ openapi })` nunca se incluyen, así que un documento nunca se documenta a sí mismo.
+
+**Errores:** lanza `routesOf() expects an Arcton app` para cualquier cosa que no sea una.
+
+**Ejemplo**
+```ts
+import { Arcton, routesOf } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.get('/users/:id', {
+  params: v.object({ id: v.string() }),
+  handler: ctx => ({ id: ctx.params.id })
+})
+
+for (const route of routesOf(app)) {
+  console.log(route.method, route.path)
+}
+// GET /users/:id
+```
 
 ## HttpMethod
 

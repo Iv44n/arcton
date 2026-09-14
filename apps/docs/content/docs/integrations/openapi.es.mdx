@@ -1,0 +1,236 @@
+---
+title: OpenAPI & Scalar
+description: Genera un documento OpenAPI 3.1 a partir de los schemas que ya tienen tus rutas, y sírvelo a través de Scalar.
+---
+
+`@arcton/openapi` construye un documento OpenAPI 3.1 a partir de las rutas
+con las que termina una app, y sirve una UI interactiva de
+[Scalar](https://scalar.com) que lo lee. No hay ningún schema separado que
+mantener — el documento se genera a partir de los mismos schemas
+`params`/`query`/`body` con los que ya valida una ruta, más un contrato
+`response` opcional.
+
+`@arcton/core` no sabe que este paquete existe. Se activa por completo a
+través de `listen({ openapi })`, el único punto en el que el framework tiene
+el árbol de rutas final, ya con todos los modules montados.
+
+## Instalación
+
+<Tabs items={['bun', 'npm', 'pnpm', 'yarn']}>
+<Tab value="bun">
+
+```bash
+bun add @arcton/openapi
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npm install @arcton/openapi
+```
+
+</Tab>
+<Tab value="pnpm">
+
+```bash
+pnpm add @arcton/openapi
+```
+
+</Tab>
+<Tab value="yarn">
+
+```bash
+yarn add @arcton/openapi
+```
+
+</Tab>
+</Tabs>
+
+## Uso básico
+
+Pasa `openapi()` a `listen()`, después de registrar cada ruta y module:
+
+```ts title="index.ts"
+import { Arcton } from '@arcton/core'
+import { openapi } from '@arcton/openapi'
+import * as z from 'zod'
+
+const app = Arcton()
+
+app.get('/users/:id', {
+  params: z.object({ id: z.uuid() }),
+  response: z.object({ id: z.string(), name: z.string() }),
+  handler: ctx => ({ id: ctx.params.id, name: 'Ada' })
+})
+
+app.listen({
+  port: 3000,
+  openapi: openapi({
+    info: { title: 'Users API', version: '1.0.0' }
+  })
+})
+```
+
+Esto sirve `GET /openapi.json` (el documento) y `GET /docs` (Scalar, leyendo
+ese mismo documento — nunca una segunda copia).
+
+## Documentar una ruta
+
+`params`, `query` y `body` ya se documentan solos — lo que le pasás a
+Arcton para validar una ruta es exactamente lo que termina en el documento
+generado. Dos campos más, ambos solo de documentación, completan una
+operación:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as z from 'zod'
+
+const app = Arcton()
+
+app.get('/users/:id', {
+  params: z.object({ id: z.uuid() }),
+
+  response: {
+    200: z.object({ id: z.string(), name: z.string() }),
+    404: z.object({ message: z.string() })
+  },
+
+  detail: {
+    operationId: 'getUser',
+    summary: 'Get user',
+    tags: ['Users']
+  },
+
+  handler: ctx => ({ id: ctx.params.id, name: 'Ada' })
+})
+
+app.listen()
+```
+
+`response` es un mapa de status → schema; un schema suelto es un atajo para
+`{ 200: schema }`. `detail` mapea `operationId`/`summary`/`description`/
+`tags`/`deprecated` a la operación de OpenAPI. Ninguno de los dos se valida
+en runtime — un handler que devuelve algo distinto responde exactamente
+igual que si no existieran. Ver
+[`response`/`detail`](../api/arcton-app.mdx#routeoptions) y
+[`RouteDetail`](../api/arcton-app.mdx#routedetail).
+
+## Requisitos del schema
+
+Convertir un schema a OpenAPI depende de [Standard JSON
+Schema](https://standardschema.dev/json-schema), una interfaz hermana de
+[Standard Schema](https://standardschema.dev/), la que Arcton ya usa para
+validar — Zod 4.6+ y ArkType 2.2+ la implementan de forma nativa. Valibot
+todavía no; envuelve un schema con `toStandardJsonSchema()` de
+[`@valibot/to-json-schema`](https://valibot.dev/guides/json-schema/) para
+sumarse.
+
+Un schema que no la implementa — o cuya forma no tiene equivalente en JSON
+Schema, como un transform de Zod en la salida — degrada a un schema vacío
+(`{}`) en vez de romper el build. El parámetro o body sigue apareciendo en
+el documento con su nombre y ubicación; solo su tipo queda sin especificar.
+Ver [Standard JSON
+Schema](../api/validation-types.mdx#standardjsonschemav1).
+
+## Configurando los paths
+
+Ambas rutas son configurables, y la UI de Scalar puede desactivarse por
+completo:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { openapi } from '@arcton/openapi'
+
+const app = Arcton()
+
+app.get('/users', () => [])
+
+app.listen({
+  openapi: openapi({
+    info: { title: 'Users API', version: '1.0.0' },
+    document: { path: '/schema.json' },
+    docs: { path: '/reference' }
+  })
+})
+```
+
+```ts
+import { Arcton } from '@arcton/core'
+import { openapi } from '@arcton/openapi'
+
+const app = Arcton()
+
+app.get('/users', () => [])
+
+app.listen({
+  openapi: openapi({
+    info: { title: 'Users API', version: '1.0.0' },
+    docs: false // solo se sirve /openapi.json
+  })
+})
+```
+
+## Configurando Scalar
+
+La configuración propia de Scalar — theme, título de página, desde qué CDN
+se carga su bundle — se mantiene separada de `info`/`servers`/`tags` del
+documento, bajo `docs`:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { openapi } from '@arcton/openapi'
+
+const app = Arcton()
+
+app.get('/users', () => [])
+
+app.listen({
+  openapi: openapi({
+    info: { title: 'Users API', version: '1.0.0' },
+    docs: {
+      pageTitle: 'Users API Reference',
+      configuration: { theme: 'purple' }
+    }
+  })
+})
+```
+
+`configuration` se pasa directo a Scalar — ver la [documentación de
+configuración propia de
+Scalar](https://guides.scalar.com/scalar/scalar-api-references/configuration)
+para cada opción que acepta. El bundle de JS de Scalar se carga desde un
+CDN por defecto; pasa `cdn` para apuntar a un build self-hosted.
+
+## Modules y el árbol de rutas final
+
+El documento refleja la app exactamente como la ve `listen()` — incluyendo
+las rutas que vienen de [modules](../routing/modules.mdx), correctamente
+prefijadas:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { openapi } from '@arcton/openapi'
+import * as z from 'zod'
+
+const users = Arcton({ prefix: '/users' })
+
+users.get('/:id', {
+  response: z.object({ id: z.string() }),
+  handler: ctx => ({ id: ctx.params.id })
+})
+
+const app = Arcton({ prefix: '/api' })
+app.use(users)
+
+app.listen({ openapi: openapi({ info: { title: 'API', version: '1.0.0' } }) })
+// documenta GET /api/users/{id}
+```
+
+Una ruta wildcard (`*rest`) no tiene equivalente como path-template de
+OpenAPI y se deja fuera del documento, y una ruta
+[`ws()`](../api/arcton-app.mdx#ws) no tiene ningún contrato que documentar
+en primer lugar — ambas siguen sirviendo con normalidad, solo que no
+aparecen en `/openapi.json`.
+
+Ver [`openapi()`](../api/openapi.mdx) para la referencia completa de la API.

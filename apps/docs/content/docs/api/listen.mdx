@@ -45,13 +45,15 @@ declare function listen(options?: ArctonListenOptions): RuntimeServer
 
 **Signature**
 ```ts
-import type { RuntimeAdapter } from '@arcton/contracts'
+import type { OpenAPIIntegration, RuntimeAdapter } from '@arcton/contracts'
 
 interface ArctonListenOptions {
   port?: number
   hostname?: string
   adapter?: RuntimeAdapter
   env?: string
+  maxBodySize?: number
+  openapi?: OpenAPIIntegration
 }
 ```
 
@@ -77,11 +79,23 @@ interface ArctonListenOptions {
       description: "Labels the startup banner's Environment line. Nothing else reads it.",
       type: 'string',
       default: "process.env.NODE_ENV ?? 'development'"
+    },
+    maxBodySize: {
+      description: 'Max request body size, in bytes.',
+      type: 'number',
+      default: '134217728 (128MB)'
+    },
+    openapi: {
+      description: 'Serves an OpenAPI document and its UI, from openapi() in @arcton/openapi.',
+      type: 'OpenAPIIntegration',
+      default: 'undefined'
     }
   }}
 />
 
 **Behavior:** see [Environment](../configuration/environment.mdx) for what `env` does (and only does), [Runtime types](./runtime-types.mdx) for the `RuntimeAdapter` interface, and [Adapters](./adapters.mdx) for the `bunAdapter`/`nodeAdapter` values.
+
+`openapi` is the one field `@arcton/core` accepts without knowing what's on the other end of it — it only knows the [`OpenAPIIntegration`](./openapi.mdx#openapiintegration) interface, never `@arcton/openapi` itself. It's read here, rather than accepted by `Arcton()`, because `listen()` is the first point at which every mounted module is part of the final route tree — the route set an integration documents is the one about to be served. See [OpenAPI & Scalar](../integrations/openapi.mdx).
 
 ## RuntimeServer
 

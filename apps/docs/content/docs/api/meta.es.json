@@ -12,6 +12,7 @@
     "adapters",
     "http-errors",
     "cors",
+    "openapi",
     "cli"
   ]
 }

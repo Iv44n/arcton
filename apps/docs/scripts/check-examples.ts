@@ -140,13 +140,16 @@ writeFileSync(
           '@arcton/adapter-node': [
             relative(OUT, join(REPO, 'packages/adapters/node/src/index.ts'))
           ],
+          '@arcton/openapi': [
+            relative(OUT, join(REPO, 'packages/openapi/src/index.ts'))
+          ],
           '@arcton/cors': [
             relative(OUT, join(REPO, 'packages/cors/src/index.ts'))
           ],
           valibot: [
             relative(OUT, join(REPO, 'examples/basic/node_modules/valibot'))
           ],
-          zod: [relative(OUT, join(REPO, 'examples/basic/node_modules/zod'))]
+          zod: [relative(OUT, join(REPO, 'packages/openapi/node_modules/zod'))]
         }
       },
       include: ['**/*.ts', '**/*.tsx']
