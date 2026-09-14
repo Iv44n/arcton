@@ -1,5 +1,5 @@
 {
   "title": "Integrations",
   "icon": "Puzzle",
-  "pages": ["better-auth", "openapi"]
+  "pages": ["better-auth", "openapi", "logger"]
 }

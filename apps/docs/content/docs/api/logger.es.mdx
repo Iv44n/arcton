@@ -1,0 +1,145 @@
+---
+title: Logger
+description: La factory logger() y sus opciones, de @arcton/logger.
+---
+
+## Resumen
+
+Loguea una línea por request, sobre Pino:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { logger } from '@arcton/logger'
+
+const app = Arcton()
+
+app.use(logger())
+
+app.get('/', () => ({ hello: 'world' }))
+
+app.listen()
+```
+
+`@arcton/logger` es solo `app.use()` — no existe una opción en `listen()`
+para esto. Ver [Logging](../integrations/logger.mdx) para el motivo, y para
+la guía orientada al uso.
+
+## `logger()`
+
+**Propósito** — construye un middleware de logging de requests, sobre Pino.
+
+**Firma**
+
+```ts no-check
+function logger(options?: LoggerOptions): ArctonLogger
+```
+
+**Parámetros**
+
+| Parámetro | Tipo | Descripción |
+|---|---|---|
+| `options` | `LoggerOptions` | Opcional. Ver abajo cada campo y su default. |
+
+**Tipo de retorno** — un [`ArctonLogger`](#arctonlogger): un
+[`Middleware`](./middleware-types.mdx#middleware) con una propiedad `.pino`
+agregada, pensado para pasarse a `app.use()`.
+
+**Comportamiento**
+
+- Lee `ctx.request.method` y el `pathname` de la URL del request (sin el
+  query string) antes de llamar a `next()`.
+- Una vez que `next()` resuelve, loguea una línea con `method`, `path`,
+  `status` (`ctx.response.status`, `200` por defecto) y `durationMs` — a
+  `error` si el status es `5xx`, `warn` si es `4xx`, `info` en cualquier
+  otro caso.
+- Si `next()` rechaza — nada aguas abajo capturó el error — loguea una
+  línea a `error` con `method`, `path`, `durationMs` y `err`, y vuelve a
+  lanzar el mismo error sin modificarlo. No se loguea ninguna línea de
+  éxito después.
+- Nunca corta la cadena ni toca `ctx.response` por sí mismo — una ruta se
+  comporta exactamente igual que sin ningún logger registrado.
+
+**Errores** — ninguno propio; `logger({ pretty: true })` lanza lo mismo que
+lanzaría Pino cuando `pino-pretty` no está instalado — ver
+[`LoggerOptions.pretty`](#loggeroptions).
+
+**Ejemplo**
+
+```ts
+import { Arcton } from '@arcton/core'
+import { logger } from '@arcton/logger'
+
+const app = Arcton()
+
+app.use(logger({ level: 'debug' }))
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get('/boom', () => {
+  throw new Error('kaboom')
+})
+
+app.listen()
+```
+
+## `LoggerOptions`
+
+**Propósito** — el objeto de opciones aceptado por `logger()`.
+
+**Firma**
+
+```ts no-check
+interface LoggerOptions {
+  instance?: pino.Logger
+  level?: pino.LevelWithSilent
+  pretty?: boolean
+  pino?: pino.LoggerOptions
+}
+```
+
+**Campos**
+
+| Campo | Tipo | Default | Descripción |
+|---|---|---|---|
+| `instance` | `pino.Logger` | — | Un logger de Pino ya configurado, para usar en vez de construir uno. Si se da, `level`/`pretty`/`pino` se ignoran. |
+| `level` | `pino.LevelWithSilent` | El default propio de Pino (`'info'`) | Nivel mínimo a loguear. Se pasa directo a Pino. |
+| `pretty` | `boolean` | `false` | Formatea con el transport `pino-pretty` propio de Pino, en vez de JSON separado por líneas. |
+| `pino` | `pino.LoggerOptions` | — | Opciones adicionales de Pino, mezcladas sobre `level`/`pretty` — la vía de escape para cualquier cosa que este objeto no exponga directamente (redacción, serializers propios, un transport distinto, ...). |
+
+**Comportamiento** — `pretty` requiere tener `pino-pretty` instalado por
+separado (`bun add pino-pretty`); es una peer dependency de
+`@arcton/logger`, no una dependencia regular. Sin instalarlo,
+`logger({ pretty: true })` lanza el mismo error
+`unable to determine transport target for "pino-pretty"` que lanzaría Pino
+directamente — ver [Pretty-printing](../integrations/logger.mdx#pretty-printing).
+
+## `ArctonLogger`
+
+**Propósito** — lo que devuelve `logger()`.
+
+**Firma**
+
+```ts no-check
+type ArctonLogger = Middleware & {
+  readonly pino: pino.Logger
+}
+```
+
+**Comportamiento** — una función [`Middleware`](./middleware-types.mdx#middleware)
+común, así que `app.use(logger())` funciona exactamente igual que
+[`app.use(cors())`](./cors.mdx). `.pino` es la instancia de Pino
+subyacente — la misma que usa el middleware para loguear — para loguear
+cualquier cosa fuera del ciclo request/response:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { logger } from '@arcton/logger'
+
+const app = Arcton()
+const log = logger()
+
+app.use(log)
+app.get('/', () => 'ok')
+
+const server = app.listen({ port: 0 })
+log.pino.info(`listening on ${server.url}`)
+```

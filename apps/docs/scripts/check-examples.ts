@@ -146,10 +146,14 @@ writeFileSync(
           '@arcton/cors': [
             relative(OUT, join(REPO, 'packages/cors/src/index.ts'))
           ],
+          '@arcton/logger': [
+            relative(OUT, join(REPO, 'packages/logger/src/index.ts'))
+          ],
           valibot: [
             relative(OUT, join(REPO, 'examples/basic/node_modules/valibot'))
           ],
-          zod: [relative(OUT, join(REPO, 'packages/openapi/node_modules/zod'))]
+          zod: [relative(OUT, join(REPO, 'packages/openapi/node_modules/zod'))],
+          pino: [relative(OUT, join(REPO, 'packages/logger/node_modules/pino'))]
         }
       },
       include: ['**/*.ts', '**/*.tsx']

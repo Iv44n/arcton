@@ -1,0 +1,124 @@
+---
+title: Logger
+description: The logger() middleware factory and its options, from @arcton/logger.
+---
+
+## Overview
+
+Log one line per request, backed by Pino:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { logger } from '@arcton/logger'
+
+const app = Arcton()
+
+app.use(logger())
+
+app.get('/', () => ({ hello: 'world' }))
+
+app.listen()
+```
+
+`@arcton/logger` is `app.use()`-only — there is no `listen()` option for
+it. See [Logging](../integrations/logger.mdx) for why, and for the
+usage-first guide.
+
+## `logger()`
+
+**Purpose** — builds a request-logging middleware backed by Pino.
+
+**Signature**
+
+```ts no-check
+function logger(options?: LoggerOptions): ArctonLogger
+```
+
+**Parameters**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `options` | `LoggerOptions` | Optional. See below for fields and defaults. |
+
+**Return type** — an [`ArctonLogger`](#arctonlogger): a [`Middleware`](./middleware-types.mdx#middleware) with a `.pino` property attached, meant to be passed to `app.use()`.
+
+**Behavior**
+
+- Reads `ctx.request.method` and the request URL's `pathname` (the query string is left out) before calling `next()`.
+- Once `next()` resolves, logs one line with `method`, `path`, `status` (`ctx.response.status`, defaulting to `200`), and `durationMs` — at `error` for a `5xx` status, `warn` for `4xx`, `info` otherwise.
+- If `next()` rejects — nothing downstream caught the error — logs one line at `error` with `method`, `path`, `durationMs`, and `err`, then rethrows the same error unchanged. No success line follows.
+- Never short-circuits and never touches `ctx.response` itself — a route behaves exactly as it would with no logger registered.
+
+**Errors** — none of its own; `logger({ pretty: true })` throws whatever Pino itself throws when `pino-pretty` isn't installed — see [`LoggerOptions.pretty`](#loggeroptions).
+
+**Example**
+
+```ts
+import { Arcton } from '@arcton/core'
+import { logger } from '@arcton/logger'
+
+const app = Arcton()
+
+app.use(logger({ level: 'debug' }))
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get('/boom', () => {
+  throw new Error('kaboom')
+})
+
+app.listen()
+```
+
+## `LoggerOptions`
+
+**Purpose** — the options object accepted by `logger()`.
+
+**Signature**
+
+```ts no-check
+interface LoggerOptions {
+  instance?: pino.Logger
+  level?: pino.LevelWithSilent
+  pretty?: boolean
+  pino?: pino.LoggerOptions
+}
+```
+
+**Fields**
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `instance` | `pino.Logger` | — | An already-configured Pino logger to use instead of building one. When given, `level`/`pretty`/`pino` are ignored. |
+| `level` | `pino.LevelWithSilent` | Pino's own default (`'info'`) | Minimum level to log. Passed straight to Pino. |
+| `pretty` | `boolean` | `false` | Pretty-prints via Pino's own `pino-pretty` transport instead of newline-delimited JSON. |
+| `pino` | `pino.LoggerOptions` | — | Additional Pino options, merged in on top of `level`/`pretty` — the escape hatch for anything not exposed directly (redaction, custom serializers, a different transport, ...). |
+
+**Behavior** — `pretty` requires `pino-pretty` to be installed separately (`bun add pino-pretty`); it's a peer dependency of `@arcton/logger`, not a regular one. Without it, `logger({ pretty: true })` throws the same `unable to determine transport target for "pino-pretty"` error Pino itself throws — see [Pretty-printing](../integrations/logger.mdx#pretty-printing).
+
+## `ArctonLogger`
+
+**Purpose** — what `logger()` returns.
+
+**Signature**
+
+```ts no-check
+type ArctonLogger = Middleware & {
+  readonly pino: pino.Logger
+}
+```
+
+**Behavior** — a plain [`Middleware`](./middleware-types.mdx#middleware) function, so `app.use(logger())` works exactly like [`app.use(cors())`](./cors.mdx). `.pino` is the underlying Pino instance — the same one the middleware logs through — for logging anything outside the request/response cycle:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { logger } from '@arcton/logger'
+
+const app = Arcton()
+const log = logger()
+
+app.use(log)
+app.get('/', () => 'ok')
+
+const server = app.listen({ port: 0 })
+log.pino.info(`listening on ${server.url}`)
+```
