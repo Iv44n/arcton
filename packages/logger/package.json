@@ -1,6 +1,6 @@
 {
   "name": "@arcton/logger",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "module": "src/index.ts",
   "types": "src/index.ts",
@@ -30,21 +30,12 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@arcton/contracts": "workspace:*",
-    "pino": "^10.3.1"
+    "@arcton/contracts": "workspace:*"
   },
   "devDependencies": {
-    "@arcton/core": "workspace:*",
-    "@types/bun": "latest",
-    "pino-pretty": "^13.1.3"
+    "@types/bun": "latest"
   },
   "peerDependencies": {
-    "pino-pretty": "^13",
     "typescript": "^7"
-  },
-  "peerDependenciesMeta": {
-    "pino-pretty": {
-      "optional": true
-    }
   }
 }

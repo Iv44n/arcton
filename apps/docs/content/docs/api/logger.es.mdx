@@ -1,11 +1,11 @@
 ---
 title: Logger
-description: La factory logger() y sus opciones, de @arcton/logger.
+description: Las factories logger() y createLogger(), la interfaz Logger, y sus opciones, de @arcton/logger.
 ---
 
 ## Resumen
 
-Loguea una línea por request, sobre Pino:
+Loguea una línea por request, sin ninguna dependencia en runtime:
 
 ```ts
 import { Arcton } from '@arcton/core'
@@ -20,13 +20,12 @@ app.get('/', () => ({ hello: 'world' }))
 app.listen()
 ```
 
-`@arcton/logger` es solo `app.use()` — no existe una opción en `listen()`
-para esto. Ver [Logging](../integrations/logger.mdx) para el motivo, y para
-la guía orientada al uso.
+`@arcton/logger` es solo `app.use()`. Ver
+[Logging](../integrations/logger.mdx) para la guía orientada al uso.
 
 ## `logger()`
 
-**Propósito** — construye un middleware de logging de requests, sobre Pino.
+**Propósito** — construye un middleware de logging de requests.
 
 **Firma**
 
@@ -41,27 +40,30 @@ function logger(options?: LoggerOptions): ArctonLogger
 | `options` | `LoggerOptions` | Opcional. Ver abajo cada campo y su default. |
 
 **Tipo de retorno** — un [`ArctonLogger`](#arctonlogger): un
-[`Middleware`](./middleware-types.mdx#middleware) con una propiedad `.pino`
-agregada, pensado para pasarse a `app.use()`.
+[`Middleware`](./middleware-types.mdx#middleware) con una propiedad
+`.logger` agregada, pensado para pasarse a `app.use()`.
 
 **Comportamiento**
 
 - Lee `ctx.request.method` y el `pathname` de la URL del request (sin el
   query string) antes de llamar a `next()`.
-- Una vez que `next()` resuelve, loguea una línea con `method`, `path`,
-  `status` (`ctx.response.status`, `200` por defecto) y `durationMs` — a
-  `error` si el status es `5xx`, `warn` si es `4xx`, `info` en cualquier
-  otro caso.
+- Con `pretty: false` (el default): una vez que `next()` resuelve, loguea
+  una línea de JSON con `method`, `path`, `status` (`ctx.response.status`,
+  `200` por defecto) y `durationMs` — a `error` si el status es `5xx`,
+  `warn` si es `4xx`, `info` en cualquier otro caso.
+- Con `pretty: true`: loguea una línea `→` cuando llega el request, y una
+  línea `←` cuando termina (o una línea `ERR` si nada aguas abajo capturó
+  un error lanzado) — ver [Modo pretty](../integrations/logger.mdx#pretty-mode).
 - Si `next()` rechaza — nada aguas abajo capturó el error — loguea una
-  línea a `error` con `method`, `path`, `durationMs` y `err`, y vuelve a
-  lanzar el mismo error sin modificarlo. No se loguea ninguna línea de
-  éxito después.
+  línea a `error` (JSON) o una línea `ERR` (pretty), con el error adjunto,
+  y vuelve a lanzar el mismo error sin modificarlo. No se loguea ninguna
+  línea de finalización después.
+- `level` filtra ambos formatos de la misma manera: `'silent'` no imprime
+  nada, y un nivel por encima del que tendría una línea dada la descarta.
 - Nunca corta la cadena ni toca `ctx.response` por sí mismo — una ruta se
   comporta exactamente igual que sin ningún logger registrado.
 
-**Errores** — ninguno propio; `logger({ pretty: true })` lanza lo mismo que
-lanzaría Pino cuando `pino-pretty` no está instalado — ver
-[`LoggerOptions.pretty`](#loggeroptions).
+**Errores** — ninguno.
 
 **Ejemplo**
 
@@ -71,7 +73,7 @@ import { logger } from '@arcton/logger'
 
 const app = Arcton()
 
-app.use(logger({ level: 'debug' }))
+app.use(logger({ level: 'debug', pretty: true }))
 
 app.get('/users/:id', ctx => ({ id: ctx.params.id }))
 app.get('/boom', () => {
@@ -81,18 +83,120 @@ app.get('/boom', () => {
 app.listen()
 ```
 
-## `LoggerOptions`
+## `createLogger()`
 
-**Propósito** — el objeto de opciones aceptado por `logger()`.
+**Propósito** — construye un [`Logger`](#logger) independiente, sin
+depender de ningún request. `logger()` construye uno de estos
+internamente para su middleware de logging de requests, pero es igual de
+usable en un background job o al arrancar.
 
 **Firma**
 
 ```ts no-check
+function createLogger(options?: LoggerOptions): Logger
+```
+
+**Parámetros**
+
+| Parámetro | Tipo | Descripción |
+|---|---|---|
+| `options` | `LoggerOptions` | Opcional. Ver abajo cada campo y su default. |
+
+**Tipo de retorno** — un [`Logger`](#logger).
+
+**Errores** — ninguno.
+
+**Ejemplo**
+
+```ts
+import { createLogger } from '@arcton/logger'
+
+const log = createLogger({ level: 'debug' })
+
+log.info('server starting', { pid: process.pid })
+
+const dbLog = log.child({ component: 'database' })
+dbLog.info('query executed', { table: 'users' })
+```
+
+## `Logger`
+
+**Propósito** — la interfaz que comparten cada método de logging (`trace`
+hasta `fatal`) y `child()`, devuelta tanto por `createLogger()` como en
+`.logger` de un [`ArctonLogger`](#arctonlogger).
+
+**Firma**
+
+```ts
+interface Logger {
+  trace(msg: string, data?: Record<string, unknown>): void
+  debug(msg: string, data?: Record<string, unknown>): void
+  info(msg: string, data?: Record<string, unknown>): void
+  warn(msg: string, data?: Record<string, unknown>): void
+  error(msg: string, data?: Record<string, unknown>): void
+  fatal(msg: string, data?: Record<string, unknown>): void
+  child(bindings: Record<string, unknown>): Logger
+}
+```
+
+**Parámetros**
+
+<TypeTable
+  type={{
+    msg: {
+      description: 'El mensaje del log.',
+      type: 'string'
+    },
+    data: {
+      description: 'Campos estructurados para esta llamada, mezclados en el record junto con cualquier binding.',
+      type: 'Record<string, unknown>',
+      default: 'undefined'
+    },
+    bindings: {
+      description: 'Campos mezclados en cada record que escriba el Logger devuelto — y sus propios hijos — de ahí en adelante.',
+      type: 'Record<string, unknown>'
+    }
+  }}
+/>
+
+**Comportamiento:** una llamada por debajo del `level` configurado retorna
+de inmediato — no se construye ningún record, no se paga ningún costo de
+`Date`/serialización. `data` en una llamada dada sobrescribe un campo de
+`bindings` del mismo nombre solo para ese record. Un valor bajo `err` (o
+cualquier key) que sea un `Error` se serializa a `{ name, message, stack }`,
+ya que `JSON.stringify` solo reduce un `Error` plano a `{}`. `child(bindings)`
+devuelve un nuevo `Logger` con `bindings` mezclado sobre el suyo propio —
+de forma recursiva, así que un nieto lleva todo lo que sus ancestros
+agregaron — sin mutar el logger sobre el que se llamó.
+
+**Ejemplo**
+
+```ts
+import { createLogger } from '@arcton/logger'
+
+const log = createLogger()
+
+log.warn('cache miss', { key: 'user:42' })
+
+const requestLog = log.child({ requestId: 'req_1' })
+requestLog.info('handled') // incluye requestId: 'req_1'
+```
+
+## `LoggerOptions`
+
+**Propósito** — el objeto de opciones aceptado tanto por `logger()` como
+por `createLogger()`.
+
+**Firma**
+
+```ts
+import type { LevelWithSilent } from '@arcton/logger'
+
 interface LoggerOptions {
-  instance?: pino.Logger
-  level?: pino.LevelWithSilent
+  level?: LevelWithSilent
   pretty?: boolean
-  pino?: pino.LoggerOptions
+  sink?: (line: string) => void
+  bindings?: Record<string, unknown>
 }
 ```
 
@@ -100,17 +204,33 @@ interface LoggerOptions {
 
 | Campo | Tipo | Default | Descripción |
 |---|---|---|---|
-| `instance` | `pino.Logger` | — | Un logger de Pino ya configurado, para usar en vez de construir uno. Si se da, `level`/`pretty`/`pino` se ignoran. |
-| `level` | `pino.LevelWithSilent` | El default propio de Pino (`'info'`) | Nivel mínimo a loguear. Se pasa directo a Pino. |
-| `pretty` | `boolean` | `false` | Formatea con el transport `pino-pretty` propio de Pino, en vez de JSON separado por líneas. |
-| `pino` | `pino.LoggerOptions` | — | Opciones adicionales de Pino, mezcladas sobre `level`/`pretty` — la vía de escape para cualquier cosa que este objeto no exponga directamente (redacción, serializers propios, un transport distinto, ...). |
+| `level` | `LevelWithSilent` | `'info'` | Nivel mínimo a loguear. Cualquier cosa por debajo se descarta antes de siquiera construir un record. |
+| `pretty` | `boolean` | `false` | Formatea para que lo lea una persona en vez de JSON separado por líneas. |
+| `sink` | `(line: string) => void` | escribe a `process.stdout` si existe, `console.log` si no | Dónde se escribe cada línea formateada. |
+| `bindings` | `Record<string, unknown>` | `{}` | Campos mezclados en cada record — lo que `child()` agrega, no un reemplazo. |
 
-**Comportamiento** — `pretty` requiere tener `pino-pretty` instalado por
-separado (`bun add pino-pretty`); es una peer dependency de
-`@arcton/logger`, no una dependencia regular. Sin instalarlo,
-`logger({ pretty: true })` lanza el mismo error
-`unable to determine transport target for "pino-pretty"` que lanzaría Pino
-directamente — ver [Pretty-printing](../integrations/logger.mdx#pretty-printing).
+**Comportamiento:** el `sink` por defecto se resuelve una sola vez, cuando
+se carga `@arcton/logger` — `process.stdout.write` en Node/Bun,
+`console.log` en cualquier lugar donde `process` no exista (un Worker).
+Pasá el tuyo propio para redirigir la salida — a un archivo, una captura
+de test, otro servicio — sin cambiar nada más.
+
+## `LogLevel` y `LevelWithSilent`
+
+**Propósito** — los nombres de nivel que acepta un `Logger`, y el conjunto
+más amplio que acepta `LoggerOptions.level`.
+
+**Firma**
+
+```ts
+type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal'
+type LevelWithSilent = LogLevel | 'silent'
+```
+
+**Comportamiento:** ordenados como se listan, `trace` el más bajo — una
+llamada se escribe cuando el rango de su propio nivel es igual o mayor que
+el del mínimo configurado. `'silent'` supera a cualquier nivel real, así
+que nada pasa el filtro.
 
 ## `ArctonLogger`
 
@@ -120,14 +240,14 @@ directamente — ver [Pretty-printing](../integrations/logger.mdx#pretty-printin
 
 ```ts no-check
 type ArctonLogger = Middleware & {
-  readonly pino: pino.Logger
+  readonly logger: Logger
 }
 ```
 
 **Comportamiento** — una función [`Middleware`](./middleware-types.mdx#middleware)
 común, así que `app.use(logger())` funciona exactamente igual que
-[`app.use(cors())`](./cors.mdx). `.pino` es la instancia de Pino
-subyacente — la misma que usa el middleware para loguear — para loguear
+[`app.use(cors())`](./cors.mdx). `.logger` es la misma instancia de
+[`Logger`](#logger) que usa el middleware para loguear, para loguear
 cualquier cosa fuera del ciclo request/response:
 
 ```ts
@@ -141,5 +261,5 @@ app.use(log)
 app.get('/', () => 'ok')
 
 const server = app.listen({ port: 0 })
-log.pino.info(`listening on ${server.url}`)
+log.logger.info(`listening on ${server.url}`)
 ```

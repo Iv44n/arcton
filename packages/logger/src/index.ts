@@ -1,2 +1,8 @@
-export type { ArctonLogger, LoggerOptions } from './logger'
-export { logger } from './logger'
+export type {
+  ArctonLogger,
+  LevelWithSilent,
+  Logger,
+  LoggerOptions,
+  LogLevel
+} from './logger'
+export { createLogger, logger } from './logger'

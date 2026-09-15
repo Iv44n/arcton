@@ -1,12 +1,11 @@
 ---
 title: Logging
-description: Log every request with @arcton/logger, a request-logging middleware backed by Pino.
+description: Log every request with @arcton/logger — a request-logging middleware with no runtime dependency.
 ---
 
 `@arcton/logger` logs one line per request — method, path, status, duration
-— through [Pino](https://getpino.io). It's a single middleware: no
-configuration lives on `Arcton()` or `listen()`, and `@arcton/core` never
-imports Pino.
+— with zero runtime dependencies. It's a single middleware: no
+configuration lives on `Arcton()` or `listen()`.
 
 ## Installation
 
@@ -59,19 +58,8 @@ app.listen()
 Every request now produces one JSON line, once the response is known:
 
 ```json
-{"level":30,"time":1234567890,"method":"GET","path":"/users/1","status":200,"durationMs":0.4,"msg":"GET /users/1 200 0.4ms"}
+{"level":"info","time":"2026-09-14T16:00:00.000Z","msg":"GET /users/1 200 0.4ms","method":"GET","path":"/users/1","status":200,"durationMs":0.4}
 ```
-
-## Why `app.use()` and not `listen()`
-
-Registering it is exactly like [`@arcton/cors`](../middleware/cors.mdx) —
-there's no `listen({ logger })` option, on purpose. `use()` steps are
-snapshotted onto each route at the moment it's registered (see
-[Execution order](../middleware/execution-order.mdx)); a hook that only
-fired from inside `listen()` would run after every route already has its
-pipeline fixed, so it could never actually wrap a request. A per-request
-access log only ever makes sense as middleware, registered before the
-routes it should cover.
 
 ## Status decides the level
 
@@ -102,11 +90,10 @@ the error attached and re-throws it unchanged, so error handling (an
 [`onError()`](../errors/global-error-handler.mdx) handler, or none at all)
 behaves exactly as it would without the logger in place.
 
-## Pretty-printing
+## Pretty mode
 
-`pretty: true` formats logs for a human instead of newline-delimited JSON,
-through Pino's own official
-[`pino-pretty`](https://github.com/pinojs/pino-pretty) transport:
+`pretty: true` trades JSON for a format meant to be read live, in a
+terminal — no dependency to install, no transport to configure:
 
 ```ts
 import { Arcton } from '@arcton/core'
@@ -116,79 +103,82 @@ const app = Arcton()
 
 app.use(logger({ pretty: process.env.NODE_ENV !== 'production' }))
 
-app.get('/', () => 'ok')
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
 
 app.listen()
 ```
 
-`pino-pretty` is a peer dependency, not a regular one — it never ships as
-part of `@arcton/logger`'s own production dependencies. Install it
-yourself where you want pretty output:
+A request now prints two lines instead of one — `→` as it arrives, `←`
+once it's done — each with the same `level` a JSON line would carry,
+spelled out and colored, not just implied by color:
 
-<Tabs items={['bun', 'npm', 'pnpm', 'yarn']}>
-<Tab value="bun">
-
-```bash
-bun add -D pino-pretty
+```text
+→ INFO  16:00:00.000 GET    /users/1
+← INFO  16:00:00.004 200 GET    /users/1 0.4ms
 ```
 
-</Tab>
-<Tab value="npm">
+A request that fails with nothing catching the error is labeled `ERROR`
+instead of a status — there isn't one, the same as the JSON line for this
+case has no `status` field — with the error's message appended:
 
-```bash
-npm install -D pino-pretty
+```text
+→ INFO  16:00:01.000 GET    /boom
+← ERROR 16:00:01.001 GET    /boom 0.1ms kaboom
 ```
 
-</Tab>
-<Tab value="pnpm">
+`level` still gates what prints: `'silent'` prints nothing at all, and a
+level above what a given request would log at (a `warn` minimum, say)
+drops the `→` arrival line and any `←`/`ERR` line that doesn't clear it
+either.
 
-```bash
-pnpm add -D pino-pretty
+## Child loggers
+
+`log.child(bindings)` returns a new logger with `bindings` merged into
+every record it writes from then on — useful for tagging every line from
+one part of an app without repeating those fields on every call:
+
+```ts
+import { createLogger } from '@arcton/logger'
+
+const log = createLogger()
+const dbLog = log.child({ component: 'database' })
+
+dbLog.info('query executed', { table: 'users' })
+// { "component": "database", "table": "users", "msg": "query executed", ... }
 ```
 
-</Tab>
-<Tab value="yarn">
+Children compose — a grandchild carries every binding its ancestors added.
+`createLogger()` builds a standalone [`Logger`](../api/logger.mdx#logger),
+independent of any request; see the [API reference](../api/logger.mdx) for
+the full `trace`/`debug`/`info`/`warn`/`error`/`fatal` set.
 
-```bash
-yarn add -D pino-pretty
-```
+## A custom sink
 
-</Tab>
-</Tabs>
-
-Without it installed, `logger({ pretty: true })` throws the same error
-Pino itself throws for a missing transport — at setup, not per request.
-
-## Bringing your own Pino instance
-
-Pass `instance` to use a Pino logger you already built — for an app that
-centralizes its own Pino config (redaction, custom serializers, a shared
-destination) outside of Arcton:
+`sink` is where a formatted line is written — `process.stdout.write` by
+default (falling back to `console.log` where `process` doesn't exist, like
+a Worker). Pass your own to redirect output, for example to collect log
+lines in a test:
 
 ```ts
 import { Arcton } from '@arcton/core'
 import { logger } from '@arcton/logger'
-import pino from 'pino'
 
-const instance = pino({ redact: ['req.headers.authorization'] })
+const lines: string[] = []
 
 const app = Arcton()
 
-app.use(logger({ instance }))
+app.use(logger({ sink: line => lines.push(line) }))
 
 app.get('/', () => 'ok')
 
 app.listen()
 ```
 
-`level`/`pretty`/`pino` are ignored when `instance` is given — the logger
-you built is used exactly as it is.
-
 ## Logging outside the request cycle
 
-`logger()` returns the middleware with the underlying Pino instance
-attached as `.pino`, so the same logger can be used anywhere else in your
-app — for example, right after `listen()`:
+`logger()` returns the middleware with the underlying `Logger` attached as
+`.logger`, so the same logger can be used anywhere else in your app — for
+example, right after `listen()`:
 
 ```ts
 import { Arcton } from '@arcton/core'
@@ -201,7 +191,7 @@ app.use(log)
 app.get('/', () => 'ok')
 
 const server = app.listen({ port: 0 })
-log.pino.info(`listening on ${server.url}`)
+log.logger.info(`listening on ${server.url}`)
 ```
 
 See [`logger()`](../api/logger.mdx) for the full API reference.

@@ -152,8 +152,7 @@ writeFileSync(
           valibot: [
             relative(OUT, join(REPO, 'examples/basic/node_modules/valibot'))
           ],
-          zod: [relative(OUT, join(REPO, 'packages/openapi/node_modules/zod'))],
-          pino: [relative(OUT, join(REPO, 'packages/logger/node_modules/pino'))]
+          zod: [relative(OUT, join(REPO, 'packages/openapi/node_modules/zod'))]
         }
       },
       include: ['**/*.ts', '**/*.tsx']

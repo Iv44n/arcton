@@ -1,11 +1,11 @@
 ---
 title: Logger
-description: The logger() middleware factory and its options, from @arcton/logger.
+description: The logger() and createLogger() factories, the Logger interface, and their options, from @arcton/logger.
 ---
 
 ## Overview
 
-Log one line per request, backed by Pino:
+Log one line per request, with no runtime dependency at all:
 
 ```ts
 import { Arcton } from '@arcton/core'
@@ -20,13 +20,12 @@ app.get('/', () => ({ hello: 'world' }))
 app.listen()
 ```
 
-`@arcton/logger` is `app.use()`-only — there is no `listen()` option for
-it. See [Logging](../integrations/logger.mdx) for why, and for the
-usage-first guide.
+`@arcton/logger` is `app.use()`-only. See
+[Logging](../integrations/logger.mdx) for the usage-first guide.
 
 ## `logger()`
 
-**Purpose** — builds a request-logging middleware backed by Pino.
+**Purpose** — builds a request-logging middleware.
 
 **Signature**
 
@@ -40,16 +39,18 @@ function logger(options?: LoggerOptions): ArctonLogger
 |---|---|---|
 | `options` | `LoggerOptions` | Optional. See below for fields and defaults. |
 
-**Return type** — an [`ArctonLogger`](#arctonlogger): a [`Middleware`](./middleware-types.mdx#middleware) with a `.pino` property attached, meant to be passed to `app.use()`.
+**Return type** — an [`ArctonLogger`](#arctonlogger): a [`Middleware`](./middleware-types.mdx#middleware) with a `.logger` property attached, meant to be passed to `app.use()`.
 
 **Behavior**
 
 - Reads `ctx.request.method` and the request URL's `pathname` (the query string is left out) before calling `next()`.
-- Once `next()` resolves, logs one line with `method`, `path`, `status` (`ctx.response.status`, defaulting to `200`), and `durationMs` — at `error` for a `5xx` status, `warn` for `4xx`, `info` otherwise.
-- If `next()` rejects — nothing downstream caught the error — logs one line at `error` with `method`, `path`, `durationMs`, and `err`, then rethrows the same error unchanged. No success line follows.
+- With `pretty: false` (the default): once `next()` resolves, logs one JSON line with `method`, `path`, `status` (`ctx.response.status`, defaulting to `200`), and `durationMs` — at `error` for a `5xx` status, `warn` for `4xx`, `info` otherwise.
+- With `pretty: true`: logs a `→` line as the request arrives, and a `←` line once it's done (or an `ERR` line if nothing downstream caught a thrown error) — see [Pretty mode](../integrations/logger.mdx#pretty-mode).
+- If `next()` rejects — nothing downstream caught the error — logs one line at `error` (JSON) or an `ERR` line (pretty), with the error attached, then rethrows the same error unchanged. No completion line follows.
+- `level` gates both formats identically: `'silent'` prints nothing, and a level above what a given line would log at drops just that line.
 - Never short-circuits and never touches `ctx.response` itself — a route behaves exactly as it would with no logger registered.
 
-**Errors** — none of its own; `logger({ pretty: true })` throws whatever Pino itself throws when `pino-pretty` isn't installed — see [`LoggerOptions.pretty`](#loggeroptions).
+**Errors** — none.
 
 **Example**
 
@@ -59,7 +60,7 @@ import { logger } from '@arcton/logger'
 
 const app = Arcton()
 
-app.use(logger({ level: 'debug' }))
+app.use(logger({ level: 'debug', pretty: true }))
 
 app.get('/users/:id', ctx => ({ id: ctx.params.id }))
 app.get('/boom', () => {
@@ -69,18 +70,106 @@ app.get('/boom', () => {
 app.listen()
 ```
 
-## `LoggerOptions`
+## `createLogger()`
 
-**Purpose** — the options object accepted by `logger()`.
+**Purpose** — builds a standalone [`Logger`](#logger), independent of any request. `logger()` above builds one of these internally for its request-logging middleware, but it's just as usable for a background job or at startup.
 
 **Signature**
 
 ```ts no-check
+function createLogger(options?: LoggerOptions): Logger
+```
+
+**Parameters**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `options` | `LoggerOptions` | Optional. See below for fields and defaults. |
+
+**Return type** — a [`Logger`](#logger).
+
+**Errors** — none.
+
+**Example**
+
+```ts
+import { createLogger } from '@arcton/logger'
+
+const log = createLogger({ level: 'debug' })
+
+log.info('server starting', { pid: process.pid })
+
+const dbLog = log.child({ component: 'database' })
+dbLog.info('query executed', { table: 'users' })
+```
+
+## `Logger`
+
+**Purpose** — the interface every logging method (`trace` through `fatal`) and `child()` share, returned by both `createLogger()` and as `.logger` on an [`ArctonLogger`](#arctonlogger).
+
+**Signature**
+
+```ts
+interface Logger {
+  trace(msg: string, data?: Record<string, unknown>): void
+  debug(msg: string, data?: Record<string, unknown>): void
+  info(msg: string, data?: Record<string, unknown>): void
+  warn(msg: string, data?: Record<string, unknown>): void
+  error(msg: string, data?: Record<string, unknown>): void
+  fatal(msg: string, data?: Record<string, unknown>): void
+  child(bindings: Record<string, unknown>): Logger
+}
+```
+
+**Parameters**
+
+<TypeTable
+  type={{
+    msg: {
+      description: 'The log message.',
+      type: 'string'
+    },
+    data: {
+      description: 'Structured fields for this one call, merged onto the record alongside any bindings.',
+      type: 'Record<string, unknown>',
+      default: 'undefined'
+    },
+    bindings: {
+      description: 'Fields merged into every record the returned Logger — and its own children — writes from here on.',
+      type: 'Record<string, unknown>'
+    }
+  }}
+/>
+
+**Behavior:** a call below the configured `level` returns immediately — no record is built, no `Date`/serialization cost is paid. `data` on a given call overrides a `bindings` field of the same name for that one record only. A value under `err` (or any key) that's an `Error` serializes to `{ name, message, stack }`, since `JSON.stringify` alone reduces a plain `Error` to `{}`. `child(bindings)` returns a new `Logger` with `bindings` merged into its own — recursively, so a grandchild carries everything its ancestors bound — without mutating the logger it was called on.
+
+**Example**
+
+```ts
+import { createLogger } from '@arcton/logger'
+
+const log = createLogger()
+
+log.warn('cache miss', { key: 'user:42' })
+
+const requestLog = log.child({ requestId: 'req_1' })
+requestLog.info('handled') // includes requestId: 'req_1'
+```
+
+## `LoggerOptions`
+
+**Purpose** — the options object accepted by both `logger()` and `createLogger()`.
+
+**Signature**
+
+```ts
+import type { LevelWithSilent } from '@arcton/logger'
+
 interface LoggerOptions {
-  instance?: pino.Logger
-  level?: pino.LevelWithSilent
+  level?: LevelWithSilent
   pretty?: boolean
-  pino?: pino.LoggerOptions
+  sink?: (line: string) => void
+  bindings?: Record<string, unknown>
 }
 ```
 
@@ -88,12 +177,25 @@ interface LoggerOptions {
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `instance` | `pino.Logger` | — | An already-configured Pino logger to use instead of building one. When given, `level`/`pretty`/`pino` are ignored. |
-| `level` | `pino.LevelWithSilent` | Pino's own default (`'info'`) | Minimum level to log. Passed straight to Pino. |
-| `pretty` | `boolean` | `false` | Pretty-prints via Pino's own `pino-pretty` transport instead of newline-delimited JSON. |
-| `pino` | `pino.LoggerOptions` | — | Additional Pino options, merged in on top of `level`/`pretty` — the escape hatch for anything not exposed directly (redaction, custom serializers, a different transport, ...). |
+| `level` | `LevelWithSilent` | `'info'` | Minimum level to log. Anything below it is dropped before a record is even built. |
+| `pretty` | `boolean` | `false` | Formats for a human instead of newline-delimited JSON. |
+| `sink` | `(line: string) => void` | writes to `process.stdout` where it exists, `console.log` otherwise | Where each formatted line is written. |
+| `bindings` | `Record<string, unknown>` | `{}` | Fields merged into every record — what `child()` adds to, not a replacement for it. |
 
-**Behavior** — `pretty` requires `pino-pretty` to be installed separately (`bun add pino-pretty`); it's a peer dependency of `@arcton/logger`, not a regular one. Without it, `logger({ pretty: true })` throws the same `unable to determine transport target for "pino-pretty"` error Pino itself throws — see [Pretty-printing](../integrations/logger.mdx#pretty-printing).
+**Behavior:** the default `sink` is resolved once, when `@arcton/logger` loads — `process.stdout.write` on Node/Bun, `console.log` anywhere `process` doesn't exist (a Worker). Pass your own to redirect output — to a file, a test capture, another service — without changing anything else.
+
+## `LogLevel` and `LevelWithSilent`
+
+**Purpose** — the level names a `Logger` accepts, and the wider set `LoggerOptions.level` accepts.
+
+**Signature**
+
+```ts
+type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal'
+type LevelWithSilent = LogLevel | 'silent'
+```
+
+**Behavior:** ranked in the order listed, `trace` lowest — a call is written when its own level's rank is at or above the configured minimum's. `'silent'` outranks every real level, so nothing at all passes it.
 
 ## `ArctonLogger`
 
@@ -103,11 +205,11 @@ interface LoggerOptions {
 
 ```ts no-check
 type ArctonLogger = Middleware & {
-  readonly pino: pino.Logger
+  readonly logger: Logger
 }
 ```
 
-**Behavior** — a plain [`Middleware`](./middleware-types.mdx#middleware) function, so `app.use(logger())` works exactly like [`app.use(cors())`](./cors.mdx). `.pino` is the underlying Pino instance — the same one the middleware logs through — for logging anything outside the request/response cycle:
+**Behavior** — a plain [`Middleware`](./middleware-types.mdx#middleware) function, so `app.use(logger())` works exactly like [`app.use(cors())`](./cors.mdx). `.logger` is the same [`Logger`](#logger) instance the middleware logs through, for logging anything outside the request/response cycle:
 
 ```ts
 import { Arcton } from '@arcton/core'
@@ -120,5 +222,5 @@ app.use(log)
 app.get('/', () => 'ok')
 
 const server = app.listen({ port: 0 })
-log.pino.info(`listening on ${server.url}`)
+log.logger.info(`listening on ${server.url}`)
 ```
