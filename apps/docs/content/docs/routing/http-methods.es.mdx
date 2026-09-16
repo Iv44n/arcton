@@ -57,7 +57,8 @@ ejemplo montar una librería como [better-auth](https://www.better-auth.com):
 
 ```ts
 import { Arcton } from '@arcton/core'
-import { auth } from './auth'
+
+declare const auth: { handler: (request: Request) => Promise<Response> }
 
 const app = Arcton()
 

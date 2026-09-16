@@ -10,6 +10,8 @@ Lanzá un error ya armado en vez de construir a mano `ctx.response.status = ...;
 ```ts
 import { Arcton, Http } from '@arcton/core'
 
+declare function findOrder(id: string): { id: string } | undefined
+
 const app = Arcton()
 
 app.get('/orders/:id', ctx => {
@@ -21,7 +23,7 @@ app.get('/orders/:id', ctx => {
 app.listen()
 ```
 
-Por sí solo esto sigue siendo un error no capturado — convertirlo en una respuesta queda de tu lado, igual que con cualquier otro throw. Ver [Respondiendo con errores](../errors/responding-with-errors.mdx#lanzar-un-httperror-ya-armado-en-lugar-de-construirlo-a-mano) para el patrón try/catch que mapea `status`/`code`/`body` de `HttpError` sobre `ctx.response`.
+Por sí solo esto sigue siendo un error no capturado — convertirlo en una respuesta queda de tu lado, igual que con cualquier otro throw. Ver [Respondiendo con errores](../errors/responding-with-errors.mdx#throw-a-ready-made-httperror-instead-of-hand-rolling-one) para el patrón try/catch que mapea `status`/`code`/`body` de `HttpError` sobre `ctx.response`.
 
 ## `HttpError`
 
@@ -52,6 +54,8 @@ class HttpError extends Error {
 **Ejemplo**
 
 ```ts
+import { HttpError } from '@arcton/core'
+
 throw new HttpError(451, 'UNAVAILABLE_FOR_LEGAL_REASONS', 'Unavailable For Legal Reasons')
 ```
 

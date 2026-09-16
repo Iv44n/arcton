@@ -57,7 +57,8 @@ an external Request/Response handler, e.g. mounting a library like
 
 ```ts
 import { Arcton } from '@arcton/core'
-import { auth } from './auth'
+
+declare const auth: { handler: (request: Request) => Promise<Response> }
 
 const app = Arcton()
 

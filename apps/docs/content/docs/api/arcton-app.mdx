@@ -109,7 +109,8 @@ app.listen()
 **Example**
 ```ts
 import { Arcton } from '@arcton/core'
-import { auth } from './auth'
+
+declare const auth: { handler: (request: Request) => Promise<Response> }
 
 const app = Arcton()
 
@@ -480,6 +481,8 @@ declare function onError<TProvided>(
 **Example**
 ```ts
 import { Arcton, Http, HttpError } from '@arcton/core'
+
+declare function findOrder(id: string): { id: string } | undefined
 
 const app = Arcton()
 

@@ -10,6 +10,8 @@ Throw a ready-made error instead of hand-rolling `ctx.response.status = ...; ret
 ```ts
 import { Arcton, Http } from '@arcton/core'
 
+declare function findOrder(id: string): { id: string } | undefined
+
 const app = Arcton()
 
 app.get('/orders/:id', ctx => {
@@ -52,6 +54,8 @@ class HttpError extends Error {
 **Example**
 
 ```ts
+import { HttpError } from '@arcton/core'
+
 throw new HttpError(451, 'UNAVAILABLE_FOR_LEGAL_REASONS', 'Unavailable For Legal Reasons')
 ```
 

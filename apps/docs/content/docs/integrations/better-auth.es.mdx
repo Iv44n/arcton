@@ -10,7 +10,25 @@ pequeña API de servidor para leer la sesión actual.
 
 Esta guía asume que ya tienes una app de Arcton y una instancia de Better
 Auth configurada. Si todavía no configuraste Better Auth, consulta su propia
-[guía de instalación](https://www.better-auth.com/docs/installation).
+[guía de instalación](https://www.better-auth.com/docs/installation). Cada
+ejemplo de abajo importa esa instancia desde un módulo local `./auth` — un
+reemplazo de la tuya:
+
+```ts title="auth.ts"
+declare const auth: {
+  handler: (request: Request) => Promise<Response>
+  api: {
+    getSession: (options: {
+      headers: Headers
+    }) => Promise<{
+      user: { id: string; email: string }
+      session: { id: string }
+    } | null>
+  }
+}
+
+export { auth }
+```
 
 ## Instalación
 

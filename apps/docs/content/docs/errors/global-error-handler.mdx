@@ -39,6 +39,8 @@ example, narrowing on `HttpError` to reuse the status it already carries:
 ```ts
 import { Arcton, Http, HttpError } from '@arcton/core'
 
+declare function findOrder(id: string): { id: string } | undefined
+
 const app = Arcton()
 
 app.get('/orders/:id', ctx => {
@@ -73,6 +75,8 @@ the request, so `onError()` covers a throw there as well:
 
 ```ts
 import { Arcton } from '@arcton/core'
+
+declare function logRequest(request: Request): void
 
 const app = Arcton()
 

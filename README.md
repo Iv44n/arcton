@@ -112,7 +112,10 @@ bun run dev
 | `@arcton/adapter-bun` | serves an Arcton app on Bun |
 | `@arcton/adapter-node` | serves an Arcton app on Node.js |
 | `@arcton/cors` | CORS middleware |
+| `@arcton/logger` | request-logging middleware, zero runtime dependencies |
+| `@arcton/openapi` | generates an OpenAPI 3.1 document from a route's schemas, served through Scalar |
 | `arcton` | CLI — `arcton create` |
+| `create-arcton` | scaffolds a new project — `bun create arcton` |
 
 ## Status
 

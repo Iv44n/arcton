@@ -130,7 +130,7 @@ namespace StandardJSONSchemaV1 {
 }
 ```
 
-**Comportamiento** — comparte la misma key `'~standard'` que `StandardSchemaV1`, así que un schema que lo soporta se detecta por feature (`'jsonSchema' in schema['~standard']`), no por qué librería lo produjo. `input` y `output` son conversiones separadas porque pueden diferir — un schema con un transform acepta una forma y produce otra. Cualquiera de las dos puede lanzar cuando un schema no tiene representación en JSON Schema en absoluto (un `Date` crudo, por ejemplo); quien quiera documentación en vez de un error debe capturarlo él mismo. Zod 4.6+ y ArkType 2.2+ la implementan de forma nativa; Valibot todavía no — envuelve un schema con `toStandardJsonSchema()` de `@valibot/to-json-schema` para sumarse. Ver [OpenAPI & Scalar](../integrations/openapi.mdx#requisitos-del-schema).
+**Comportamiento** — comparte la misma key `'~standard'` que `StandardSchemaV1`, así que un schema que lo soporta se detecta por feature (`'jsonSchema' in schema['~standard']`), no por qué librería lo produjo. `input` y `output` son conversiones separadas porque pueden diferir — un schema con un transform acepta una forma y produce otra. Cualquiera de las dos puede lanzar cuando un schema no tiene representación en JSON Schema en absoluto (un `Date` crudo, por ejemplo); quien quiera documentación en vez de un error debe capturarlo él mismo. Zod 4.6+ y ArkType 2.2+ la implementan de forma nativa; Valibot todavía no — envuelve un schema con `toStandardJsonSchema()` de `@valibot/to-json-schema` para sumarse. Ver [OpenAPI & Scalar](../integrations/openapi.mdx#schema-requirements).
 
 **Ejemplo**
 

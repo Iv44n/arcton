@@ -41,6 +41,8 @@ ya trae:
 ```ts
 import { Arcton, Http, HttpError } from '@arcton/core'
 
+declare function findOrder(id: string): { id: string } | undefined
+
 const app = Arcton()
 
 app.get('/orders/:id', ctx => {
@@ -77,6 +79,8 @@ matchea el request, así que `onError()` también cubre un throw ahí:
 ```ts
 import { Arcton } from '@arcton/core'
 
+declare function logRequest(request: Request): void
+
 const app = Arcton()
 
 app.use(async (ctx, next) => {
@@ -101,7 +105,7 @@ de errores independiente.
 
 Para un límite acotado a una sola sección de la app, envuelve `next()` en un
 try/catch dentro de un [middleware con scope](../middleware/scoped.mdx) — ver
-[Capturar un error lanzado dentro de un middleware](./responding-with-errors.mdx#capturar-un-error-lanzado-dentro-de-un-middleware).
+[Capturar un error lanzado dentro de un middleware](./responding-with-errors.mdx#catch-a-thrown-error-inside-middleware).
 Los dos se combinan bien: un try/catch con scope maneja lo que reconoce y
 relanza el resto, que entonces llega a `onError()` como el catch-all final.
 

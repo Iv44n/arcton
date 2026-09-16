@@ -128,6 +128,8 @@ status/message pairing lives in one place instead of at every throw site:
 ```ts
 import { Arcton, Http } from '@arcton/core'
 
+declare function findOrder(id: string): { id: string } | undefined
+
 const app = Arcton()
 
 app.get('/orders/:id', ctx => {
@@ -151,6 +153,8 @@ returns an `HttpError` (a subclass of `Error`) carrying:
   of the default `{ code, message }`
 
 ```ts
+import { Http } from '@arcton/core'
+
 throw Http.Conflict('Email already registered', { field: 'email' })
 ```
 
@@ -169,6 +173,8 @@ status and body it carries drive the response:
 ```ts
 import type { Middleware } from '@arcton/contracts'
 import { Arcton, Http, HttpError } from '@arcton/core'
+
+declare function findOrder(id: string): { id: string } | undefined
 
 const catchHttpErrors: Middleware = async (ctx, next) => {
   try {

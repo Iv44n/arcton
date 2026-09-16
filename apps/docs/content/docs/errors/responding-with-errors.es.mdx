@@ -132,6 +132,8 @@ lanza:
 ```ts
 import { Arcton, Http } from '@arcton/core'
 
+declare function findOrder(id: string): { id: string } | undefined
+
 const app = Arcton()
 
 app.get('/orders/:id', ctx => {
@@ -156,6 +158,8 @@ lleva:
   del default `{ code, message }`
 
 ```ts
+import { Http } from '@arcton/core'
+
 throw Http.Conflict('Email already registered', { field: 'email' })
 ```
 
@@ -175,6 +179,8 @@ arman la respuesta:
 ```ts
 import type { Middleware } from '@arcton/contracts'
 import { Arcton, Http, HttpError } from '@arcton/core'
+
+declare function findOrder(id: string): { id: string } | undefined
 
 const catchHttpErrors: Middleware = async (ctx, next) => {
   try {

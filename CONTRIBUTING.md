@@ -48,6 +48,11 @@ bun run build   # type-check and build all packages
 bun run check   # Biome
 ```
 
+`bun install` also points Git at `.githooks` (via `postinstall`), so `git push`
+runs lint and a format check locally — `bun run check` and
+`bun run format:check` — and refuses to push if either fails. Neither writes
+to your files; run `bun run lint` or `bun run format` yourself to apply fixes.
+
 A single package can be worked on directly:
 
 ```bash
