@@ -1532,9 +1532,9 @@ test('.use(subApp): use()/provide() registered on the parent before the mount re
   const order: string[] = []
 
   const users = Arcton({ prefix: '/users' })
-  users.get('/', (ctx: any) => {
+  users.get('/', ctx => {
     order.push('handler')
-    return { db: ctx.db }
+    return { db: (ctx as unknown as { db: string }).db }
   })
 
   const app = Arcton({ prefix: '/api' })

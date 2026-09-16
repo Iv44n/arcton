@@ -351,7 +351,7 @@ import type { ArctonApp } from '@arcton/core'
 
 declare function use<TProvided>(middleware: Middleware): ArctonApp<TProvided>
 declare function use<TProvided>(scope: string, middleware: Middleware): ArctonApp<TProvided>
-declare function use<TProvided>(app: ArctonApp<any>): ArctonApp<TProvided>
+declare function use<TProvided, M>(app: ArctonApp<M>): ArctonApp<TProvided>
 ```
 
 **Parameters:** `middleware` — a [`Middleware`](./middleware-types.mdx#middleware) function. `scope` — a static path; the middleware only applies to routes at or under it. `app` — another `ArctonApp` instance to mount as a module.
@@ -526,7 +526,7 @@ declare function listen(options?: ArctonListenOptions): RuntimeServer
 import type { RouteRecord } from '@arcton/contracts'
 import type { ArctonApp } from '@arcton/core'
 
-declare function routesOf(app: ArctonApp<any>): readonly RouteRecord[]
+declare function routesOf<T>(app: ArctonApp<T>): readonly RouteRecord[]
 ```
 
 **Parameters:** `app` — any `ArctonApp` instance, mounted or not.

@@ -170,11 +170,11 @@ export interface ArctonApp<TProvided = {}> {
    * `prefix`. Grafts its already-built route tree (and ws routes) into this
    * app's tree, wrapped once with this app's own `use()`/`provide()` steps
    * registered so far — same snapshot-at-registration-time semantics as
-   * everything else. Accepts any `ArctonApp<any>` — this app's own
+   * everything else. Accepts an `ArctonApp<M>` for any `M` — this app's own
    * `TProvided` is unaffected, and the module's handlers aren't retyped
    * against whatever this app goes on to `provide()`.
    */
-  use(app: ArctonApp<any>): ArctonApp<TProvided>
+  use<M>(app: ArctonApp<M>): ArctonApp<TProvided>
   /**
    * Composes typed context — adds `R` flat onto `ctx` for every
    * middleware/handler registered after this call. Rejects re-providing a
@@ -776,7 +776,7 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
  * `@arcton/openapi` and anything else that documents or inspects an app,
  * without exposing the router or the pipeline.
  */
-export function routesOf(app: ArctonApp<any>): readonly RouteRecord[] {
+export function routesOf<T>(app: ArctonApp<T>): readonly RouteRecord[] {
   const internal = getInternal(app)
   if (!internal) {
     throw new Error('routesOf() expects an Arcton app')
