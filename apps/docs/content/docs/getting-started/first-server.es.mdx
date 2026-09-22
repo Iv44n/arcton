@@ -1,0 +1,73 @@
+---
+title: Tu primer servidor
+description: Crea una app de Arcton, registra una ruta y empieza a escuchar requests.
+---
+
+Una aplicación de Arcton empieza con una sola llamada a `Arcton()`. Registra una ruta
+en ella y luego llama a `listen()`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen()
+```
+
+Ejecútalo con `bun src/index.ts` (o `tsx src/index.ts` en Node.js) y escucha
+en el puerto 3000 por defecto, imprimiendo un banner de inicio con la URL en la que está
+sirviendo.
+
+## Devolviendo datos
+
+Lo que sea que el handler devuelva se convierte en el body de la response. Devuelve un objeto
+o array y se serializa como JSON automáticamente:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/health', () => ({ status: 'ok' }))
+
+app.listen()
+```
+
+El conjunto completo de tipos de retorno que Arcton entiende — strings, objetos, datos
+binarios, streams, un `Response` en crudo — está en [Response](../fundamentals/response.mdx).
+
+## Leyendo un parámetro de ruta
+
+Un segmento `:param` en la ruta se captura y se tipa en `ctx.params`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.listen()
+```
+
+Ver [Parámetros de ruta](../routing/path-parameters.mdx) para saber cómo se hace match de
+los segmentos, y [Aplicación](../fundamentals/application.mdx) para el resto de lo que puede
+hacer una instancia de app.
+
+## Eligiendo un puerto
+
+`listen()` recibe un objeto de opciones:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen({ port: 4000 })
+```
+
+La lista completa de opciones está en [Opciones de listen](../configuration/listen-options.mdx).

@@ -1,0 +1,9 @@
+#!/bin/sh
+
+echo "Running lint..."
+bun run check || exit 1
+
+echo "Checking format..."
+bun run format:check || exit 1
+
+echo "✓ Lint and format checks passed"

@@ -1,0 +1,237 @@
+---
+title: Respondiendo con Errores
+description: Patrones para responder a una request con una respuesta que representa un fallo
+---
+
+## Devolver un Response y saltarse el mapeo por completo
+
+Devolver un objeto `Response` desde un handler lo deja pasar tal cual — sin
+merge de headers, sin validación de status. Es la forma más directa de
+responder a una request que no puede tener éxito:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/profile', ctx => {
+  const token = ctx.request.headers.get('authorization')
+  if (token !== 'secret') {
+    return new Response('Unauthorized', { status: 401 })
+  }
+
+  return { user: 'Alice' }
+})
+
+app.listen()
+```
+
+## Configurar ctx.response.status y devolver un valor plano
+
+Para seguir devolviendo un objeto plano y dejar que Arcton lo serialice a
+JSON, se configura el status en `ctx.response` antes de que el handler
+retorne:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.post('/orders', ctx => {
+  ctx.response.status = 201
+  return { created: true }
+})
+
+app.listen()
+```
+
+<Callout>
+`ctx.response.status` solo se puede configurar antes de que el body de la
+respuesta finalice — dentro del handler, o antes de `await next()` en un
+middleware global o de ruta. Una vez que el body finaliza (el handler
+retorna, un step corta la cadena, o una capa reemplaza el body después de
+`next()`), `ctx.response` ya se convirtió en un `Response` real, cuyo
+`status` no tiene setter — asignarle un valor lanza
+`TypeError: Attempted to assign to readonly property.`. La mutación de
+headers es distinta: `ctx.response.headers.set(...)` / `.append(...)` sigue
+funcionando después de `await next()` y llega igual al cliente.
+</Callout>
+
+```ts
+import type { Middleware } from '@arcton/contracts'
+import { Arcton } from '@arcton/core'
+
+const timing: Middleware = async (ctx, next) => {
+  const start = performance.now()
+  await next()
+  ctx.response.headers.set(
+    'X-Response-Time',
+    `${(performance.now() - start).toFixed(2)}ms`
+  )
+}
+
+const app = Arcton()
+
+app.use(timing)
+app.get('/health', () => ({ status: 'ok' }))
+
+app.listen()
+```
+
+## Capturar un error lanzado dentro de un middleware
+
+Un middleware es una simple función async, así que envolver `await next()`
+en un try/catch convierte en una respuesta normal cualquier cosa que el
+resto de la cadena lance:
+
+```ts
+import type { Middleware } from '@arcton/contracts'
+import { Arcton } from '@arcton/core'
+
+const catchErrors: Middleware = async (ctx, next) => {
+  try {
+    await next()
+  } catch (error) {
+    ctx.response.status = 500
+    return { error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
+const app = Arcton()
+
+app.use(catchErrors)
+
+app.get('/risky', () => {
+  throw new Error('boom')
+})
+
+app.listen()
+```
+
+Como el throw ocurre antes de que el valor de retorno del propio handler
+finalice la respuesta, `ctx.response.status` todavía se puede escribir
+cuando se ejecuta el bloque `catch`.
+
+<Callout>
+Para un único catch-all en lugar de un try/catch en cada middleware, ver
+[Global error handler](./global-error-handler.mdx).
+</Callout>
+
+## Lanzar un HttpError ya armado en lugar de construirlo a mano
+
+Repetir `ctx.response.status = ...; return {...}` en cada lugar donde una
+request puede fallar se acumula rápido. `@arcton/core` exporta `HttpError`
+más un namespace `Http` con una factory por cada status común —
+`Http.BadRequest`, `Http.Unauthorized`, `Http.Forbidden`, `Http.NotFound`,
+`Http.MethodNotAllowed`, `Http.Conflict`, `Http.Gone`,
+`Http.UnprocessableEntity`, `Http.TooManyRequests`,
+`Http.InternalServerError`, `Http.ServiceUnavailable` — así el par
+status/mensaje vive en un solo lugar en vez de en cada punto donde se
+lanza:
+
+```ts
+import { Arcton, Http } from '@arcton/core'
+
+declare function findOrder(id: string): { id: string } | undefined
+
+const app = Arcton()
+
+app.get('/orders/:id', ctx => {
+  const order = findOrder(ctx.params.id)
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
+  return order
+})
+
+app.listen()
+```
+
+Cada factory es una función simple, no una clase — se llama, no se
+instancia con `new`. Retorna un `HttpError` (una subclase de `Error`) que
+lleva:
+
+- `status` — el status HTTP (`404` para `Http.NotFound`)
+- `code` — una etiqueta estable y legible por máquina (`'NOT_FOUND'`), segura
+  para que un cliente haga switch sobre ella, a diferencia de `message`
+- `message` — la frase de razón del status por default, sobreescribible como
+  primer argumento de la factory
+- `body` — un segundo argumento opcional: el valor exacto a devolver en vez
+  del default `{ code, message }`
+
+```ts
+import { Http } from '@arcton/core'
+
+throw Http.Conflict('Email already registered', { field: 'email' })
+```
+
+<Callout type="warn">
+`throw Http.NotFound` — la referencia a la función pelada, sin `()` — lanza
+la función misma, no un `HttpError`. Un bloque catch que chequea
+`instanceof HttpError` no la va a reconocer, y llega al adapter como un
+`500` sin diferenciar (ver [Errores no capturados](./uncaught-errors.mdx)).
+Siempre hay que llamar a la factory.
+</Callout>
+
+Por sí solo, lanzar uno de estos sigue siendo un error no capturado.
+Capturalo con el mismo patrón try/catch de arriba, chequeando
+`instanceof HttpError` para que el status y el body que trae sean los que
+arman la respuesta:
+
+```ts
+import type { Middleware } from '@arcton/contracts'
+import { Arcton, Http, HttpError } from '@arcton/core'
+
+declare function findOrder(id: string): { id: string } | undefined
+
+const catchHttpErrors: Middleware = async (ctx, next) => {
+  try {
+    await next()
+  } catch (err) {
+    if (err instanceof HttpError) {
+      ctx.response.status = err.status
+      return err.body ?? { code: err.code, message: err.message }
+    }
+    throw err
+  }
+}
+
+const app = Arcton()
+
+app.use(catchHttpErrors)
+
+app.get('/orders/:id', ctx => {
+  const order = findOrder(ctx.params.id)
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
+  return order
+})
+
+app.listen()
+```
+
+Un status sin factory con nombre también funciona — construí `HttpError`
+directamente: `new HttpError(451, 'UNAVAILABLE_FOR_LEGAL_REASONS', 'Unavailable For Legal Reasons')`.
+Ver [HTTP errors](../api/http-errors.mdx) para la lista completa de
+factories y su status/code/message por default.
+
+## Respuestas propias de Arcton
+
+Algunas respuestas vienen del propio Arcton, no del código de la aplicación:
+
+- Ninguna ruta coincide con la request → `404` con un body JSON con forma
+  `{"code":"NOT_FOUND","message":"Not Found"}`, armado directamente a partir
+  de `Http.NotFound()` — computado una sola vez, no por request, y resuelto
+  sin lanzar nunca (a diferencia de un `throw Http.NotFound()` hecho a mano
+  en un handler, no depende de que haya un catch-all registrado para
+  convertirse en respuesta — ver [HTTP errors](../api/http-errors.mdx)).
+- Existe una ruta para el path pero no para este método → `405` con un
+  header `Allow` que lista los métodos que ese node sí tiene (por ejemplo,
+  `Allow: GET, POST`).
+- Un schema de `params`, `query` o `body` rechaza la request → `400` con un
+  body JSON con forma `{"issues":[{"message":"...","path":[...]}]}` — ver
+  [Errores de validación](../validation/validation-errors.mdx).
+- El `Content-Type` de la request no tiene un parser registrado para él →
+  `415` con body vacío — ver [Parsers de body](../validation/body-parsers.mdx).
+- Un parser integrado no puede parsear el body (JSON malformado, por
+  ejemplo) → `400` con `{"issues":[{"message":"Invalid request body"}]}`.
+
+Ver [Response](../fundamentals/response.mdx) para el mapeo completo entre el
+valor de retorno de un handler y un `Response`.

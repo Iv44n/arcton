@@ -1,0 +1,135 @@
+---
+title: Route Middleware
+description: Attaching middleware to a single route, either as arguments before the handler or through the middleware option.
+---
+
+Pass middleware before the handler to attach it to one route:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get(
+  '/reports',
+  async (ctx, next) => {
+    if (ctx.request.headers.get('authorization') === null) {
+      return new Response('Unauthorized', { status: 401 })
+    }
+
+    await next()
+  },
+  () => ({ reports: [] })
+)
+
+app.listen()
+```
+
+The last argument is always the handler; everything before it is middleware,
+running in the order written. Any number can be passed:
+
+```ts
+import { Arcton } from '@arcton/core'
+import type { Middleware } from '@arcton/contracts'
+
+const authenticate: Middleware = async (ctx, next) => {
+  if (ctx.request.headers.get('authorization') === null) {
+    return new Response('Unauthorized', { status: 401 })
+  }
+  await next()
+}
+
+const audit: Middleware = async (ctx, next) => {
+  await next()
+  console.log(`audited ${new URL(ctx.request.url).pathname}`)
+}
+
+const app = Arcton()
+
+app.delete('/users/:id', authenticate, audit, ctx => ({
+  deleted: ctx.params.id
+}))
+
+app.listen()
+```
+
+## Route middleware is typed by its route
+
+A middleware written inline gets the route's parameter types:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get(
+  '/users/:id',
+  async (ctx, next) => {
+    console.log(`looking up user ${ctx.params.id}`)
+    await next()
+  },
+  ctx => ({ id: ctx.params.id })
+)
+
+app.listen()
+```
+
+A middleware declared separately as `Middleware` is reusable across routes and
+sees `ctx.params` as `Record<string, string>`.
+
+## With the options form
+
+When a route uses the [options form](../validation/overview.mdx), the
+middleware goes in the `middleware` array:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/users/:id/orders', {
+  params: v.object({
+    id: v.pipe(v.string(), v.transform(Number), v.number())
+  }),
+  body: v.object({
+    item: v.string(),
+    quantity: v.pipe(v.number(), v.integer(), v.minValue(1))
+  }),
+  middleware: [
+    async (ctx, next) => {
+      console.log(`order for user ${ctx.params.id}: ${ctx.body.item}`)
+      await next()
+    }
+  ],
+  handler: ctx => ({ userId: ctx.params.id, order: ctx.body })
+})
+
+app.listen()
+```
+
+Route middleware runs **after** validation, so it sees the validated,
+converted values: `ctx.params.id` is a number here, and `ctx.body` is typed
+from the schema.
+
+## Where it sits in the chain
+
+Route middleware is the innermost layer, closest to the handler:
+
+```text
+global middleware → validation → route middleware → handler
+```
+
+So a global middleware wraps a route middleware, which wraps the handler. See
+[Execution order](./execution-order.mdx).
+
+Because route middleware belongs to a matched route, it does not run on the
+`404` and `405` responses Arcton generates.
+
+## Choosing a form
+
+| Use | When |
+|---|---|
+| Route middleware | one or two routes need the behavior |
+| [Scoped](./scoped.mdx) | a whole section of the API needs it |
+| [Global](./global.mdx) | every response needs it, including `404`/`405` |

@@ -1,0 +1,67 @@
+---
+title: Despliegue
+description: Compila un binario de Bun, o compila y ejecuta el template de Node.js para producción.
+---
+
+Desplegar una app de Arcton se reduce a ejecutar un comando de build y luego arrancar
+el resultado — qué comando depende de qué template hayas generado.
+
+## Bun: compilar un binario independiente
+
+El script `compile` del template de Bun empaqueta tu app y el runtime de Bun en un
+único ejecutable:
+
+```bash
+bun run compile
+```
+
+que ejecuta:
+
+```bash
+bun build --compile --minify --sourcemap ./src/index.ts --outfile arcton-app
+```
+
+El resultado es un binario autocontenido — sin `node_modules`, sin necesidad de
+instalar el runtime por separado en la máquina destino:
+
+```bash
+./arcton-app
+```
+
+Si prefieres ejecutar el código fuente directamente sin compilar, el script `start`
+del template hace eso en su lugar:
+
+```bash
+bun run start
+```
+
+## Node.js: compilar y luego ejecutar
+
+El script `build` del template de Node.js verifica los tipos y emite JavaScript:
+
+```bash
+npm run build
+```
+
+que ejecuta:
+
+```bash
+tsc --build
+```
+
+Después arranca el resultado compilado con el script `start`:
+
+```bash
+npm run start
+```
+
+que ejecuta:
+
+```bash
+node dist/index.js
+```
+
+## Etiquetando el entorno
+
+Pasa `env` a `listen()` para etiquetar el banner de inicio con el entorno al que estás
+desplegando — ver [Entorno](../configuration/environment.mdx).

@@ -1,0 +1,60 @@
+---
+title: Providers Overview
+description: Compose typed values onto ctx with provide(), available to everything registered after it.
+---
+
+`provide()` composes typed context: it runs a function per request and merges
+whatever it returns flat onto `ctx`, typed, for everything registered after
+it:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .provide(ctx => ({
+    requestId: ctx.request.headers.get('x-request-id') ?? crypto.randomUUID()
+  }))
+  .get('/whoami', ctx => ({ requestId: ctx.requestId }))
+
+app.listen()
+```
+
+`ctx.requestId` type-checks on the handler above because `.get()` is chained
+directly onto the value `.provide()` returns — that's the object whose type
+actually carries `requestId`. See
+[Typed Context](./typed-context.mdx) for exactly why the chaining matters.
+
+## Providers can build on each other
+
+Providers run in registration order, and a later one can read what an earlier
+one added:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .provide(() => ({ db: { query: async (_sql: string) => [] } }))
+  .provide(async ctx => {
+    const users = await ctx.db.query('select * from users')
+    return { users }
+  })
+  .get('/users', ctx => ctx.users)
+
+app.listen()
+```
+
+## What you can't provide
+
+Re-providing a key that's already on `ctx` — one you provided earlier, or one
+of the base fields `request`, `params`, `query`, `response`, `body` — is a
+compile error, not something checked at runtime.
+
+Providers run before validation and route middleware, and don't run for
+`404`/`405` responses. For how `provide()` composes typed context in more
+depth, see [Typed Context](./typed-context.mdx); for when to reach for
+`provide()` versus `use()`, see
+[Providers vs Middleware](./providers-vs-middleware.mdx).

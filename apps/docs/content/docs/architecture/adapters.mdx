@@ -1,0 +1,112 @@
+---
+title: Adapters
+description: Why serving is a separate layer, what the adapter contract covers, and what it deliberately leaves out.
+---
+
+An adapter is the only part of Arcton that talks to a runtime. It receives a
+`fetch`-style function and a list of WebSocket routes, starts a real server,
+and returns a handle.
+
+```ts
+import type { RuntimeServeOptions, RuntimeServer } from '@arcton/contracts'
+
+interface RuntimeAdapter {
+  readonly name: string
+  readonly version: string
+  readonly capabilities: { readonly websocket: boolean }
+  serve(options: RuntimeServeOptions): RuntimeServer
+}
+```
+
+That is the entire surface between Arcton and the world.
+
+## Why this boundary exists
+
+Bun and Node.js disagree about almost everything at the server level: how a
+server starts, how a request is represented, how a response is written, how a
+socket upgrade is expressed. They agree on `Request` and `Response`.
+
+Building the boundary at exactly that agreement keeps the routing, the
+pipeline and the response mapping runtime-independent — which means they are
+written once, tested once, and behave identically wherever the app runs. The
+per-runtime work shrinks to translation, and each adapter is a single file.
+
+It also means adding a runtime does not touch the core. Anything that can
+accept a `Request` and produce a `Response` can back an adapter.
+
+## What an adapter is responsible for
+
+- Starting a server on a port and hostname, and reporting the bound `port` and
+  `url` — including the real port when `0` was requested.
+- Converting the runtime's native request into a standard `Request`, and
+  writing a standard `Response` back, headers and streaming body included.
+- Upgrading the WebSocket routes it was handed, and translating the runtime's
+  socket into the shared socket interface.
+- Stopping, with the option of closing active connections.
+- Catching anything thrown out of the request handler, logging it, and
+  answering `500` — the last line of defense, so a runtime never sees an
+  unhandled rejection from user code.
+
+## What an adapter is not responsible for
+
+An adapter does no routing. Every request goes straight to the handler Arcton
+gave it, whatever the path — the adapters' own tests assert exactly that. It
+does not know about middleware, providers, validation or modules, and it never
+inspects the body of a request or response.
+
+Keeping adapters this thin is what makes them interchangeable. If an adapter
+started making routing decisions, two runtimes could answer the same request
+differently, and the promise that an app behaves the same everywhere would
+quietly stop being true.
+
+## Capabilities
+
+Some runtime features cannot be emulated. `capabilities` describes them, and
+today it carries one flag, `websocket`.
+
+Arcton checks it in `listen()` rather than in `ws()`, because a module mounted
+after a `ws()` call can still contribute WebSocket routes — `listen()` is the
+first moment the final set is known. Checking at startup means a mismatch fails
+immediately with a message naming the runtime, instead of at the first upgrade
+attempt.
+
+## Differences that remain visible
+
+The abstraction covers behavior, not every detail of the underlying platform.
+Two differences reach the user:
+
+- `stop()` completes synchronously on Bun and returns a promise on Node.js,
+  because Node's `close()` is inherently asynchronous. Awaiting it works on
+  both.
+- `version` reports the runtime's own version, so its format follows the
+  runtime.
+
+Both are documented in [Runtime support](../introduction/runtime-support.mdx),
+because pretending they are identical would be a worse trade than naming them.
+
+## Writing an adapter
+
+Implement `RuntimeAdapter` and pass the instance to `listen()`:
+
+```ts
+import type { RuntimeAdapter } from '@arcton/contracts'
+
+export const myAdapter: RuntimeAdapter = {
+  name: 'my-runtime',
+  version: '1.0.0',
+  capabilities: { websocket: false },
+  serve(options) {
+    // start a server that calls options.fetch(request, context)
+    // and writes the returned Response back
+    return {
+      port: options.port,
+      url: new URL(`http://localhost:${options.port}/`),
+      stop() {}
+    }
+  }
+}
+```
+
+The `serve()` implementation must call `options.fetch` for every request and
+write whatever `Response` comes back. See
+[Runtime types](../api/runtime-types.mdx) for the full contract.

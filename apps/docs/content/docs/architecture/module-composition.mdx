@@ -1,0 +1,86 @@
+---
+title: Module Composition
+description: Why mounting a module merges route trees at registration instead of delegating to a nested router at request time.
+---
+
+`app.use(module)` takes the module's route tree and grafts it into the parent's
+tree, right at that call. Afterwards there is one tree, and nothing records
+that a module was ever involved.
+
+## The alternative Arcton did not take
+
+The common approach is a nested router: the parent keeps a reference to the
+child and, when a request comes in with a matching prefix, hands it off. That
+is simple to implement and it costs something on every request — a match in the
+parent, then a match in the child, and again for each level of nesting. A
+three-level structure means three matching passes per request, forever.
+
+Merging pays that cost once, at startup. A request against a deeply nested
+module costs exactly what a top-level route costs, because by the time requests
+arrive there is no nesting left — just a tree.
+
+## What merging actually does
+
+Grafting walks the module's tree and inserts each route into the parent's tree
+at the combined prefix, using the same get-or-create and conflict primitives
+that a direct `app.get()` uses. Two things follow from reusing those
+primitives rather than duplicating them:
+
+- A collision produced by mounting throws the same error, with the same
+  message, as registering a duplicate route by hand. There is no second class
+  of conflict to learn.
+- A parameter-name conflict between a mounted route and an existing one is
+  caught the same way, at the same moment.
+
+The module's own tree is left untouched, so the same module can be mounted into
+more than one parent.
+
+## Wrapping, once
+
+Each mounted handler is wrapped with the parent's global steps as they existed
+at the moment of the mount — the same snapshot rule that governs a directly
+registered route.
+
+The wrap happens once per handler, at mount time, not per request. A handler
+that came through two levels of mounting has both parents' middleware baked
+into it, in the right order, with no request-time composition.
+
+Scoped middleware on the parent is deliberately excluded. A scope is a
+statement about a route's own path, and a module arrives as a whole subtree
+with no single path to test — so there is nothing sound to compare against.
+Rather than guessing, mounting drops scoped steps, and the module keeps its own
+scoped middleware, which is compared against the module's local paths. The same
+reasoning drives what runs on
+[404 and 405](../middleware/execution-order.mdx).
+
+## Why a module is just an application
+
+There is no `Router` type to learn. A module is an `Arcton()` instance, which
+means it has the full API: its own middleware, its own providers, its own
+validation, its own modules.
+
+That has a practical payoff. A module can be developed and run on its own —
+call `listen()` on it directly during development, mount it into the parent in
+production — because there was never anything different about it.
+
+## What the merge costs you
+
+Merging at registration means the tree is built from what exists at that
+moment, which produces one rule worth remembering: routes added to a module
+*after* it was mounted do not appear in the parent. Mount a module once it is
+fully built.
+
+In exchange, the shape of the application is fixed once `listen()` is called.
+Nothing about routing can change between requests, conflicts are impossible to
+introduce at runtime, and the route table is knowable at startup.
+
+## Prefixes
+
+A prefix is stored on the instance and applied when a route is registered on it
+— so a module's routes are already prefixed by the time anything mounts it, and
+mounting simply adds the parent's prefix on top.
+
+Prefixes must be static paths. A dynamic prefix would make the mounted routes'
+parameters depend on where they were mounted, and `ctx.params` would stop being
+derivable from the route literal the module wrote. Keeping prefixes static
+keeps that inference intact at every level of nesting.

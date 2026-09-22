@@ -1,0 +1,201 @@
+---
+title: Logging
+description: Loguea cada request con @arcton/logger — un middleware de logging sin ninguna dependencia en runtime.
+---
+
+`@arcton/logger` loguea una línea por request — método, path, status,
+duración — sin ninguna dependencia en runtime. Es un único middleware:
+ninguna configuración vive en `Arcton()` ni en `listen()`.
+
+## Instalación
+
+<Tabs items={['bun', 'npm', 'pnpm', 'yarn']}>
+<Tab value="bun">
+
+```bash
+bun add @arcton/logger
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npm install @arcton/logger
+```
+
+</Tab>
+<Tab value="pnpm">
+
+```bash
+pnpm add @arcton/logger
+```
+
+</Tab>
+<Tab value="yarn">
+
+```bash
+yarn add @arcton/logger
+```
+
+</Tab>
+</Tabs>
+
+## Uso básico
+
+```ts title="index.ts"
+import { Arcton } from '@arcton/core'
+import { logger } from '@arcton/logger'
+
+const app = Arcton()
+
+app.use(logger())
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.listen()
+```
+
+Cada request ahora produce una línea de JSON, una vez que se conoce la
+respuesta:
+
+```json
+{"level":"info","time":"2026-09-14T16:00:00.000Z","msg":"GET /users/1 200 0.4ms","method":"GET","path":"/users/1","status":200,"durationMs":0.4}
+```
+
+## El status decide el nivel
+
+```ts
+import { Arcton } from '@arcton/core'
+import { logger } from '@arcton/logger'
+
+const app = Arcton()
+
+app.use(logger())
+
+app.get('/ok', () => ({ ok: true })) // logueado a info
+app.get('/missing', ctx => {
+  ctx.response.status = 404 // logueado a warn (4xx)
+  return { error: 'not found' }
+})
+app.get('/boom', () => {
+  throw new Error('kaboom') // logueado a error
+})
+
+app.listen()
+```
+
+Una respuesta `2xx`/`3xx` se loguea a `info`, una `4xx` a `warn`, una `5xx`
+a `error` — ningún handler tiene que loguear nada por su cuenta. Si un
+request falla y nada aguas abajo captura el error, el logger lo loguea a
+`error` con el error adjunto y vuelve a lanzarlo sin modificarlo, así que
+el manejo de errores (un handler de
+[`onError()`](../errors/global-error-handler.mdx), o ninguno) se comporta
+exactamente igual que sin el logger.
+
+## Modo pretty
+
+`pretty: true` cambia JSON por un formato pensado para leerse en vivo, en
+una terminal — sin dependencia que instalar, sin transport que configurar:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { logger } from '@arcton/logger'
+
+const app = Arcton()
+
+app.use(logger({ pretty: process.env.NODE_ENV !== 'production' }))
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.listen()
+```
+
+Un request ahora imprime dos líneas en vez de una — `→` cuando llega, `←`
+cuando termina — cada una con el mismo `level` que llevaría una línea de
+JSON, escrito y coloreado, no solo implícito por el color:
+
+```text
+→ INFO  16:00:00.000 GET    /users/1
+← INFO  16:00:00.004 200 GET    /users/1 0.4ms
+```
+
+Un request que falla sin que nada capture el error queda etiquetado
+`ERROR` en vez de un status — no hay ninguno, igual que la línea de JSON
+para este caso no tiene campo `status` — con el mensaje del error al
+final:
+
+```text
+→ INFO  16:00:01.000 GET    /boom
+← ERROR 16:00:01.001 GET    /boom 0.1ms kaboom
+```
+
+`level` sigue filtrando qué se imprime: `'silent'` no imprime nada, y un
+nivel por encima del que tendría un request dado (un mínimo `warn`, por
+ejemplo) descarta la línea `→` de llegada y cualquier línea `←`/`ERR` que
+tampoco lo supere.
+
+## Child loggers
+
+`log.child(bindings)` devuelve un nuevo logger con `bindings` mezclado en
+cada record que escriba de ahí en adelante — útil para etiquetar cada
+línea de una parte de la app sin repetir esos campos en cada llamada:
+
+```ts
+import { createLogger } from '@arcton/logger'
+
+const log = createLogger()
+const dbLog = log.child({ component: 'database' })
+
+dbLog.info('query executed', { table: 'users' })
+// { "component": "database", "table": "users", "msg": "query executed", ... }
+```
+
+Los children se componen — un nieto lleva cada binding que agregaron sus
+ancestros. `createLogger()` construye un
+[`Logger`](../api/logger.mdx#logger) independiente, sin depender de ningún
+request; consultá la [referencia de la API](../api/logger.mdx) para el
+conjunto completo `trace`/`debug`/`info`/`warn`/`error`/`fatal`.
+
+## Un sink personalizado
+
+`sink` es dónde se escribe una línea formateada — `process.stdout.write`
+por defecto (con fallback a `console.log` donde `process` no existe, como
+un Worker). Pasá el tuyo propio para redirigir la salida, por ejemplo para
+capturar líneas de log en un test:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { logger } from '@arcton/logger'
+
+const lines: string[] = []
+
+const app = Arcton()
+
+app.use(logger({ sink: line => lines.push(line) }))
+
+app.get('/', () => 'ok')
+
+app.listen()
+```
+
+## Loguear fuera del ciclo de request
+
+`logger()` devuelve el middleware con el `Logger` subyacente agregado como
+`.logger`, así que el mismo logger se puede usar en cualquier otro lugar
+de tu app — por ejemplo, justo después de `listen()`:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { logger } from '@arcton/logger'
+
+const app = Arcton()
+const log = logger()
+
+app.use(log)
+app.get('/', () => 'ok')
+
+const server = app.listen({ port: 0 })
+log.logger.info(`listening on ${server.url}`)
+```
+
+Ver [`logger()`](../api/logger.mdx) para la referencia completa de la API.

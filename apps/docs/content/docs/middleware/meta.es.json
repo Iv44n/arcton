@@ -1,0 +1,13 @@
+{
+  "title": "Middleware",
+  "icon": "Layers",
+  "pages": [
+    "overview",
+    "global",
+    "scoped",
+    "route-level",
+    "execution-order",
+    "modifying-responses",
+    "cors"
+  ]
+}

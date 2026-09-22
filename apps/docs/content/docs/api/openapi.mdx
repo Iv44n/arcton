@@ -1,0 +1,325 @@
+---
+title: OpenAPI
+description: The openapi() integration factory and its options, from @arcton/openapi.
+---
+
+## Overview
+
+Serve an OpenAPI 3.1 document and a Scalar UI reading it, generated from a
+route's own `params`/`query`/`body`/`response`/`detail`:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { openapi } from '@arcton/openapi'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.listen({
+  openapi: openapi({ info: { title: 'API', version: '1.0.0' } })
+})
+```
+
+See [OpenAPI & Scalar](../integrations/openapi.mdx) for the usage-first
+guide.
+
+## `openapi()`
+
+**Purpose** — builds the [`OpenAPIIntegration`](#openapiintegration)
+`listen({ openapi })` accepts.
+
+**Signature**
+
+```ts no-check
+import type { OpenAPIIntegration } from '@arcton/contracts'
+
+function openapi(options: OpenAPIOptions): OpenAPIIntegration
+```
+
+**Parameters**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `options` | `OpenAPIOptions` | Required — at minimum, `info`. See below for every field. |
+
+**Return type** — an [`OpenAPIIntegration`](#openapiintegration), meant to
+be passed as `listen({ openapi })`.
+
+**Behavior** — the document is built once, when `listen()` calls the
+integration's `routes()` with the app's final `RouteRecord[]` — not per
+request, and not before every module has been mounted. It registers up to
+two plain `GET` routes on the app: the document itself (`document.path`,
+default `/openapi.json`) and, unless `docs: false`, a Scalar page
+(`docs.path`, default `/docs`) that loads the document by URL rather than
+embedding a second copy of it.
+
+**Errors** — if either path collides with a route already registered (or
+with each other), `listen()` throws the same `Duplicate route` error as
+registering any other route twice — see [Registration
+errors](../errors/registration-errors.mdx).
+
+**Example**
+
+```ts
+import { Arcton } from '@arcton/core'
+import { openapi } from '@arcton/openapi'
+import * as z from 'zod'
+
+const app = Arcton()
+
+app.get('/users/:id', {
+  params: z.object({ id: z.uuid() }),
+  response: z.object({ id: z.string() }),
+  detail: { operationId: 'getUser', tags: ['Users'] },
+  handler: ctx => ({ id: ctx.params.id })
+})
+
+app.listen({
+  port: 3000,
+  openapi: openapi({
+    info: { title: 'Users API', version: '1.0.0' },
+    docs: { path: '/reference' }
+  })
+})
+```
+
+## `OpenAPIOptions`
+
+**Purpose** — the options object accepted by `openapi()`.
+
+**Signature**
+
+```ts no-check
+interface OpenAPIOptions extends DocumentOptions {
+  document?: { path?: string }
+  docs?: (ScalarOptions & { path?: string }) | false
+}
+```
+
+**Fields**
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `info` | `OpenAPIInfo` | — | Required — see [`DocumentOptions`](#documentoptions). |
+| `servers` | `object[]` | — | See [`DocumentOptions`](#documentoptions). |
+| `tags` | `object[]` | — | See [`DocumentOptions`](#documentoptions). |
+| `security` | `object[]` | — | See [`DocumentOptions`](#documentoptions). |
+| `document.path` | `string` | `'/openapi.json'` | Where the document itself is served. |
+| `docs` | `ScalarOptions \| false` | `{}` | Scalar's own options — see [`ScalarOptions`](#scalaroptions) — plus `path` (default `'/docs'`). `false` serves the document alone, with no UI. |
+
+**Behavior** — `document` and `docs` are kept separate from `info`/
+`servers`/`tags`/`security` on purpose: one side describes the API, the
+other describes the UI reading it. See [Configuring the
+paths](../integrations/openapi.mdx#configuring-the-paths) and [Configuring
+Scalar](../integrations/openapi.mdx#configuring-scalar).
+
+## `OpenAPIInfo`
+
+**Purpose** — the document's `info` object — the one required field of
+`OpenAPIOptions`.
+
+**Signature**
+
+```ts
+interface OpenAPIInfo {
+  title: string
+  version: string
+  description?: string
+  [key: string]: unknown
+}
+```
+
+**Fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `title` | `string` | The API's name. |
+| `version` | `string` | The API's own version — unrelated to the OpenAPI spec version (`3.1.0`, always set for you). |
+| `description` | `string` | Optional. |
+
+**Behavior** — any other OpenAPI `info` field (`termsOfService`, `contact`,
+`license`, ...) is accepted through the index signature and passed straight
+through to the document, unvalidated.
+
+## `DocumentOptions`
+
+**Purpose** — the document-level fields `OpenAPIOptions` extends; also what
+[`buildDocument()`](#builddocument) itself takes.
+
+**Signature**
+
+```ts no-check
+interface DocumentOptions {
+  info: OpenAPIInfo
+  servers?: Record<string, unknown>[]
+  tags?: Record<string, unknown>[]
+  security?: Record<string, unknown>[]
+}
+```
+
+**Fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `info` | `OpenAPIInfo` | See [`OpenAPIInfo`](#openapiinfo). |
+| `servers` | `object[]` | OpenAPI Server Objects, passed through as given. |
+| `tags` | `object[]` | OpenAPI Tag Objects, passed through as given. |
+| `security` | `object[]` | OpenAPI Security Requirement Objects, passed through as given. |
+
+**Behavior** — `servers`/`tags`/`security` are copied onto the document
+verbatim when present, and omitted entirely otherwise — none of the three
+has a default.
+
+## `ScalarOptions`
+
+**Purpose** — Scalar's own configuration, under `OpenAPIOptions.docs`.
+
+**Signature**
+
+```ts
+interface ScalarOptions {
+  pageTitle?: string
+  cdn?: string
+  configuration?: Record<string, unknown>
+}
+```
+
+**Fields**
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `pageTitle` | `string` | `'Scalar API Reference'` | The `<title>` of the `/docs` page. |
+| `cdn` | `string` | jsDelivr | Where Scalar's JS bundle is loaded from — set to point at a self-hosted build. |
+| `configuration` | `object` | `{}` | Scalar's own configuration object (theme, sidebar, auth, ...) — see [Scalar's configuration docs](https://guides.scalar.com/scalar/scalar-api-references/configuration). |
+
+**Behavior** — `configuration.url` is always set for you, from
+`OpenAPIOptions.document.path` — the page reads the document by URL, so it
+never embeds a second copy of it. Any `url` passed in `configuration` is
+overridden.
+
+## `buildDocument()`
+
+**Purpose** — the lower-level function `openapi()` itself calls: turns a set
+of route records straight into an OpenAPI document object, with no HTTP
+integration. Useful for writing the document to a file at build time, or for
+testing what a set of routes produces without starting a server.
+
+**Signature**
+
+```ts no-check
+import type { RouteRecord } from '@arcton/contracts'
+
+function buildDocument(
+  records: readonly RouteRecord[],
+  options: DocumentOptions
+): Record<string, unknown>
+```
+
+**Parameters**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `records` | `readonly RouteRecord[]` | Typically the result of [`routesOf(app)`](./arcton-app.mdx#routesof). |
+| `options` | `DocumentOptions` | See [`DocumentOptions`](#documentoptions) above. |
+
+**Return type** — a plain, JSON-serializable OpenAPI 3.1 document.
+
+**Example**
+
+```ts
+import { Arcton, routesOf } from '@arcton/core'
+import { buildDocument } from '@arcton/openapi'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+const document = buildDocument(routesOf(app), {
+  info: { title: 'Users API', version: '1.0.0' }
+})
+
+await Bun.write('openapi.json', JSON.stringify(document, null, 2))
+```
+
+## `RouteRecord`
+
+**Purpose** — what a route declared, kept alongside the route tree so it
+survives after registration — the tree itself stores only composed
+handlers. Read through [`routesOf(app)`](./arcton-app.mdx#routesof); this is
+also what an `OpenAPIIntegration`'s `routes()` receives.
+
+**Signature**
+
+```ts no-check
+import type { StandardSchemaV1 } from '@arcton/contracts'
+
+interface RouteRecord {
+  method: HttpMethod
+  path: string
+  params?: StandardSchemaV1
+  query?: StandardSchemaV1
+  body?: StandardSchemaV1
+  response?: Record<number, StandardSchemaV1>
+  detail?: RouteDetail
+}
+```
+
+**Fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `method` | `HttpMethod` | One concrete method — `app.all()` produces one record per method it registers, never an "any method" record. |
+| `path` | `string` | The route's final path, with every mounting prefix already applied. |
+| `params`/`query`/`body` | `StandardSchemaV1` | The original schema instances, not a converted form — see [`StandardSchemaV1`](./validation-types.mdx#standardschemav1). |
+| `response` | `Record<number, StandardSchemaV1>` | Normalized from `RouteOptions.response` — always keyed by status, even when a bare schema was given. |
+| `detail` | `RouteDetail` | See [`RouteDetail`](./arcton-app.mdx#routedetail). |
+
+**Behavior** — a `ws()` route produces no record, having no contract to
+describe. See [`routesOf()`](./arcton-app.mdx#routesof) for how records
+compose across mounted modules.
+
+## `OpenAPIIntegration`
+
+**Purpose** — the single extension point `listen({ openapi })` accepts.
+`@arcton/core` knows this interface and never `@arcton/openapi` itself,
+which is what keeps the dependency pointing `@arcton/openapi` →
+`@arcton/core` and not the other way around.
+
+**Signature**
+
+```ts no-check
+interface OpenAPIIntegration {
+  routes(records: readonly RouteRecord[]): DocumentRoute[]
+}
+```
+
+**Behavior** — `listen()` calls `routes()` once, after every module has
+been grafted into the final route tree, and registers each returned
+`DocumentRoute` as a plain `GET` route — global `use()`/`provide()` steps
+don't apply to them. `openapi()` is the only implementation Arcton ships;
+the interface itself has nothing OpenAPI-specific about it; a different
+package could implement it to serve some other kind of generated
+documentation from the same `RouteRecord[]`.
+
+## `DocumentRoute`
+
+**Purpose** — a route an `OpenAPIIntegration` asks `listen()` to register.
+
+**Signature**
+
+```ts
+import type { RouteHandler } from '@arcton/contracts'
+
+interface DocumentRoute {
+  path: string
+  handler: RouteHandler
+}
+```
+
+**Fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `path` | `string` | An absolute path — not prefixed by the app's own `ArctonConfig.prefix`. |
+| `handler` | `RouteHandler` | Registered as `GET`, the only method `openapi()`'s own routes use. |

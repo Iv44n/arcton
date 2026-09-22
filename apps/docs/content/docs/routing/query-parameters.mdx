@@ -1,0 +1,109 @@
+---
+title: Query Parameters
+description: Reading the query string from the context, how repeated keys behave, and how to validate query input.
+---
+
+Query parameters arrive on `ctx.query`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/search', ctx => ({
+  term: ctx.query.q,
+  page: ctx.query.page
+}))
+
+app.listen()
+```
+
+`GET /search?q=arcton&page=2` returns `{"term":"arcton","page":"2"}`.
+
+## Values are strings, and may be missing
+
+`ctx.query` is a `Record<string, string>`. A key that was not sent is
+`undefined`, so handle absence explicitly:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/search', ctx => {
+  const term = ctx.query.q ?? ''
+  const page = Number(ctx.query.page ?? '1')
+
+  return { term, page }
+})
+
+app.listen()
+```
+
+Two details worth knowing:
+
+- A key sent without a value is an empty string: `?debug` gives
+  `ctx.query.debug === ''`.
+- A key sent more than once keeps the last value: `?tag=a&tag=b` gives
+  `ctx.query.tag === 'b'`.
+
+The query string is parsed the first time something reads `ctx.query`, so a
+handler that never touches it pays nothing.
+
+## Validating and converting
+
+Converting by hand gets repetitive once a route takes more than one parameter.
+A `query` schema does the conversion and typing in one place:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.get('/search', {
+  query: v.object({
+    q: v.string(),
+    page: v.optional(
+      v.pipe(v.string(), v.transform(Number), v.number()),
+      '1'
+    )
+  }),
+  handler: ctx => ({ term: ctx.query.q, page: ctx.query.page })
+})
+
+app.listen()
+```
+
+`ctx.query.page` is a `number` here, and a request missing `q` is answered with
+`400` before the handler runs. See
+[Params and query](../validation/params-and-query.mdx) and
+[Validation errors](../validation/validation-errors.mdx).
+
+## Reading the raw query string
+
+`ctx.request.url` is always available when you need the URL itself — for
+repeated keys you want to keep, for example:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/filter', ctx => {
+  const url = new URL(ctx.request.url)
+  const tags = url.searchParams.getAll('tag')
+
+  return { tags }
+})
+
+app.listen()
+```
+
+`GET /filter?tag=a&tag=b` returns `{"tags":["a","b"]}`.
+
+<Callout>
+  Query parameters are not part of route matching. `/search` and
+  `/search?q=x` reach the same route, and two routes cannot be distinguished by
+  their query string.
+</Callout>

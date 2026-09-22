@@ -1,0 +1,126 @@
+---
+title: Arcton
+description: A TypeScript backend framework structured for real applications, with priority-based routing, typed context and a runtime-decoupled core.
+---
+
+Arcton is a backend framework for TypeScript. You write handlers that return
+values, compose behavior with middleware, and organize an application into
+modules that merge into a single route tree.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => ({ message: 'Welcome to Arcton' }))
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.listen({ port: 3000 })
+```
+
+`ctx.params.id` is typed as `string` because the route literal says so — no
+generic argument, no cast. The returned object becomes a JSON response.
+
+## Start here
+
+A straight line from zero to a running server:
+
+<Cards>
+  <Card
+    title="What is Arcton?"
+    description="The problem it solves and the shape of an Arcton app."
+    href="./introduction/what-is-arcton.mdx"
+  />
+  <Card
+    title="Installation"
+    description="Scaffold a project for Bun or Node.js in one command."
+    href="./getting-started/installation.mdx"
+  />
+  <Card
+    title="Your first server"
+    description="From an empty directory to a running HTTP API."
+    href="./getting-started/first-server.mdx"
+  />
+  <Card
+    title="Project structure"
+    description="What the scaffold gives you, and where your code goes."
+    href="./getting-started/project-structure.mdx"
+  />
+</Cards>
+
+## Core concepts
+
+The ideas that show up everywhere else in Arcton:
+
+<Cards>
+  <Card
+    title="Context"
+    description="The single object a handler receives: request, params, query, response."
+    href="./fundamentals/context.mdx"
+  />
+  <Card
+    title="Routing"
+    description="Static, dynamic and wildcard segments, and which one wins."
+    href="./routing/overview.mdx"
+  />
+  <Card
+    title="Middleware"
+    description="Onion-shaped composition, and the registration order that drives it."
+    href="./middleware/overview.mdx"
+  />
+  <Card
+    title="Validation"
+    description="Standard Schema on params, query and body, with typed output."
+    href="./validation/overview.mdx"
+  />
+  <Card
+    title="Providers"
+    description="Compose typed values onto ctx with provide(), available to everything after it."
+    href="./providers/overview.mdx"
+  />
+  <Card
+    title="Modules"
+    description="Compose an application from Arcton instances that merge at registration."
+    href="./routing/modules.mdx"
+  />
+</Cards>
+
+## Running an app for real
+
+<Cards>
+  <Card
+    title="Errors"
+    description="How a mistake, yours or the caller's, turns into a response."
+    href="./errors/overview.mdx"
+  />
+  <Card
+    title="Configuration"
+    description="What ArctonConfig and listen() actually control — and what env only labels."
+    href="./configuration/app-config.mdx"
+  />
+  <Card
+    title="Testing"
+    description="Testing routes and middleware with bun:test, no mocking required."
+    href="./testing/overview.mdx"
+  />
+</Cards>
+
+## Reference
+
+<Cards>
+  <Card
+    title="API Reference"
+    description="Every public export, with signatures, behavior and examples."
+    href="./api/arcton.mdx"
+  />
+  <Card
+    title="Architecture"
+    description="Why the router, the pipeline and the adapters are built this way."
+    href="./architecture/overview.mdx"
+  />
+</Cards>
+
+<Callout>
+  Arcton is pre-1.0. The API described here is the API that ships today.
+</Callout>

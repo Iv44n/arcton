@@ -1,0 +1,73 @@
+---
+title: Aplicación
+description: Crea una app de Arcton con `Arcton()` y descubre toda la superficie de una instancia de app.
+---
+
+Toda app de Arcton empieza igual — llama a `Arcton()` y obtienes un objeto sobre el que
+registras rutas y comportamiento:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => ({ ok: true }))
+
+app.listen()
+```
+
+Cada método de registro — `get`, `post`, `use`, `provide`, `parser` — devuelve la misma
+app, así que las llamadas se pueden encadenar:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .use(async (ctx, next) => {
+    console.log(ctx.request.method, new URL(ctx.request.url).pathname)
+    await next()
+  })
+  .get('/health', () => ({ status: 'ok' }))
+
+app.listen()
+```
+
+## Poniendo un prefix a una instancia
+
+`Arcton()` recibe un config opcional con un solo campo, `prefix`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const api = Arcton({ prefix: '/api' })
+
+api.get('/status', () => ({ ok: true }))
+
+api.listen()
+```
+
+`prefix` se aplica a cada ruta y ruta `ws` registrada directamente en esa instancia —
+en este caso, `GET /api/status`. Tiene que ser una ruta estática (sin segmento
+`:param` ni `*wildcard`), y `'/'` se comporta igual que omitirlo. La misma instancia
+en la que configuras un prefix es también la que montas como module dentro de otra
+app — ver [Modules](../routing/modules.mdx).
+
+## La superficie de la app
+
+| Member | Qué hace |
+|---|---|
+| `config` | el objeto `ArctonConfig` que le pasaste a `Arcton()` |
+| `get` / `post` / `put` / `delete` / `patch` / `head` / `options` | registra una ruta para ese método HTTP — ver [Métodos HTTP](../routing/http-methods.mdx) |
+| `ws` | registra una ruta de WebSocket — ver [WebSockets](../routing/websockets.mdx) |
+| `use` | agrega middleware global o con scope de ruta, o monta un module — ver [Middleware](../middleware/overview.mdx) y [Modules](../routing/modules.mdx) |
+| `provide` | compone valores tipados sobre `ctx` — ver [Providers](../providers/overview.mdx) |
+| `parser` | registra un parser de body para un `Content-Type` — ver [Parsers de Body](../validation/body-parsers.mdx) |
+| `listen` | arranca el servidor — ver [Opciones de listen](../configuration/listen-options.mdx) |
+
+Cada método de ruta acepta un handler (con middleware opcional antes) o un objeto de
+opciones con esquemas de `params` / `query` / `body` — ver
+[Descripción general de validación](../validation/overview.mdx). Lo que pasa entre que
+llega un request y corre un handler es el tema de
+[Ciclo de vida de la request](./request-lifecycle.mdx).

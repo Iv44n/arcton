@@ -1,0 +1,79 @@
+---
+title: Adapters
+description: Los valores bunAdapter y nodeAdapter que conectan Arcton con un runtime.
+---
+
+## Resumen
+
+Elige un runtime pasando un adapter a `app.listen()`. `bunAdapter` es el default; pasa `nodeAdapter` para correr bajo Node.js en su lugar. Ambos implementan la interfaz [`RuntimeAdapter`](./runtime-types.mdx).
+
+```ts
+import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello from Node')
+
+app.listen({ adapter: nodeAdapter })
+```
+
+## `bunAdapter`
+
+**Propósito** — corre una app de Arcton en Bun.
+
+**Firma**
+
+```ts no-check
+const bunAdapter: RuntimeAdapter
+```
+
+**Comportamiento** — `name` es `'bun'`. `version` es un getter en vivo que retorna `Bun.version`. `capabilities.websocket` es `true`. Envuelve `Bun.serve()`: sirve el handler `fetch` de la app, expone `port`/`url` en el server retornado, hace auto-upgrade de cualquier ruta `ws()` registrada, y convierte un error no capturado lanzado desde el handler en una respuesta `500`, loggeado con `console.error`. `stop()` retorna `void` de forma síncrona.
+
+**Ejemplo**
+
+```ts
+import { bunAdapter } from '@arcton/adapter-bun'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello from Bun')
+
+app.listen({ adapter: bunAdapter })
+```
+
+## `nodeAdapter`
+
+**Propósito** — corre una app de Arcton en Node.js.
+
+**Firma**
+
+```ts no-check
+const nodeAdapter: RuntimeAdapter
+```
+
+**Comportamiento** — `name` es `'node'`. `version` es un getter en vivo que retorna `process.version` sin la `v` inicial, para que coincida con el formato de número puro de Bun (por ejemplo, `'20.11.0'`, no `'v20.11.0'`). `capabilities.websocket` es `true`. Envuelve `createServer` de `node:http` para HTTP y el paquete `ws` para los upgrades de WebSocket: sirve el handler `fetch` de la app, expone `port`/`url` en el server retornado, hace auto-upgrade de cualquier ruta `ws()` registrada, y convierte un error no capturado lanzado desde el handler en una respuesta `500`, loggeado con `console.error`. `stop()` retorna una `Promise<void>`.
+
+**Ejemplo**
+
+```ts
+import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello from Node')
+
+const server = app.listen({ adapter: nodeAdapter, port: 0 })
+await server.stop()
+```
+
+## Diferencias reales entre ambos
+
+Ambos adapters sirven el mismo handler `fetch` y las mismas rutas `ws()`, pero dos detalles difieren de una forma que vale la pena conocer antes de depender de ellos:
+
+- `stop()` retorna una `Promise<void>` en `nodeAdapter` y `void` en `bunAdapter`. `await server.stop()` es seguro con cualquiera de los dos — hacer `await` de un valor que no es una `Promise` es un no-op.
+- `bunAdapter.version` es exactamente `Bun.version`; `nodeAdapter.version` es el string de versión de Node sin la `v` inicial.
+
+Ver [Runtime support](../introduction/runtime-support.mdx) para orientación sobre cómo elegir entre ambos.

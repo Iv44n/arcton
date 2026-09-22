@@ -1,0 +1,11 @@
+{
+  "title": "Fundamentals",
+  "icon": "Boxes",
+  "pages": [
+    "application",
+    "request-lifecycle",
+    "context",
+    "request",
+    "response"
+  ]
+}

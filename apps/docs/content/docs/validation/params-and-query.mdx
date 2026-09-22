@@ -1,0 +1,69 @@
+---
+title: Params and Query
+description: Validate route params and query strings with a schema and read the coerced result from `ctx`.
+---
+
+Without a schema, `ctx.params` comes from the route literal and `ctx.query` is
+`Record<string, string>` — see [Context](../fundamentals/context.mdx),
+[Path Parameters](../routing/path-parameters.mdx) and
+[Query Parameters](../routing/query-parameters.mdx). Declaring a `params` or
+`query` schema replaces either with the schema's own output, coercions
+included.
+
+## Params
+
+Route params always arrive as strings — a `params` schema is how you turn
+`:id` into something more useful:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.get('/users/:id', {
+  params: v.object({
+    id: v.pipe(v.string(), v.transform(Number), v.number())
+  }),
+  handler: ctx => ({ id: ctx.params.id, doubled: ctx.params.id * 2 })
+})
+
+app.listen()
+```
+
+`ctx.params.id` is typed and valued as a `number`, so arithmetic on it just
+works.
+
+## Query
+
+Query values are strings too, and often optional — a query schema is where
+you turn `?limit=10` into a real number with a real default:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.get('/search', {
+  query: v.object({
+    q: v.pipe(v.string(), v.minLength(1)),
+    limit: v.optional(
+      v.pipe(v.string(), v.transform(Number), v.number())
+    )
+  }),
+  handler: ctx => ({ query: ctx.query.q, limit: ctx.query.limit ?? 10 })
+})
+
+app.listen()
+```
+
+`limit` stays `number | undefined` since it's optional — the fallback with
+`??` happens in the handler.
+
+## Order
+
+When a route declares both, `params` validates before `query`, and either can
+short-circuit the request with `400` before the other runs — see
+[Validation Overview](./overview.mdx) and
+[Validation Errors](./validation-errors.mdx).

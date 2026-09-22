@@ -1,0 +1,101 @@
+---
+title: Runtime Abstraction
+description: Por qué los tipos de runtime viven en su propio paquete, y qué le compra eso al core, a los adapters y a tu aplicación.
+---
+
+`@arcton/contracts` contiene tipos y nada más. Ninguna función, ninguna
+clase, ningún código de runtime. Cada otro paquete depende de él, y él
+no depende de nada.
+
+```text
+@arcton/core ──┐
+               ├──→ @arcton/contracts
+@arcton/adapter-bun ──┤
+@arcton/adapter-node ─┤
+@arcton/cors ─────────┘
+```
+
+## Por qué un paquete separado
+
+El core necesita describir qué espera de un runtime. Un adapter
+necesita implementar exactamente eso. Si cualquiera de los dos lados
+fuera dueño de la descripción, el otro tendría que depender de él — y
+un adapter dependiendo del core, o el core dependiendo de cada
+adapter, es un ciclo esperando a formarse.
+
+Poner el vocabulario en un paquete que no depende de nada rompe el
+ciclo. El core está escrito contra `RuntimeAdapter`, cada adapter
+implementa `RuntimeAdapter`, y ninguno de los dos sabe que el otro
+existe. Eso es lo que hace que el adapter por default se pueda
+reemplazar pasando una sola opción.
+
+Tiene un segundo efecto: como el paquete solo tiene tipos, desaparece
+en tiempo de build. Depender del vocabulario compartido no cuesta nada
+en runtime.
+
+## Qué vive ahí
+
+Dos grupos de tipos.
+
+**El contrato de runtime** — `RuntimeAdapter`, `RuntimeServer`,
+`RuntimeServeOptions`, `RuntimeHandler`, `RuntimeCapabilities`,
+`RuntimeRequestContext`, y los tipos de WebSocket. Estos describen un
+servidor, y son lo que un adapter implementa.
+
+**El vocabulario de la aplicación** — `Context`, `Middleware`,
+`RouteHandler`, `NextFunction`, `ProvideFn`, `BodyParser`, `Body`,
+`HttpMethod`, `StandardSchemaV1` y compañía. Estos describen las cosas
+que escribe tu código.
+
+Ambos grupos están en el mismo paquete porque ambos son compartidos:
+`@arcton/cors` necesita `Middleware` y `Context` sin necesitar el
+core, y lo mismo cualquier middleware que publiques tú mismo.
+
+## Por qué la interfaz es la plataforma web
+
+El contrato está construido sobre `Request`, `Response`, `Headers` y
+`ReadableStream` en vez de sobre un objeto de request específico de
+Arcton.
+
+Esos tipos ya existen en cada runtime objetivo, están especificados de
+forma independiente, y los desarrolladores ya los conocen. Un wrapper
+específico del framework agregaría una capa que aprender, una capa que
+mantener sincronizada con la plataforma, y una conversión en cada
+límite — a cambio de muy poco. Así que `ctx.request` es un `Request`
+real, y todo lo que sabes sobre la Fetch API aplica.
+
+El único lugar donde Arcton agrega su propia forma es la respuesta,
+donde `ctx.response` guarda un status y headers que siguen siendo
+mutables. Un `Response` real es inmutable en las formas en que el
+middleware necesita cambiarlo, así que el pipeline mantiene un objeto
+mutable de staging y lo materializa — ver [Pipeline](./pipeline.mdx).
+
+## Standard Schema, por la misma razón
+
+La validation sigue el mismo principio. En vez de traer su propio
+validador o depender de uno, Arcton acepta cualquier schema que
+implemente [Standard Schema](https://standardschema.dev/) — la
+interfaz que implementan Zod, Valibot y ArkType.
+
+El framework nunca importa una librería de validación, a los usuarios
+no se los obliga a usar la favorita del mantenedor, y un proyecto que
+ya usa una sigue usándola. La interfaz es tan chica que
+`StandardSchemaV1` está declarada en contracts junto con todo lo
+demás, así que ni siquiera eso es una dependencia.
+
+## Qué significa esto para tu código
+
+Tipar un middleware o handler independiente significa importar desde
+contracts:
+
+```ts
+import type { Middleware } from '@arcton/contracts'
+
+export const requestId: Middleware = async (ctx, next) => {
+  ctx.response.headers.set('X-Request-Id', crypto.randomUUID())
+  await next()
+}
+```
+
+Como el paquete es solo-tipos, ese import desaparece del output del
+build.

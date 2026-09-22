@@ -1,0 +1,29 @@
+{
+  "name": "arcton",
+  "private": true,
+  "packageManager": "bun@1.4.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "packages/adapters/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "postinstall": "git config core.hooksPath .githooks || true",
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "biome check --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.10",
+    "@types/bun": "latest",
+    "turbo": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^7"
+  }
+}

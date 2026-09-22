@@ -1,0 +1,11 @@
+{
+  "title": "Getting Started",
+  "icon": "Rocket",
+  "pages": [
+    "installation",
+    "first-server",
+    "project-structure",
+    "development",
+    "deployment"
+  ]
+}

@@ -1,0 +1,223 @@
+---
+title: Runtime Types
+description: The RuntimeAdapter contract and the supporting types an adapter implements.
+---
+
+## Overview
+
+These types define what a `RuntimeAdapter` is and what it hands back — they're the contract `bunAdapter` and `nodeAdapter` (see [Adapters](./adapters.mdx)) implement, and the shapes you'd need if you wrote your own. Most applications never touch these directly; they matter when you're passing `adapter` to `app.listen()` or authoring a new one.
+
+```ts
+import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello from Node')
+
+app.listen({ adapter: nodeAdapter })
+```
+
+## `RuntimeAdapter`
+
+**Purpose** — the interface a runtime integration implements so `@arcton/core` can serve requests without importing Bun or Node APIs itself.
+
+**Signature**
+
+```ts no-check
+interface RuntimeAdapter {
+  readonly name: string
+  readonly version: string
+  readonly capabilities: RuntimeCapabilities
+  serve(options: RuntimeServeOptions): RuntimeServer
+}
+```
+
+**Behavior** — `name` and `version` identify the runtime (used in the startup banner printed by `listen()`, see [listen()](./listen.mdx)). `capabilities.websocket` is checked once, inside `listen()`, against whatever `ws()` routes exist at that point (including ones added by mounting a module) — not at `ws()`-registration time.
+
+**Example** — see [Adapters](./adapters.mdx) for the two concrete, shipped values.
+
+## `RuntimeCapabilities`
+
+**Purpose** — declares what an adapter supports.
+
+**Signature**
+
+```ts
+interface RuntimeCapabilities {
+  readonly websocket: boolean
+}
+```
+
+**Behavior** — both shipped adapters set `websocket: true`. If `websocket` is `false` on the adapter passed to `listen()` and the app has registered `ws()` routes, `listen()` throws.
+
+## `RuntimeHandler`
+
+**Purpose** — the function shape of the HTTP request handler an adapter's `serve()` is given.
+
+**Signature**
+
+```ts no-check
+type RuntimeHandler = (
+  request: Request,
+  context: RuntimeRequestContext
+) => Response | undefined | Promise<Response | undefined>
+```
+
+**Parameters**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `request` | `Request` | The incoming request. |
+| `context` | `RuntimeRequestContext` | Runtime-provided helpers, currently just the low-level WebSocket upgrade primitive. |
+
+**Return type** — a `Response`, or `undefined` when the handler has already completed the request another way (for example, a successful WebSocket upgrade).
+
+## `RuntimeServeOptions`
+
+**Purpose** — what's passed into `RuntimeAdapter.serve()`.
+
+**Signature**
+
+```ts no-check
+interface RuntimeServeOptions {
+  fetch: RuntimeHandler
+  port: number
+  hostname?: string
+  websocket?: RuntimeWebSocketRoute[]
+}
+```
+
+**Behavior** — `websocket` lists every `ws()` route registered on the app (including ones grafted in by mounting a module); the adapter is expected to auto-upgrade requests that match one of these paths, ahead of calling `fetch` at all.
+
+## `RuntimeRequestContext`
+
+**Purpose** — the low-level WebSocket upgrade primitive handed to a `RuntimeHandler`, for upgrades that can't be expressed as a static `websocket` route entry (for example, one gated on auth).
+
+**Signature**
+
+```ts no-check
+interface RuntimeRequestContext {
+  upgrade(request: Request, options?: RuntimeUpgradeOptions): boolean
+}
+```
+
+**Parameters**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `request` | `Request` | The request to upgrade. |
+| `options` | `RuntimeUpgradeOptions` | Optional upgrade payload/headers. |
+
+**Return type** — `boolean`: `true` if the upgrade succeeded, `false` otherwise.
+
+**Behavior** — only usable when `RuntimeAdapter.capabilities.websocket` is `true`. On success, the handler must not also return a `Response`; on failure (`false`), the handler should return an error `Response` itself.
+
+**Example** — a fragment showing the primitive, not a full adapter:
+
+```ts
+import type { RuntimeHandler } from '@arcton/contracts'
+
+const fetchFallback: RuntimeHandler = (request, context) => {
+  if (new URL(request.url).pathname === '/socket') {
+    return context.upgrade(request)
+      ? undefined
+      : new Response('Upgrade failed', { status: 400 })
+  }
+
+  return new Response('not found', { status: 404 })
+}
+```
+
+## `RuntimeUpgradeOptions`
+
+**Purpose** — optional data passed alongside a `RuntimeRequestContext.upgrade()` call.
+
+**Signature**
+
+```ts
+interface RuntimeUpgradeOptions {
+  data?: unknown
+  headers?: Record<string, string>
+}
+```
+
+**Behavior** — `data` becomes the WebSocket's `RuntimeWebSocket.data` once the connection is open.
+
+## `RuntimeWebSocket`
+
+**Purpose** — the WebSocket handle passed to a `RuntimeWebSocketHandler`'s callbacks.
+
+**Signature**
+
+```ts
+interface RuntimeWebSocket {
+  readonly data: unknown
+  send(message: string | ArrayBuffer | ArrayBufferView): void
+  close(code?: number, reason?: string): void
+}
+```
+
+**Behavior** — `data` carries whatever payload the upgrade produced; it is `undefined` unless something explicitly attached one (see `RuntimeUpgradeOptions`).
+
+## `RuntimeWebSocketHandler`
+
+**Purpose** — the callbacks for a registered `ws()` route.
+
+**Signature**
+
+```ts no-check
+interface RuntimeWebSocketHandler {
+  message(ws: RuntimeWebSocket, message: string | ArrayBuffer): void | Promise<void>
+  open?(ws: RuntimeWebSocket): void | Promise<void>
+  close?(ws: RuntimeWebSocket, code: number, reason: string): void | Promise<void>
+  drain?(ws: RuntimeWebSocket): void | Promise<void>
+}
+```
+
+**Behavior** — only `message` is required. See [WebSockets](../routing/websockets.mdx) for `app.ws()` itself and worked examples.
+
+**Example** — a fragment showing the shape:
+
+```ts
+import type { RuntimeWebSocketHandler } from '@arcton/contracts'
+
+const echoHandler: RuntimeWebSocketHandler = {
+  message(ws, message) {
+    if (message === 'bye') {
+      ws.close(1000, 'client said bye')
+      return
+    }
+    ws.send(message)
+  }
+}
+```
+
+## `RuntimeWebSocketRoute`
+
+**Purpose** — one entry in `RuntimeServeOptions.websocket`.
+
+**Signature**
+
+```ts no-check
+interface RuntimeWebSocketRoute {
+  path: string
+  handler: RuntimeWebSocketHandler
+}
+```
+
+## `RuntimeServer`
+
+**Purpose** — what `RuntimeAdapter.serve()` returns, and what `app.listen()` returns to the caller.
+
+**Signature**
+
+```ts
+interface RuntimeServer {
+  readonly port: number
+  readonly url: URL
+  stop(closeActiveConnections?: boolean): void | Promise<void>
+}
+```
+
+**Behavior** — `stop()` returns `void` on the Bun adapter and a `Promise<void>` on the Node adapter (see [Adapters](./adapters.mdx)); `await`-ing it works either way. Full usage — including `port: 0` to pick a free port — is covered in [listen()](./listen.mdx).

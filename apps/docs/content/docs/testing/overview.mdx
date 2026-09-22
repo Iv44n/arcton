@@ -1,0 +1,13 @@
+---
+title: Testing
+description: How to test Arcton routes and middleware with bun:test.
+---
+
+Arcton apps are tested with [`bun:test`](https://bun.sh/docs/cli/test), the same runner the framework itself uses. There is no separate test client or mocking layer to learn — you exercise the real thing.
+
+## Two techniques
+
+- **Routes** — start a real server on an ephemeral port with `app.listen({ port: 0 })`, hit it with the platform `fetch`, then call `server.stop()`. This runs the full pipeline (middleware, providers, validation, the handler) exactly as it runs in production. See [Testing routes](./testing-routes.mdx).
+- **Middleware** — a [`Middleware`](../api/middleware-types.mdx) is a plain `(ctx, next) => ...` function, so it can be called directly with a hand-built `ctx` and a fake `next`, with no server involved. See [Testing middleware](./testing-middleware.mdx).
+
+Reach for the first when you want to confirm behavior end to end (routing, status codes, headers, response bodies). Reach for the second when you want to test one piece of middleware in isolation, independent of any particular route.

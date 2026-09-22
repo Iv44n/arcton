@@ -1,0 +1,36 @@
+{
+  "name": "@arcton/adapter-bun",
+  "version": "0.0.8",
+  "type": "module",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "bun": "./src/index.ts",
+      "node": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc --noEmit && bun build ./src/index.ts --target=node --outdir=dist --packages=external",
+    "prepublishOnly": "bun run build",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@arcton/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^7"
+  }
+}

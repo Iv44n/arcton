@@ -1,0 +1,52 @@
+---
+title: Request
+description: Leer la request entrante dentro de un handler o middleware — headers, método, URL y el body crudo.
+---
+
+`ctx.request` es un [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request) estándar — todo lo que te da la Fetch API está disponible directamente:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/whoami', ctx => ({
+  method: ctx.request.method,
+  userAgent: ctx.request.headers.get('user-agent'),
+  url: ctx.request.url
+}))
+
+app.listen()
+```
+
+## Query string y ruta
+
+`new URL(ctx.request.url)` funciona si quieres la URL cruda, pero para el caso común
+Arcton ya te da las piezas parseadas: `ctx.query` para los search params y
+`ctx.params` para los segmentos de ruta — ver [Context](./context.mdx),
+[Parámetros de query](../routing/query-parameters.mdx) y
+[Parámetros de ruta](../routing/path-parameters.mdx).
+
+## Leyendo el body directamente
+
+Leer `ctx.request` por tu cuenta — `.json()`, `.text()`, `.arrayBuffer()`,
+`.formData()` — funciona igual que en cualquier `Request`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.post('/echo', async ctx => {
+  const payload = await ctx.request.json()
+  return { received: payload }
+})
+
+app.listen()
+```
+
+Este es un camino separado de `ctx.body`: `ctx.body` solo existe en una ruta que
+declara un esquema de `body`, y su valor es lo que salió de la validación, ya parseado
+según el `Content-Type` de la request y transformado por tu esquema. Ver
+[Body](../validation/body.mdx) y [Parsers de Body](../validation/body-parsers.mdx)
+para ese camino.

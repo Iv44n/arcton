@@ -1,0 +1,176 @@
+---
+title: Middleware Overview
+description: What a middleware is in Arcton, the onion model, and the three ways to attach one.
+---
+
+A middleware is a function that runs around your handlers. It receives the
+[context](../fundamentals/context.mdx) and a `next` function, and it decides
+what happens before and after the rest of the chain:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  const start = performance.now()
+
+  await next()
+
+  ctx.response.headers.set(
+    'X-Response-Time',
+    `${(performance.now() - start).toFixed(2)}ms`
+  )
+})
+
+app.get('/', () => ({ ok: true }))
+
+app.listen()
+```
+
+Everything before `await next()` runs on the way in. Everything after runs on
+the way out, once the handler and every inner middleware have finished.
+
+## The onion
+
+Middleware nests. With two registered, the flow through a request is:
+
+```text
+   ┌── middleware A ─────────────────────────┐
+   │   ┌── middleware B ──────────────────┐  │
+   │   │   ┌── handler ───────────────┐   │  │
+   │   │   │  returns a value         │   │  │
+   │   │   └──────────────────────────┘   │  │
+   │   │   code after await next()        │  │
+   │   └──────────────────────────────────┘  │
+   │   code after await next()               │
+   └─────────────────────────────────────────┘
+```
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  console.log('A: in')
+  await next()
+  console.log('A: out')
+})
+
+app.use(async (ctx, next) => {
+  console.log('B: in')
+  await next()
+  console.log('B: out')
+})
+
+app.get('/', () => {
+  console.log('handler')
+  return { ok: true }
+})
+
+app.listen()
+```
+
+A request to `/` logs `A: in`, `B: in`, `handler`, `B: out`, `A: out`.
+
+## Three ways to attach one
+
+| Form | Applies to |
+|---|---|
+| `app.use(middleware)` | every route registered after the call, plus `404`/`405` responses |
+| `app.use('/admin', middleware)` | routes under that path, registered after the call |
+| `app.get(path, middleware, handler)` | that route only |
+
+```ts
+import { Arcton } from '@arcton/core'
+import type { Middleware } from '@arcton/contracts'
+
+const requestId: Middleware = async (ctx, next) => {
+  ctx.response.headers.set('X-Request-Id', crypto.randomUUID())
+  await next()
+}
+
+const app = Arcton()
+
+app.use(requestId)                                   // global
+app.use('/admin', requestId)                         // scoped
+app.get('/health', requestId, () => ({ ok: true }))  // route level
+
+app.listen()
+```
+
+Each form has its own page: [Global](./global.mdx), [Scoped](./scoped.mdx) and
+[Route level](./route-level.mdx).
+
+<Callout>
+  Which middleware a route runs is decided when the route is registered, from
+  the calls made before it. [Execution order](./execution-order.mdx) is the
+  page to read once the basics are clear.
+</Callout>
+
+## Short-circuiting
+
+A middleware that returns a value without calling `next()` answers the request
+on its own. The handler and everything inside never run:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  if (ctx.request.headers.get('x-api-key') !== 'secret') {
+    return new Response('Unauthorized', { status: 401 })
+  }
+
+  await next()
+})
+
+app.get('/private', () => ({ secret: true }))
+
+app.listen()
+```
+
+The returned value goes through the same
+[response mapping](../fundamentals/response.mdx) as a handler's, so returning
+an object produces JSON and returning a `Response` passes it through.
+
+## Typing a middleware
+
+`Middleware` is exported from `@arcton/contracts`. Declaring the type gives a
+standalone middleware its parameter types:
+
+```ts
+import type { Middleware } from '@arcton/contracts'
+
+export const logger: Middleware = async (ctx, next) => {
+  const { method, url } = ctx.request
+
+  console.log(`→ ${method} ${new URL(url).pathname}`)
+
+  await next()
+}
+```
+
+That is a fragment — import it into a file that builds an app to run it.
+
+## Reusable middleware
+
+A middleware that takes options is just a function that returns one:
+
+```ts
+import type { Middleware } from '@arcton/contracts'
+
+export function requireHeader(name: string): Middleware {
+  return async (ctx, next) => {
+    if (!ctx.request.headers.has(name)) {
+      return new Response(`Missing ${name}`, { status: 400 })
+    }
+
+    await next()
+  }
+}
+```
+
+That is the same shape [`@arcton/cors`](./cors.mdx) uses.

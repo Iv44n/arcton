@@ -1,0 +1,47 @@
+---
+title: Desarrollo
+description: Ejecuta el proyecto generado localmente con el script de dev del template.
+---
+
+Ambos templates vienen con un script `dev` conectado a su runtime, así que la forma de
+arrancar el desarrollo local es la misma sin importar cuál hayas elegido:
+
+```bash
+bun run dev
+```
+
+```bash
+npm run dev
+```
+
+```bash
+pnpm run dev
+```
+
+## Qué ejecuta el script `dev` de cada template
+
+El script `dev` del template de Bun es:
+
+```bash
+bun --hot src/index.ts
+```
+
+`--hot` recarga tu código a medida que cambian los archivos sin cerrar las conexiones
+abiertas, así que puedes seguir iterando sobre rutas y middleware sin reiniciar el
+proceso a mano.
+
+El script `dev` del template de Node.js es:
+
+```bash
+tsx watch src/index.ts
+```
+
+`tsx` ejecuta el entry point de TypeScript directamente, y `watch` reinicia el proceso
+cada vez que cambia un archivo fuente.
+
+## Entorno
+
+La opción `env` de `listen()` solo etiqueta el banner de inicio que imprime — por
+defecto usa `process.env.NODE_ENV`, y si eso no está definido cae en `'development'`,
+que es justo el caso mientras corres cualquiera de los dos scripts de dev. Ver
+[Entorno](../configuration/environment.mdx) para saber cómo definirlo explícitamente.

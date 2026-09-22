@@ -1,0 +1,110 @@
+---
+title: Philosophy
+description: Los principios detrás de la API de Arcton — orden de registro explícito, tipos derivados de lo que escribiste, y un núcleo que no sabe nada del runtime.
+---
+
+Arcton toma un puñado de decisiones con carácter propio. Conocerlas hace que
+el resto de la API sea predecible.
+
+## El orden de registro es la semántica
+
+La mayoría de los frameworks tratan el orden de las llamadas a `use()` como
+una sugerencia. En Arcton es la regla, aplicada consistentemente: una ruta
+corre el middleware y los providers que se registraron **antes que ella**, y
+nada más.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/first', () => 'no timing header')
+
+app.use(async (ctx, next) => {
+  const start = performance.now()
+  await next()
+  ctx.response.headers.set('X-Time', `${performance.now() - start}ms`)
+})
+
+app.get('/second', () => 'timed')
+
+app.listen()
+```
+
+`/first` y `/second` tienen pipelines distintos, y el archivo se lee de
+arriba hacia abajo exactamente como se comporta. La misma regla gobierna
+`provide()`, el middleware con scope de path, y montar un módulo — una sola
+idea en vez de cuatro.
+
+[Execution order](../middleware/execution-order.mdx) cubre esto en
+profundidad.
+
+## Los tipos vienen de lo que escribiste
+
+Arcton deriva los tipos del código que ya escribiste en vez de pedirte que
+los declares dos veces. El literal de la ruta produce `ctx.params`. Un
+schema produce la forma validada de `ctx.body`. Un provider amplía el
+contexto para todo lo que viene después.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .provide(() => ({ startedAt: Date.now() }))
+  .get('/uptime/:unit', ctx => ({
+    unit: ctx.params.unit,
+    uptime: Date.now() - ctx.startedAt
+  }))
+
+app.listen()
+```
+
+Nada de lo anterior nombra un tipo, y todo en él está tipado.
+
+## Valores, no objetos de respuesta
+
+Un handler retorna un valor. Arcton lo mapea a un `Response`. No hay ningún
+`res.send()` que se te pueda olvidar, ni un doble envío que debuggear, y un
+handler se mantiene como una función ordinaria que retorna datos — lo cual
+es justo lo que lo hace fácil de testear.
+
+Cuando una ruta necesita headers, un status code, o un stream, tanto
+`ctx.response` como retornar un `Response` están disponibles.
+
+## Composición sobre configuración
+
+El comportamiento surge de componer piezas pequeñas: un middleware, un
+provider, un módulo. No hay un registro de plugins que aprender — una
+funcionalidad reusable es una función que retorna un middleware, que es
+exactamente cómo está construido
+[`@arcton/cors`](../middleware/cors.mdx).
+
+## El núcleo no conoce el runtime
+
+`@arcton/core` nunca importa una API de Bun o de Node.js. Todo lo que el
+framework necesita de un runtime está descripto por la interfaz
+`RuntimeAdapter` en `@arcton/contracts`, y un adapter la implementa. Eso
+mantiene el código de routing y middleware idéntico entre runtimes, y hace
+que soportar uno nuevo sea cuestión de escribir un solo archivo.
+
+Ver [Runtime abstraction](../architecture/runtime-abstraction.mdx).
+
+## El trabajo se hace en tiempo de registro
+
+Arcton prefiere hacer el trabajo una sola vez, cuando las rutas se
+registran, en vez de en cada request. Cada ruta guarda su propio pipeline
+ya resuelto. Montar un módulo fusiona su árbol de rutas en el del padre en
+vez de encadenar routers. `ctx.query` se parsea solo si algo lo lee.
+
+El resultado es que un request hace lo mínimo: matchear un path, correr una
+cadena ya preparada, mapear un valor.
+
+## Explícito por sobre implícito
+
+Arcton evita la magia que es cómoda una vez y confusa después. No hay un
+namespace donde se escondan los valores del framework — los valores
+provistos quedan directamente sobre el contexto. Un scope es un path
+estático, no un segundo lenguaje de patrones. Las rutas en conflicto tiran
+un error al registrarse en vez de pisarse silenciosamente entre sí.

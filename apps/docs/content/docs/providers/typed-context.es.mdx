@@ -1,0 +1,66 @@
+---
+title: Context tipado
+description: Cómo provide() hace crecer el tipo de ctx para todo lo que se registre después, sin namespace.
+---
+
+Cada llamada a `provide()` devuelve un nuevo valor de app cuyo tipo trae el campo
+agregado, para lo que sea que se registre sobre *ese valor devuelto* después:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .get('/before', () => {
+    // ctx has no `user` here — the provide() below hasn't run yet
+    // in registration order
+    return { ok: true }
+  })
+  .provide(ctx => ({
+    user: ctx.request.headers.get('authorization') ? { id: 1 } : null
+  }))
+  .get('/after', ctx => ({ user: ctx.user }))
+
+app.listen()
+```
+
+`ctx.user` pasa el type-check en `/after` y no en `/before`, porque `/after` se
+registra sobre el valor que devolvió `.provide()`, y `/before` se registra sobre el
+valor de antes.
+
+`provide()` no ensancha retroactivamente el tipo de una `app` que ya tienes — devuelve
+una nueva, con un tipo más amplio. Registrar cualquier cosa que necesite un valor
+provisto tiene que pasar sobre ese valor devuelto, ya sea encadenando como en el
+ejemplo de arriba o reasignando, por ejemplo `app = app.provide(...)` con `app`
+declarada `let`. Llamar a `.provide()` y después seguir registrando rutas como
+statements separados sobre el `const app` original no va a pasar el type-check,
+aunque el valor esté presente en `ctx` en runtime de todas formas.
+
+## Plano, sin namespace
+
+Un valor provisto queda directo sobre `ctx` — no hay ningún objeto envoltorio que
+atravesar:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .provide(() => ({ user: { id: 1, name: 'Alice' } }))
+  .get('/me', ctx => ctx.user)
+
+app.listen()
+```
+
+## Keys reservadas
+
+Una llamada a `provide()` no puede reusar una key que ya está ahí. Eso incluye los
+campos base de `Context` — `request`, `params`, `query`, `response`, `body` — y
+cualquier key que un `provide()` anterior en la cadena ya haya agregado. Ambos casos
+se refuerzan a nivel de tipos: reusar una es un error de compilación.
+
+Ver [Descripción general de Providers](./overview.mdx) para la mecánica request por
+request, y [Context](../fundamentals/context.mdx) para los campos base junto a los
+que queda un valor provisto.

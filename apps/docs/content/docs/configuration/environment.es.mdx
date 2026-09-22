@@ -1,0 +1,73 @@
+---
+title: Entorno
+description: Qué hace la opción env y cómo leer variables de entorno en cada runtime.
+---
+
+## Qué hace `env`
+
+`app.listen()` recibe una opción `env` que por defecto vale
+`process.env.NODE_ENV ?? 'development'`. Se usa para exactamente una cosa: la
+etiqueta que se imprime en el banner de inicio.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen({ env: 'staging' })
+```
+
+El banner imprime entonces `Environment  staging` en vez del valor por
+defecto. Consulta [Opciones de Listen](./listen-options.mdx) para el resto de
+lo que `listen()` imprime y devuelve.
+
+## Leer variables de entorno
+
+Más allá de esa única etiqueta, las variables de entorno se leen de la forma
+normal para el runtime que esté sirviendo la app — no hay ninguna capa de
+configuración propia de Arcton de por medio.
+
+En Bun, los archivos `.env` se cargan automáticamente, así que `process.env`
+ya tiene lo que sea que defina un archivo `.env` para cuando corre tu código:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+const databaseUrl = process.env.DATABASE_URL
+
+app.get('/health', () => ({ ok: databaseUrl !== undefined }))
+
+app.listen()
+```
+
+En Node.js, lee `process.env` de la misma manera. Carga un archivo `.env`
+primero si usas uno — por ejemplo con la propia flag `--env-file` de Node al
+arrancar el proceso:
+
+```bash
+node --env-file=.env dist/index.js
+```
+
+```ts
+import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+const databaseUrl = process.env.DATABASE_URL
+
+app.get('/health', () => ({ ok: databaseUrl !== undefined }))
+
+app.listen({ adapter: nodeAdapter })
+```
+
+<Callout>
+  `NODE_ENV` no se lee para nada más que ese valor por defecto de `env` — si
+  tu propio código toma decisiones según esa variable (feature flags, nivel
+  de logging, etc.), lee `process.env.NODE_ENV` directamente, igual que hace
+  `app.listen()`.
+</Callout>

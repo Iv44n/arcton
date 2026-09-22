@@ -1,0 +1,52 @@
+---
+title: Request
+description: Reading the incoming request inside a handler or middleware — headers, method, URL, and the raw body.
+---
+
+`ctx.request` is a standard [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request) — everything the Fetch API gives you is available directly:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/whoami', ctx => ({
+  method: ctx.request.method,
+  userAgent: ctx.request.headers.get('user-agent'),
+  url: ctx.request.url
+}))
+
+app.listen()
+```
+
+## Query string and path
+
+`new URL(ctx.request.url)` works if you want the raw URL, but for the common
+case Arcton already gives you the parsed pieces: `ctx.query` for the search
+params and `ctx.params` for path segments — see [Context](./context.mdx),
+[Query Parameters](../routing/query-parameters.mdx) and
+[Path Parameters](../routing/path-parameters.mdx).
+
+## Reading the body directly
+
+Reading `ctx.request` yourself — `.json()`, `.text()`, `.arrayBuffer()`,
+`.formData()` — works the same as it would on any `Request`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.post('/echo', async ctx => {
+  const payload = await ctx.request.json()
+  return { received: payload }
+})
+
+app.listen()
+```
+
+This is a separate path from `ctx.body`: `ctx.body` only exists on a route
+that declares a `body` schema, and its value is what came out of validation,
+already parsed according to the request's `Content-Type` and coerced by your
+schema. See [Body](../validation/body.mdx) and
+[Body Parsers](../validation/body-parsers.mdx) for that path.

@@ -1,0 +1,58 @@
+---
+title: Body
+description: Validate a request body with a schema and access the parsed, validated result as `ctx.body`.
+---
+
+Declaring a `body` schema on a route's options gives you `ctx.body` — the
+request body, parsed according to its `Content-Type` and validated against
+your schema:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/users', {
+  body: v.object({
+    name: v.pipe(v.string(), v.minLength(1)),
+    email: v.pipe(v.string(), v.email())
+  }),
+  handler: ctx => ({ created: ctx.body })
+})
+
+app.listen()
+```
+
+`ctx.body` only appears — and only type-checks — on a route that declared a
+`body` schema this way. A route without one doesn't have `ctx.body` at all.
+
+## Body isn't only JSON
+
+Whatever value the request's `Content-Type` parses to is what your schema
+validates against, so a schema can just as well describe a `FormData` body:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/upload', {
+  body: v.instance(FormData),
+  handler: ctx => ({ received: ctx.body.get('name') })
+})
+
+app.listen()
+```
+
+Which `Content-Type` values parse to which JavaScript value — and what happens
+when the request's `Content-Type` isn't one Arcton knows how to parse — is
+covered in [Body Parsers](./body-parsers.mdx).
+
+## Order
+
+`body` validates last, after `params` and `query` — see
+[Validation Overview](./overview.mdx). A failing body schema responds with
+`400` the same way params or query failures do — see
+[Validation Errors](./validation-errors.mdx).

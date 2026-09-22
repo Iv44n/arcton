@@ -1,0 +1,5 @@
+{
+  "title": "Configuración",
+  "icon": "Settings",
+  "pages": ["app-config", "listen-options", "environment"]
+}

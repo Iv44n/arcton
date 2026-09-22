@@ -1,0 +1,103 @@
+---
+title: Architecture Overview
+description: Cómo fluye un request de Arcton desde el runtime, pasando por el adapter, el router y el pipeline, hasta tu handler.
+---
+
+Una aplicación de Arcton tiene cuatro capas. Esta página es el mapa; cada
+capa tiene una página más profunda bajo
+[Arquitectura](../architecture/overview.mdx).
+
+```text
+        Bun  /  Node.js                    el runtime
+               │
+        RuntimeAdapter                     @arcton/adapter-bun | @arcton/adapter-node
+               │  Request
+               ▼
+          route tree                       matchea method + pathname
+               │  handler + params
+               ▼
+        pipeline (steps)                   middleware · providers · validation
+               │  valor retornado
+               ▼
+       response mapping                    valor → Response
+```
+
+## El adapter es dueño del runtime
+
+`listen()` le entrega al adapter una función estilo `fetch` y una lista de
+rutas WebSocket. El adapter levanta un servidor real, convierte lo que sea
+que use el runtime en un `Request` estándar, y escribe de vuelta el
+`Response`.
+
+Como ese es todo el contrato, la misma aplicación corre en Bun o en Node.js
+cambiando una sola opción:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { nodeAdapter } from '@arcton/adapter-node'
+
+const app = Arcton()
+
+app.get('/', () => ({ ok: true }))
+
+app.listen({ adapter: nodeAdapter })
+```
+
+## El router matchea paths
+
+Las rutas se guardan en un árbol. Cada nodo tiene un map de hijos
+estáticos más un slot dinámico y un slot wildcard, así que seguir un path
+es una serie de búsquedas directas en vez de un escaneo sobre una lista de
+patrones.
+
+El matching prueba estático, después dinámico, después wildcard, y hace
+backtracking cuando una rama llega a un callejón sin salida. Ver
+[Precedence](../routing/precedence.mdx) para lo que eso significa cuando
+escribes rutas que se solapan, y [Router](../architecture/router.mdx) para
+por qué el árbol tiene esta forma.
+
+## El pipeline se resuelve cuando te registras
+
+Cuando registras una ruta, Arcton captura el middleware y los providers que
+existen en ese momento y guarda la cadena ya terminada junto con la ruta.
+Nada se vuelve a resolver por request, y ninguna búsqueda en tiempo de
+request puede cambiar qué middleware corre una ruta.
+
+El orden dentro de esa cadena siempre es:
+
+```text
+global middleware → validation → route middleware → handler
+```
+
+con cada middleware envolviendo al siguiente, así que el código posterior a
+`next()` se desenrolla en orden inverso. Ver
+[Execution order](../middleware/execution-order.mdx).
+
+## Las respuestas se mapean a partir de valores
+
+Lo que sea que el handler retorne se mapea a un `Response`: objetos a
+JSON, strings a texto, tipos binarios a `application/octet-stream`, un
+`Response` directo sin tocar. `ctx.response` lleva el status y los headers
+acumulados en el camino. Ver [Response](../fundamentals/response.mdx).
+
+## Los módulos se fusionan en un solo árbol
+
+`app.use(module)` injerta el árbol de rutas de un módulo en el árbol del
+padre en tiempo de registro, combinando prefixes y envolviendo los
+handlers montados con el middleware del padre. Después de montar hay un
+solo árbol y una sola búsqueda por request, sin importar cómo se organizó
+la aplicación en el código fuente.
+
+Ver [Modules](../routing/modules.mdx) y
+[Module composition](../architecture/module-composition.mdx).
+
+## Paquetes
+
+| Paquete | Rol |
+|---|---|
+| `@arcton/core` | `Arcton()`, routing, pipeline, mapeo de respuestas |
+| `@arcton/contracts` | los tipos que comparten ambos lados, incluyendo `RuntimeAdapter` |
+| `@arcton/adapter-bun` | sirve sobre Bun |
+| `@arcton/adapter-node` | sirve sobre Node.js |
+| `@arcton/cors` | middleware de CORS |
+| `arcton` | el CLI que scaffoldea un proyecto |

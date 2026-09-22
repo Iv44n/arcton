@@ -1,0 +1,139 @@
+---
+title: What is Arcton?
+description: A TypeScript backend framework built around typed context, an explicit middleware pipeline, and a route tree that modules merge into.
+---
+
+Arcton is a framework for building HTTP APIs in TypeScript. An application is
+an `Arcton()` instance: you register routes on it, compose behavior around
+them, and start it with `listen()`.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/health', () => ({ status: 'ok' }))
+
+app.listen({ port: 3000 })
+```
+
+That is a complete, runnable file. `bun src/index.ts` serves it.
+
+## Handlers return values
+
+A handler returns whatever the response should contain. Arcton maps the
+returned value to an HTTP response: an object becomes JSON, a string becomes
+`text/plain`, a `Uint8Array` becomes a binary body.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/json', () => ({ ok: true }))
+app.get('/text', () => 'plain text')
+app.get('/empty', () => {})
+
+app.listen()
+```
+
+When you need full control, return a `Response` and Arcton passes it through
+untouched. The complete mapping is in [Response](../fundamentals/response.mdx).
+
+## The route literal types the context
+
+Arcton reads the path you wrote and types `ctx.params` from it:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:userId/posts/:postId', ctx => {
+  // ctx.params is { userId: string; postId: string }
+  return { user: ctx.params.userId, post: ctx.params.postId }
+})
+
+app.listen()
+```
+
+Misspelling `ctx.params.userID` is a compile error, not a runtime `undefined`.
+
+## Context grows as you compose
+
+`provide()` attaches values to the context and widens its type for everything
+registered afterwards:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .provide(ctx => ({
+    requestId: ctx.request.headers.get('x-request-id') ?? crypto.randomUUID()
+  }))
+  .get('/whoami', ctx => ({ requestId: ctx.requestId }))
+
+app.listen()
+```
+
+`ctx.requestId` is typed on the handler because the provider was registered
+before the route. See [Providers](../providers/overview.mdx).
+
+## Applications are built from modules
+
+A module is an `Arcton()` instance with its own prefix. Mounting one merges its
+routes into the parent's route tree:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const users = Arcton({ prefix: '/users' })
+
+users.get('/', () => [{ id: '1' }])
+users.get('/:id', ctx => ({ id: ctx.params.id }))
+
+const app = Arcton({ prefix: '/api' })
+
+app.use(users)
+
+app.listen()
+```
+
+This serves `GET /api/users` and `GET /api/users/:id`. See
+[Modules](../routing/modules.mdx).
+
+## Runtimes
+
+The core has no dependency on any specific runtime. Bun and Node.js are both
+supported through adapters, selected at `listen()`:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { nodeAdapter } from '@arcton/adapter-node'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello from Node.js')
+
+app.listen({ adapter: nodeAdapter })
+```
+
+See [Runtime support](./runtime-support.mdx).
+
+## What Arcton includes
+
+- A route tree with static, dynamic and wildcard segments and defined
+  [precedence](../routing/precedence.mdx).
+- [Middleware](../middleware/overview.mdx) that is global, path-scoped or
+  attached to a single route.
+- Per-route [validation](../validation/overview.mdx) of params, query and body
+  through [Standard Schema](https://standardschema.dev/), so Zod, Valibot and
+  ArkType all work.
+- [Body parsing](../validation/body-parsers.mdx) by `Content-Type`, extensible
+  with your own parsers.
+- [WebSocket routes](../routing/websockets.mdx).
+- [CORS](../middleware/cors.mdx) as a separate package.
+- Bun and Node.js [adapters](../api/adapters.mdx), and the `RuntimeAdapter`
+  interface behind them.

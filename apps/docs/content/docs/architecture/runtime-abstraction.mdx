@@ -1,0 +1,91 @@
+---
+title: Runtime Abstraction
+description: Why the runtime types live in their own package, and what that buys the core, the adapters and your application.
+---
+
+`@arcton/contracts` contains types and nothing else. No functions, no classes,
+no runtime code at all. Every other package depends on it, and it depends on
+nothing.
+
+```text
+@arcton/core ──┐
+               ├──→ @arcton/contracts
+@arcton/adapter-bun ──┤
+@arcton/adapter-node ─┤
+@arcton/cors ─────────┘
+```
+
+## Why a separate package
+
+The core needs to describe what it expects from a runtime. An adapter needs to
+implement exactly that. If either side owned the description, the other would
+have to depend on it — and an adapter depending on the core, or the core
+depending on every adapter, is a cycle waiting to happen.
+
+Putting the vocabulary in a package that depends on nothing breaks the cycle.
+The core is written against `RuntimeAdapter`, each adapter implements
+`RuntimeAdapter`, and neither knows the other exists. That is what makes the
+default adapter swappable by passing one option.
+
+It has a second effect: because the package holds only types, it disappears at
+build time. Depending on the shared vocabulary costs nothing at runtime.
+
+## What lives there
+
+Two groups of types.
+
+**The runtime contract** — `RuntimeAdapter`, `RuntimeServer`,
+`RuntimeServeOptions`, `RuntimeHandler`, `RuntimeCapabilities`,
+`RuntimeRequestContext`, and the WebSocket types. These describe a server, and
+they are what an adapter implements.
+
+**The application vocabulary** — `Context`, `Middleware`, `RouteHandler`,
+`NextFunction`, `ProvideFn`, `BodyParser`, `Body`, `HttpMethod`,
+`StandardSchemaV1` and friends. These describe the things your code writes.
+
+Both groups sit in the same package because both are shared: `@arcton/cors`
+needs `Middleware` and `Context` without needing the core, and so does any
+middleware you publish yourself.
+
+## Why the web platform is the interface
+
+The contract is built on `Request`, `Response`, `Headers` and `ReadableStream`
+rather than on an Arcton-specific request object.
+
+Those types already exist in every target runtime, they are specified
+independently, and developers already know them. A framework-specific wrapper
+would add a layer to learn, a layer to keep in sync with the platform, and a
+conversion at every boundary — in exchange for very little. So `ctx.request` is
+a real `Request`, and everything you know about the Fetch API applies.
+
+The one place Arcton adds its own shape is the response, where `ctx.response`
+holds a status and headers that are still mutable. A real `Response` is
+immutable in the ways middleware needs to change, so the pipeline keeps a
+mutable staging object and materializes it — see [Pipeline](./pipeline.mdx).
+
+## Standard Schema, for the same reason
+
+Validation follows the same principle. Rather than shipping a validator or
+depending on one, Arcton accepts any schema implementing
+[Standard Schema](https://standardschema.dev/) — the interface Zod, Valibot and
+ArkType all implement.
+
+The framework never imports a validation library, users are not forced onto the
+maintainer's favorite, and a project already using one keeps using it. The
+interface is small enough that `StandardSchemaV1` is declared in contracts
+alongside everything else, so even that is not a dependency.
+
+## What this means for your code
+
+Typing a standalone middleware or handler means importing from contracts:
+
+```ts
+import type { Middleware } from '@arcton/contracts'
+
+export const requestId: Middleware = async (ctx, next) => {
+  ctx.response.headers.set('X-Request-Id', crypto.randomUUID())
+  await next()
+}
+```
+
+Since the package is types-only, that import vanishes from the build output.

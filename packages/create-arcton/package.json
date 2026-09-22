@@ -1,0 +1,25 @@
+{
+  "name": "create-arcton",
+  "version": "0.0.7",
+  "type": "module",
+  "bin": {
+    "create-arcton": "./dist/index.js"
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --noEmit && bun build ./src/index.ts --target=node --outdir=dist --packages=external",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "arcton": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^7"
+  }
+}

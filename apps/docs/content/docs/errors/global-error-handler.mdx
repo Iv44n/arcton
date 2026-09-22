@@ -1,0 +1,113 @@
+---
+title: Global Error Handler
+description: Catch every otherwise-uncaught error in one place with app.onError()
+---
+
+[Uncaught errors](./uncaught-errors.mdx) reach the runtime adapter as a bare
+`500` unless something catches them first. `app.onError()` registers a single
+handler that catches any of those — from a provider, a middleware, a body
+parser, or the route handler itself — before it gets that far:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/risky', () => {
+  throw new Error('boom')
+})
+
+app.onError((err, ctx) => {
+  console.error(err)
+  return { error: 'Something went wrong' }
+})
+
+app.listen()
+```
+
+A request to `/risky` now answers with the handler's own response instead of
+the adapter's generic `500` text. `onError()` is opt-in — an app that never
+calls it keeps behaving exactly like [Uncaught errors](./uncaught-errors.mdx)
+describes.
+
+## The status defaults to 500
+
+If the handler doesn't set `ctx.response.status` itself, the response
+defaults to `500`. Set it explicitly to answer with something else — for
+example, narrowing on `HttpError` to reuse the status it already carries:
+
+```ts
+import { Arcton, Http, HttpError } from '@arcton/core'
+
+declare function findOrder(id: string): { id: string } | undefined
+
+const app = Arcton()
+
+app.get('/orders/:id', ctx => {
+  const order = findOrder(ctx.params.id)
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
+  return order
+})
+
+app.onError((err, ctx) => {
+  if (err instanceof HttpError) {
+    ctx.response.status = err.status
+    return err.body ?? { code: err.code, message: err.message }
+  }
+  return { code: 'INTERNAL_SERVER_ERROR', message: 'Internal Server Error' }
+})
+
+app.listen()
+```
+
+A status set earlier in the request — by a middleware that ran before the
+throw, say — is left alone if the handler never touches `ctx.response.status`
+itself; the `500` default only fills in when nothing set a status at all.
+
+Like any handler, `onError()` can return a plain value (mapped through the
+usual [Response](../fundamentals/response.mdx) rules) or a `Response` object
+directly, which is sent through unchanged.
+
+## Runs for the 404/405 fallback too
+
+Global [middleware](../middleware/global.mdx) runs even when nothing matches
+the request, so `onError()` covers a throw there as well:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+declare function logRequest(request: Request): void
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  logRequest(ctx.request) // throws if the logger is down
+  await next()
+})
+
+app.onError((err, ctx) => ({ error: 'Something went wrong' }))
+
+app.listen()
+```
+
+## It's a single, top-level handler
+
+Only one `onError()` handler exists per app — registering a second one
+replaces the first — and only the instance whose own `listen()` ends up
+serving the request is ever consulted. If you build part of your app as a
+separate module and mount it with `app.use(module)`, an `onError()` call on
+that module has no effect; modules compose routes, middleware, and
+providers into the mounting app, not an independent error boundary.
+
+For a boundary scoped to one section of the app, wrap `next()` in a
+try/catch inside a [scoped middleware](../middleware/scoped.mdx) instead —
+see [Catch a thrown error inside middleware](./responding-with-errors.mdx#catch-a-thrown-error-inside-middleware).
+The two compose fine together: a scoped try/catch handles what it recognizes
+and rethrows anything else, which then reaches `onError()` as the final
+catch-all.
+
+<Callout type="warn">
+  If the `onError()` handler itself throws, that error isn't passed back
+  in — it propagates the same way an uncaught error would with no handler
+  registered at all.
+</Callout>

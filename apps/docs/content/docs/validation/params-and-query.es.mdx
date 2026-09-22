@@ -1,0 +1,69 @@
+---
+title: Params y Query
+description: Valida los params de ruta y los query strings con un esquema y lee el resultado transformado desde `ctx`.
+---
+
+Sin un esquema, `ctx.params` viene del literal de ruta y `ctx.query` es
+`Record<string, string>` — ver [Context](../fundamentals/context.mdx),
+[Parámetros de ruta](../routing/path-parameters.mdx) y
+[Parámetros de query](../routing/query-parameters.mdx). Declarar un esquema de
+`params` o `query` reemplaza el que sea con el output propio del esquema, coerciones
+incluidas.
+
+## Params
+
+Los params de ruta siempre llegan como strings — un esquema de `params` es la forma
+de convertir `:id` en algo más útil:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.get('/users/:id', {
+  params: v.object({
+    id: v.pipe(v.string(), v.transform(Number), v.number())
+  }),
+  handler: ctx => ({ id: ctx.params.id, doubled: ctx.params.id * 2 })
+})
+
+app.listen()
+```
+
+`ctx.params.id` está tipado y valuado como `number`, así que las operaciones
+aritméticas sobre él simplemente funcionan.
+
+## Query
+
+Los valores de query también son strings, y a menudo opcionales — un esquema de
+query es donde conviertes `?limit=10` en un number real con un default real:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.get('/search', {
+  query: v.object({
+    q: v.pipe(v.string(), v.minLength(1)),
+    limit: v.optional(
+      v.pipe(v.string(), v.transform(Number), v.number())
+    )
+  }),
+  handler: ctx => ({ query: ctx.query.q, limit: ctx.query.limit ?? 10 })
+})
+
+app.listen()
+```
+
+`limit` se mantiene como `number | undefined` porque es opcional — el fallback con
+`??` pasa en el handler.
+
+## Orden
+
+Cuando una ruta declara ambos, `params` se valida antes que `query`, y cualquiera de
+los dos puede cortar la cadena con `400` antes de que corra el otro — ver
+[Descripción general de validación](./overview.mdx) y
+[Errores de validación](./validation-errors.mdx).

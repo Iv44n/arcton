@@ -1,0 +1,200 @@
+---
+title: Better Auth
+description: Register Better Auth's handler in Arcton and access the current session in your routes.
+---
+
+[Better Auth](https://www.better-auth.com) is a framework-agnostic
+authentication library. It exposes a standard Web handler — a function that
+takes a `Request` and returns a `Response` — along with a small server-side
+API for reading the current session.
+
+This guide assumes you already have an Arcton app and a configured Better
+Auth instance. If you haven't set up Better Auth yet, see its own
+[installation guide](https://www.better-auth.com/docs/installation). Every
+example below imports that instance from a local `./auth` module — a stand-in
+for yours:
+
+```ts title="auth.ts"
+declare const auth: {
+  handler: (request: Request) => Promise<Response>
+  api: {
+    getSession: (options: {
+      headers: Headers
+    }) => Promise<{
+      user: { id: string; email: string }
+      session: { id: string }
+    } | null>
+  }
+}
+
+export { auth }
+```
+
+## Installation
+
+<Tabs items={['bun', 'npm', 'pnpm', 'yarn']}>
+<Tab value="bun">
+
+```bash
+bun add better-auth
+```
+
+</Tab>
+<Tab value="npm">
+
+```bash
+npm install better-auth
+```
+
+</Tab>
+<Tab value="pnpm">
+
+```bash
+pnpm add better-auth
+```
+
+</Tab>
+<Tab value="yarn">
+
+```bash
+yarn add better-auth
+```
+
+</Tab>
+</Tabs>
+
+## Register the Better Auth handler
+
+Better Auth's `auth.handler` takes a `Request` and returns a `Response`.
+Forward every request under your auth path to it with
+[`app.all()`](../routing/http-methods.mdx#every-method-on-one-path):
+
+```ts title="index.ts"
+import { Arcton } from '@arcton/core'
+import { auth } from './auth'
+
+const app = Arcton()
+
+app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+
+app.listen()
+```
+
+`app.all()` registers the same handler for every HTTP method Arcton
+supports, so this one route answers `GET`, `POST`, and everything else
+Better Auth's routes need — sign-up, sign-in, sign-out, session lookup, and
+so on.
+
+A handler can return a `Response` directly, and Arcton sends it through
+unchanged, so `auth.handler`'s response reaches the client as-is. See
+[Response](../fundamentals/response.mdx) for more.
+
+<Callout>
+  `*path` is a [wildcard](../routing/path-parameters.mdx) and requires at
+  least one path segment, so a request to `/api/auth` on its own doesn't
+  match. Register it separately if your app needs to handle that exact path:
+  `app.all('/api/auth', ctx => auth.handler(ctx.request))`.
+</Callout>
+
+## CORS
+
+If your frontend runs on a different origin, add
+[`@arcton/cors`](../middleware/cors.mdx) before the auth route, with
+`credentials: true` so the session cookie is sent cross-origin. Add that
+same origin to Better Auth's `trustedOrigins`:
+
+```ts title="index.ts"
+import { Arcton } from '@arcton/core'
+import { cors } from '@arcton/cors'
+import { auth } from './auth'
+
+const app = Arcton()
+
+app.use(
+  cors({
+    origin: 'http://localhost:3001',
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization']
+  })
+)
+
+app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+
+app.listen()
+```
+
+See [CORS](../middleware/cors.mdx) for the full set of options.
+
+## Accessing the session in protected routes
+
+Use `auth.api.getSession()` to read the current session from the request
+headers, and expose it with [`provide()`](../providers/overview.mdx) so it's
+available on `ctx` for any route registered afterward:
+
+```ts title="index.ts"
+import { Arcton } from '@arcton/core'
+import { auth } from './auth'
+
+const app = Arcton()
+  .provide(async ctx => {
+    const session = await auth.api.getSession({ headers: ctx.request.headers })
+    return { user: session?.user ?? null, session: session?.session ?? null }
+  })
+
+app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+
+app.get(
+  '/me',
+  async (ctx, next) => {
+    if (!ctx.user) return new Response('Unauthorized', { status: 401 })
+    await next()
+  },
+  ctx => ({ user: ctx.user })
+)
+
+app.listen()
+```
+
+`ctx.user` and `ctx.session` are `null` when there's no active session. Add
+a middleware like the one above to any route that should require
+authentication — apply it per route, or scope it with `use()` over a whole
+section of routes.
+
+## Complete example
+
+```ts title="index.ts"
+import { Arcton } from '@arcton/core'
+import { cors } from '@arcton/cors'
+import { auth } from './auth'
+
+const app = Arcton()
+  .use(
+    cors({
+      origin: 'http://localhost:3001',
+      credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization']
+    })
+  )
+  .provide(async ctx => {
+    const session = await auth.api.getSession({ headers: ctx.request.headers })
+    return { user: session?.user ?? null, session: session?.session ?? null }
+  })
+
+app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+
+app.get(
+  '/me',
+  async (ctx, next) => {
+    if (!ctx.user) return new Response('Unauthorized', { status: 401 })
+    await next()
+  },
+  ctx => ({ user: ctx.user })
+)
+
+app.get('/posts', ctx => ({ posts: [], viewer: ctx.user }))
+
+app.listen()
+```
+
+This works the same way on Bun and Node — Arcton hands `auth.handler` a
+standard `Request` on either runtime.

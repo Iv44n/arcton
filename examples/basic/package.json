@@ -1,0 +1,16 @@
+{
+  "name": "example-basic",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot src/index.ts"
+  },
+  "dependencies": {
+    "@arcton/contracts": "workspace:*",
+    "@arcton/core": "workspace:*",
+    "valibot": "^1.4.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

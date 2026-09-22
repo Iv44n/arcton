@@ -1,0 +1,250 @@
+---
+title: Modules
+description: Dividir una aplicación en instancias de Arcton que se fusionan en un único árbol de rutas al montarlas.
+---
+
+Un módulo es una instancia de `Arcton()` con un prefix. Montarlo con
+`use()` fusiona sus rutas en el padre:
+
+```ts title="users.ts"
+import { Arcton } from '@arcton/core'
+
+export const users = Arcton({ prefix: '/users' })
+
+users.get('/', () => [{ id: '1' }])
+users.get('/:id', ctx => ({ id: ctx.params.id }))
+users.post('/', () => ({ created: true }))
+```
+
+```ts title="index.ts"
+import { Arcton } from '@arcton/core'
+import { users } from './users'
+
+const app = Arcton({ prefix: '/api' })
+
+app.use(users)
+
+app.listen()
+```
+
+Eso sirve `GET /api/users`, `GET /api/users/:id` y `POST /api/users`.
+
+Un módulo no es un tipo especial. Es una aplicación — los mismos
+métodos, el mismo middleware, la misma validation. Lo que lo convierte
+en un módulo es que otra cosa lo monta.
+
+## Los prefixes se componen
+
+El path donde termina una ruta es el prefix del padre, después el
+prefix del módulo, después el path de la ruta:
+
+```text
+'/api'  +  '/users'  +  '/:id'   →   /api/users/:id
+```
+
+Un prefix debe ser un path static; los segmentos `:param` y `*wildcard`
+tiran un error cuando se crea la instancia. `Arcton({ prefix: '/' })` es
+lo mismo que no tener prefix.
+
+## Montar fusiona el árbol de rutas
+
+`app.use(module)` copia las rutas del módulo en el árbol de rutas del
+padre en el momento en que lo llamas. Después de montar hay un solo
+árbol, y un request cuesta una sola búsqueda sin importar de cuántos
+módulos se armó la aplicación.
+
+De fusionar en tiempo de registro se siguen dos consecuencias:
+
+- Las rutas registradas en el módulo **después** de haber sido montado
+  no aparecen en el padre. Monta un módulo una vez que ya está
+  completamente construido — típicamente como lo último que hace el
+  archivo del padre.
+- Una colisión sale a la luz de inmediato. Si montar produjera un método
+  y path que el padre ya tiene, el registro tira un error, igual que
+  registrar una ruta duplicada directamente.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const users = Arcton({ prefix: '/users' })
+users.get('/:id', ctx => ({ id: ctx.params.id }))
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.use(users) // throws: Duplicate route: GET /users/:id is already registered
+
+app.listen()
+```
+
+## Middleware y montaje
+
+El middleware global y los providers del padre registrados **antes**
+del montaje envuelven cada ruta que trae el módulo. Cualquier cosa
+registrada después no lo alcanza — la misma regla de orden de registro
+que gobierna al [middleware](../middleware/execution-order.mdx) en
+todos lados.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const users = Arcton({ prefix: '/users' })
+
+users.get('/:id', ctx => ({ id: ctx.params.id }))
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  await next()
+  ctx.response.headers.set('X-Request-Id', crypto.randomUUID())
+})
+
+app.use(users) // every route the module brings in gets the header
+
+app.listen()
+```
+
+Cada instancia se tipa por su cuenta, así que los handlers de un módulo
+ven el contexto que ese módulo declara. Cuando los handlers de un
+módulo necesitan un valor tipado, es el módulo el que declara el
+provider:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const users = Arcton({ prefix: '/users' })
+
+users
+  .provide(ctx => ({
+    requestId: ctx.request.headers.get('x-request-id') ?? crypto.randomUUID()
+  }))
+  .get('/:id', ctx => ({ id: ctx.params.id, requestId: ctx.requestId }))
+
+const app = Arcton()
+
+app.use(users)
+
+app.listen()
+```
+
+Un módulo también conserva su propio middleware, incluyendo el
+middleware con scope de path, que sigue comparándose contra el path
+módulo-local — el path tal como se escribió adentro del módulo, no el
+ya montado:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const api = Arcton({ prefix: '/api' })
+
+api.use('/admin', async (ctx, next) => {
+  if (ctx.request.headers.get('x-admin-key') !== 'secret') {
+    return new Response('Unauthorized', { status: 401 })
+  }
+  await next()
+})
+
+api.get('/admin/stats', () => ({ users: 1 }))
+api.get('/public', () => ({ ok: true }))
+
+const app = Arcton()
+
+app.use(api)
+
+app.listen()
+```
+
+El scope se escribe `'/admin'`, coincidiendo con la ruta tal como se
+escribió adentro del módulo, mientras que la ruta se sirve en
+`/api/admin/stats`.
+
+<Callout>
+  El middleware con scope de path del padre no alcanza a un módulo
+  montado. Pon el middleware con scope adentro del módulo al que
+  pertenece, o usa middleware global en el padre.
+</Callout>
+
+## Anidamiento
+
+Los módulos montan módulos, a cualquier profundidad:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const posts = Arcton({ prefix: '/posts' })
+posts.get('/:postId', ctx => ({ post: ctx.params.postId }))
+
+const users = Arcton({ prefix: '/users' })
+users.get('/:id', ctx => ({ id: ctx.params.id }))
+users.use(posts)
+
+const app = Arcton({ prefix: '/api' })
+app.use(users)
+
+app.listen()
+```
+
+Esto sirve `GET /api/users/:id` y `GET /api/users/posts/:postId`.
+
+## Las rutas WebSocket también viajan
+
+Una [ruta WebSocket](./websockets.mdx) registrada adentro de un módulo
+recibe ambos prefixes al montarse:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const chat = Arcton({ prefix: '/chat' })
+
+chat.ws('/room', {
+  message(ws, message) {
+    ws.send(`echo: ${message}`)
+  }
+})
+
+const app = Arcton({ prefix: '/api' })
+
+app.use(chat)
+
+app.listen()
+```
+
+El socket se sirve en `/api/chat/room`.
+
+## Organizar una aplicación real
+
+Un layout común es un módulo por dominio, cada uno dueño de sus rutas y
+del middleware que necesita:
+
+```text
+src/
+├── index.ts        # crea la app, monta los módulos, llama a listen()
+├── users/
+│   └── index.ts    # export const users = Arcton({ prefix: '/users' })
+└── orders/
+    └── index.ts    # export const orders = Arcton({ prefix: '/orders' })
+```
+
+```ts title="src/index.ts" no-check
+import { Arcton } from '@arcton/core'
+import { orders } from './orders'
+import { users } from './users'
+
+const app = Arcton({ prefix: '/api' })
+
+app.use(async (ctx, next) => {
+  console.log(`${ctx.request.method} ${new URL(ctx.request.url).pathname}`)
+  await next()
+})
+
+app.use(users)
+app.use(orders)
+
+app.listen({ port: 3000 })
+```
+
+El middleware de logging se registra antes de los montajes, así que
+cubre todas las rutas que traen ambos módulos.
+
+Ver [Module composition](../architecture/module-composition.mdx) para
+saber por qué la fusión ocurre en tiempo de registro.

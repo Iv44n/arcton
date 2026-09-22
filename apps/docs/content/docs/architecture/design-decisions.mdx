@@ -1,0 +1,187 @@
+---
+title: Design Decisions
+description: An index of the choices that shape Arcton's API, each with the reasoning behind it.
+---
+
+Every entry here is a decision that could reasonably have gone another way.
+This page states what was chosen and why; the linked page has the detail.
+
+## Registration order decides a route's pipeline
+
+A route runs the middleware and providers registered before it, captured as a
+snapshot when the route is created.
+
+The alternative — applying every `use()` to every route regardless of position
+— was the original behavior, and it became inconsistent as soon as `provide()`
+introduced typed context, because the type of `ctx` necessarily depends on
+what came before. Rather than keeping two different order rules, one for types
+and one for runtime, both were made the same rule.
+
+→ [Execution order](../middleware/execution-order.mdx)
+
+## Global middleware still runs on 404 and 405
+
+The snapshot rule is relative to a route, and those responses have no route.
+Since the concerns that live in global middleware — CORS, logging, request ids
+— are only correct if they cover every response, unscoped middleware applies
+there regardless of where it was registered.
+
+→ [Global middleware](../middleware/global.mdx)
+
+## The most specific path owns the URL, for every method
+
+When matching reaches a node with handlers but none for the request's method,
+it answers `405` instead of continuing to look for another pattern that would
+accept it. Otherwise one URL could resolve to different routes depending on the
+verb.
+
+→ [Precedence](../routing/precedence.mdx)
+
+## Routes live in a tree with three fixed slots
+
+Static children in a map, one dynamic slot, one wildcard slot. Priority is
+encoded in the structure rather than in a sort, lookups do not scale with the
+number of routes, and the result never depends on registration order.
+
+→ [Router](./router.mdx)
+
+## Mounting merges trees at registration
+
+A nested router costs a matching pass per level on every request. Merging costs
+one graft at startup and nothing afterwards, and it makes conflicts surface
+immediately.
+
+→ [Module composition](./module-composition.mdx)
+
+## A module is an application
+
+Rather than a separate `Router` type, a module is an `Arcton()` instance with a
+prefix. One API to learn, and a module can be run standalone during
+development.
+
+→ [Modules](../routing/modules.mdx)
+
+## Middleware, providers and validation share one sequence
+
+One ordered list instead of phases per concern, so the order you write is the
+order that runs, and there is no precedence table between kinds of step.
+
+→ [Pipeline](./pipeline.mdx)
+
+## Providers have no `next`
+
+A provider computes a value and continues. Deciding whether the rest of the
+chain runs is a middleware's job, and keeping the two separate means a provider
+cannot accidentally become control flow.
+
+→ [Providers vs middleware](../providers/providers-vs-middleware.mdx)
+
+## Provided values sit flat on the context
+
+A provider's values land directly on the context, so a handler reads
+`ctx.user`. Grouping them under a namespace would add a level of nesting to
+every access in exchange for avoiding collisions — and collisions are already
+prevented at compile time, since re-providing an existing key or one of the
+base context fields does not type-check.
+
+→ [Typed context](../providers/typed-context.mdx)
+
+## Handlers return values
+
+A returned value is mapped to a `Response`, so a handler stays an ordinary
+function that returns data: easy to test, impossible to double-send. Returning
+a `Response` remains available for full control.
+
+→ [Response](../fundamentals/response.mdx)
+
+## `ctx.response` is mutable until the body finalizes
+
+Middleware needs to set headers after the handler has run, and a real
+`Response` cannot be mutated that way. The pipeline keeps a mutable staging
+object and materializes it as soon as a body exists at any layer, which is what
+makes post-`next()` header changes stick.
+
+The accepted cost is that the status is fixed from that point on, since a real
+`Response` exposes it as read-only.
+
+→ [Modifying responses](../middleware/modifying-responses.mdx)
+
+## A raw `Response` wins outright
+
+When a handler or middleware returns a `Response`, it is used as-is — no
+merging of accumulated headers or status. Merging would make the result depend
+on layers the author of that `Response` cannot see; passing it through keeps
+the escape hatch predictable.
+
+→ [Response](../fundamentals/response.mdx)
+
+## Validation speaks Standard Schema
+
+Accepting any library that implements
+[Standard Schema](https://standardschema.dev/) means Arcton never depends on a
+validator and never imposes one, while the schema's output type still flows
+into the handler.
+
+→ [Validation](../validation/overview.mdx)
+
+## Body parsing is separate from validation
+
+A schema validates a value already in memory and knows nothing about HTTP.
+Turning bytes into that value, based on `Content-Type`, is a separate concern
+with its own extension point in `app.parser()`.
+
+→ [Body parsers](../validation/body-parsers.mdx)
+
+## Parsers are a flat table, not pipeline steps
+
+`app.parser()` maps a media type to a parser. Registering the same type again
+replaces it. Parsers have no ordering or snapshot semantics because there is no
+composition to express: exactly one parser handles a given `Content-Type`.
+
+→ [Body parsers](../validation/body-parsers.mdx)
+
+## Path scopes must be static
+
+A scope is compared against a route's path as a plain relation between two
+paths. Allowing `:param` segments would turn scope matching into a second
+pattern-matching system running alongside the router.
+
+→ [Scoped middleware](../middleware/scoped.mdx)
+
+## Prefixes must be static too
+
+A dynamic prefix would make a module's parameters depend on where it was
+mounted, breaking the inference of `ctx.params` from the route literal.
+
+→ [Modules](../routing/modules.mdx)
+
+## Runtime support is an interface, not a build target
+
+`RuntimeAdapter` is a public interface in a types-only package, so the core is
+written once and each runtime is a thin translation layer chosen at `listen()`.
+
+→ [Adapters](./adapters.mdx)
+
+## Capabilities are checked at `listen()`
+
+A module mounted after a `ws()` call can still add WebSocket routes, so
+`listen()` is the first point where the final set is known — and startup is
+where a mismatch should surface.
+
+→ [WebSockets](../routing/websockets.mdx)
+
+## Conflicts throw at registration
+
+Duplicate routes, conflicting parameter names, invalid paths, non-static scopes
+and prefixes all throw when registered. Startup is the cheapest possible place
+to find them, and the message can name the route.
+
+→ [Registration errors](../errors/registration-errors.mdx)
+
+## Work happens at registration, not per request
+
+The thread running through most of the above. A request matches a path, runs a
+prepared chain, and maps a value — everything else was decided when the
+application was built.
+
+→ [Overview](./overview.mdx)

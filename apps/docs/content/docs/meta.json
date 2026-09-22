@@ -1,0 +1,18 @@
+{
+  "pages": [
+    "index",
+    "introduction",
+    "getting-started",
+    "fundamentals",
+    "routing",
+    "middleware",
+    "validation",
+    "providers",
+    "integrations",
+    "errors",
+    "configuration",
+    "testing",
+    "architecture",
+    "api"
+  ]
+}

@@ -1,0 +1,122 @@
+---
+title: Response
+description: How a handler's return value becomes an HTTP response, and how to shape status, headers, and cookies.
+---
+
+A handler returns whatever the response should contain, and Arcton maps it to
+a `Response`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/json', () => ({ ok: true }))
+app.get('/text', () => 'plain text')
+app.get('/bytes', () => new Uint8Array([1, 2, 3]))
+app.get('/raw', () => new Response('custom', { status: 202 }))
+
+app.listen()
+```
+
+## The full mapping
+
+| Returned | Body | Inferred `Content-Type` |
+|---|---|---|
+| `Response` | passed through as-is; `ctx.response` is ignored entirely | — |
+| `string` | the string | `text/plain; charset=UTF-8` |
+| plain object or array | `JSON.stringify(...)` | `application/json; charset=UTF-8` |
+| `Blob` | the blob | `blob.type`, or `application/octet-stream` when empty |
+| `FormData` | the form data | none — an explicit `Content-Type` is removed so the runtime can generate its own multipart boundary |
+| `URLSearchParams` | the params | none inferred (the runtime sets `application/x-www-form-urlencoded;charset=UTF-8`) |
+| `ArrayBuffer`, or any view of one (`Uint8Array`, `Int32Array`, `DataView`, Node `Buffer`) | the bytes | `application/octet-stream` |
+| `ReadableStream` | streamed | `application/octet-stream` |
+| `null`, `undefined`, or no return | empty | none |
+
+An explicit `ctx.response.headers.set('Content-Type', ...)` always wins over
+the inferred one, with one exception:
+
+<Callout type="warn">
+Returning `FormData` drops any `Content-Type` you set yourself — Arcton
+removes it so the runtime can generate its own
+`multipart/form-data; boundary=...` header. Set other headers freely; the
+boundary has to come from the runtime.
+</Callout>
+
+<Callout type="warn">
+`Map` and `Set` aren't handled specially — they fall into the plain-object
+branch, and `JSON.stringify` serializes them as `{}`. Return an array or plain
+object built from their entries instead, e.g. `Object.fromEntries(myMap)` or
+`[...mySet]`.
+</Callout>
+
+## Status
+
+`ctx.response.status` sets the status; it defaults to `200`. A status outside
+`200`–`599` throws `Invalid response status N: must be between 200 and 599`.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.post('/users', ctx => {
+  ctx.response.status = 201
+  ctx.response.headers.set('Location', '/users/1')
+  return { id: '1' }
+})
+
+app.listen()
+```
+
+<Callout type="warn">
+Set `ctx.response.status` before the response materializes — in the handler,
+or before calling `await next()` in middleware. Setting it afterward throws,
+because by then it's already part of a real `Response`, whose `status` can't
+be reassigned.
+</Callout>
+
+`204`, `205` and `304` force an empty body: an inferred `Content-Type` is
+dropped, but a `Content-Type` you set explicitly survives.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.delete('/users/:id', ctx => {
+  ctx.response.status = 204
+})
+
+app.listen()
+```
+
+## Setting cookies
+
+`ctx.response.headers` is a real `Headers` object — `.append('Set-Cookie', ...)`
+adds a cookie without clobbering ones already set, so multiple cookies work by
+calling it more than once. This works whether you do it in the handler or in
+middleware after `await next()`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  await next()
+  ctx.response.headers.append('Set-Cookie', 'theme=dark; Path=/')
+  ctx.response.headers.append('Set-Cookie', 'session=abc123; HttpOnly; Path=/')
+})
+
+app.get('/', () => ({ ok: true }))
+
+app.listen()
+```
+
+Header mutation after `await next()` reaching the client this way — and status
+only being settable before that point — comes from how `ctx.response`
+materializes into a real response as the pipeline unwinds. See
+[Request Lifecycle](./request-lifecycle.mdx) and
+[Modifying Responses](../middleware/modifying-responses.mdx) for that
+mechanism.

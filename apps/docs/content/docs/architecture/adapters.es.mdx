@@ -1,0 +1,121 @@
+---
+title: Adapters
+description: Por qué servir es una capa separada, qué cubre el contrato del adapter, y qué deja afuera a propósito.
+---
+
+Un adapter es la única parte de Arcton que habla con un runtime. Recibe
+una función estilo `fetch` y una lista de rutas WebSocket, arranca un
+servidor real, y retorna un handle.
+
+```ts
+import type { RuntimeServeOptions, RuntimeServer } from '@arcton/contracts'
+
+interface RuntimeAdapter {
+  readonly name: string
+  readonly version: string
+  readonly capabilities: { readonly websocket: boolean }
+  serve(options: RuntimeServeOptions): RuntimeServer
+}
+```
+
+Esa es toda la superficie entre Arcton y el mundo.
+
+## Por qué existe este límite
+
+Bun y Node.js discrepan en casi todo a nivel de servidor: cómo arranca
+un servidor, cómo se representa un request, cómo se escribe una
+respuesta, cómo se expresa un upgrade de socket. Coinciden en `Request`
+y `Response`.
+
+Construir el límite justo en ese acuerdo mantiene el routing, el
+pipeline y el mapeo de respuestas independientes del runtime — lo cual
+significa que se escriben una vez, se testean una vez, y se comportan
+idéntico donde sea que corra la app. El trabajo por runtime se reduce
+a traducción, y cada adapter es un solo archivo.
+
+También significa que agregar un runtime no toca el core. Cualquier
+cosa que pueda aceptar un `Request` y producir un `Response` puede
+respaldar un adapter.
+
+## De qué es responsable un adapter
+
+- Arrancar un servidor en un puerto y hostname, y reportar el `port` y
+  la `url` reales — incluyendo el puerto real cuando se pidió `0`.
+- Convertir el request nativo del runtime en un `Request` estándar, y
+  escribir de vuelta un `Response` estándar, headers y body en stream
+  incluidos.
+- Hacer el upgrade de las rutas WebSocket que se le entregaron, y
+  traducir el socket del runtime a la interfaz de socket compartida.
+- Detenerse, con la opción de cerrar las conexiones activas.
+- Capturar cualquier cosa que se tire fuera del handler del request,
+  loguearla, y responder `500` — la última línea de defensa, para que
+  un runtime nunca vea un rejection sin manejar del código del usuario.
+
+## De qué no es responsable un adapter
+
+Un adapter no hace ningún routing. Cada request va directo al handler
+que le dio Arcton, sea cual sea el path — los propios tests de los
+adapters verifican exactamente eso. No sabe nada de middleware,
+providers, validation ni módulos, y nunca inspecciona el body de un
+request o de una respuesta.
+
+Mantener a los adapters así de delgados es lo que los hace
+intercambiables. Si un adapter empezara a tomar decisiones de routing,
+dos runtimes podrían responder el mismo request de manera distinta, y
+la promesa de que una app se comporta igual en todos lados dejaría de
+ser cierta silenciosamente.
+
+## Capabilities
+
+Algunas funcionalidades de runtime no se pueden emular. `capabilities`
+las describe, y hoy lleva una sola bandera, `websocket`.
+
+Arcton la verifica en `listen()` en vez de en `ws()`, porque un módulo
+montado después de una llamada a `ws()` todavía puede aportar rutas
+WebSocket — `listen()` es el primer momento en que se conoce el
+conjunto final. Verificar al arrancar significa que un desajuste falla
+de inmediato con un mensaje que nombra el runtime, en vez de en el
+primer intento de upgrade.
+
+## Diferencias que siguen siendo visibles
+
+La abstracción cubre comportamiento, no cada detalle de la plataforma
+subyacente. Dos diferencias llegan hasta el usuario:
+
+- `stop()` se completa de forma síncrona en Bun y retorna una promesa
+  en Node.js, porque el `close()` de Node es inherentemente asíncrono.
+  Awaitearlo funciona en ambos.
+- `version` reporta la propia versión del runtime, así que su formato
+  sigue al runtime.
+
+Ambas están documentadas en
+[Runtime support](../introduction/runtime-support.mdx), porque fingir
+que son idénticas sería un trade peor que nombrarlas.
+
+## Escribir un adapter
+
+Implementa `RuntimeAdapter` y pásale la instancia a `listen()`:
+
+```ts
+import type { RuntimeAdapter } from '@arcton/contracts'
+
+export const myAdapter: RuntimeAdapter = {
+  name: 'my-runtime',
+  version: '1.0.0',
+  capabilities: { websocket: false },
+  serve(options) {
+    // start a server that calls options.fetch(request, context)
+    // and writes the returned Response back
+    return {
+      port: options.port,
+      url: new URL(`http://localhost:${options.port}/`),
+      stop() {}
+    }
+  }
+}
+```
+
+La implementación de `serve()` tiene que llamar a `options.fetch` en
+cada request y escribir de vuelta el `Response` que sea que retorne.
+Ver [Runtime types](../api/runtime-types.mdx) para el contrato
+completo.

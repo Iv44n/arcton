@@ -1,0 +1,57 @@
+---
+title: Body
+description: Valida el body de una request con un esquema y accede al resultado parseado y validado como `ctx.body`.
+---
+
+Declarar un esquema de `body` en las opciones de una ruta te da `ctx.body` — el body
+de la request, parseado según su `Content-Type` y validado contra tu esquema:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/users', {
+  body: v.object({
+    name: v.pipe(v.string(), v.minLength(1)),
+    email: v.pipe(v.string(), v.email())
+  }),
+  handler: ctx => ({ created: ctx.body })
+})
+
+app.listen()
+```
+
+`ctx.body` solo aparece — y solo pasa el type-check — en una ruta que declaró un
+esquema de `body` de esta forma. Una ruta sin uno directamente no tiene `ctx.body`.
+
+## Body no es solo JSON
+
+El esquema valida contra el valor al que el `Content-Type` de la request lo haga
+parsear, así que un esquema puede igual de bien describir un body de `FormData`:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/upload', {
+  body: v.instance(FormData),
+  handler: ctx => ({ received: ctx.body.get('name') })
+})
+
+app.listen()
+```
+
+Qué valores de `Content-Type` parsean a qué valor de JavaScript — y qué pasa cuando
+el `Content-Type` de la request no es uno que Arcton sepa parsear — está cubierto en
+[Parsers de Body](./body-parsers.mdx).
+
+## Orden
+
+`body` se valida al final, después de `params` y `query` — ver
+[Descripción general de validación](./overview.mdx). Un esquema de body que falla
+responde con `400` de la misma forma que las fallas de params o query — ver
+[Errores de validación](./validation-errors.mdx).

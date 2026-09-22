@@ -1,0 +1,64 @@
+---
+title: Body Parsers
+description: How Arcton parses a request body by Content-Type before validating it, and how to add your own parser.
+---
+
+Body parsing only happens for a route that declared a `body` schema — see
+[Body](./body.mdx). Arcton picks a parser by the request's `Content-Type`
+(parameters like `; charset=` are ignored, and the match is
+case-insensitive), runs it, and hands the result to your schema.
+
+## Built-in parsers
+
+| Content-Type | Parsed value |
+|---|---|
+| `application/json` and any `application/*+json` | `await request.json()` |
+| `text/plain` | `string` |
+| `application/x-www-form-urlencoded` | `FormData` |
+| `multipart/form-data` | `FormData` |
+| `application/octet-stream` | `ArrayBuffer` |
+
+A request whose `Content-Type` isn't one of these — and has no custom parser
+registered either — gets `415` with an empty body. A built-in parser that
+throws on malformed input (invalid JSON, for instance) responds `400` with
+`{"issues":[{"message":"Invalid request body"}]}`.
+
+## Registering your own parser
+
+`app.parser(mediaType, parser)` registers a parser for an exact media type,
+overriding a built-in for the same type if there is one. Registering the same
+media type again replaces the previous parser — it's a flat table, not an
+ordered pipeline, so it doesn't matter when relative to your routes you call
+it.
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.parser('text/csv', async request => {
+  const [header = '', ...rows] = (await request.text()).trim().split('\n')
+  const keys = header.split(',')
+  return rows.map(row =>
+    Object.fromEntries(keys.map((key, i) => [key, row.split(',')[i]]))
+  )
+})
+
+app.post('/import', {
+  body: v.array(v.record(v.string(), v.string())),
+  handler: ctx => ({ imported: ctx.body.length, rows: ctx.body })
+})
+
+app.listen()
+```
+
+A `BodyParser` receives the raw `Request`, not `ctx` — parsing has nothing to
+do with route context.
+
+Returning `undefined` from a custom parser means "I don't handle this
+request" and falls back to `415`, the same as no parser being registered at
+all. Any other value counts as handled, including `false`, `0` and `''`. A
+custom parser that throws propagates uncaught, the same as a handler or
+`provide()` throwing — it isn't caught into a `400` the way a built-in
+parser's throw is.

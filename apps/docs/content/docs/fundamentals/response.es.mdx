@@ -1,0 +1,121 @@
+---
+title: Response
+description: Cómo el valor de retorno de un handler se convierte en una response HTTP, y cómo darle forma al status, los headers y las cookies.
+---
+
+Un handler devuelve lo que sea que deba contener la response, y Arcton lo mapea a un
+`Response`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/json', () => ({ ok: true }))
+app.get('/text', () => 'plain text')
+app.get('/bytes', () => new Uint8Array([1, 2, 3]))
+app.get('/raw', () => new Response('custom', { status: 202 }))
+
+app.listen()
+```
+
+## El mapeo completo
+
+| Devuelto | Body | `Content-Type` inferido |
+|---|---|---|
+| `Response` | pasa tal cual; `ctx.response` se ignora por completo | — |
+| `string` | el string | `text/plain; charset=UTF-8` |
+| objeto plano o array | `JSON.stringify(...)` | `application/json; charset=UTF-8` |
+| `Blob` | el blob | `blob.type`, o `application/octet-stream` cuando está vacío |
+| `FormData` | el form data | ninguno — se elimina un `Content-Type` explícito para que el runtime pueda generar su propio boundary de multipart |
+| `URLSearchParams` | los params | ninguno inferido (el runtime define `application/x-www-form-urlencoded;charset=UTF-8`) |
+| `ArrayBuffer`, o cualquier view de uno (`Uint8Array`, `Int32Array`, `DataView`, `Buffer` de Node) | los bytes | `application/octet-stream` |
+| `ReadableStream` | en streaming | `application/octet-stream` |
+| `null`, `undefined`, o sin retorno | vacío | ninguno |
+
+Un `ctx.response.headers.set('Content-Type', ...)` explícito siempre gana sobre el
+inferido, con una excepción:
+
+<Callout type="warn">
+Devolver `FormData` descarta cualquier `Content-Type` que hayas definido tú mismo —
+Arcton lo elimina para que el runtime pueda generar su propio header
+`multipart/form-data; boundary=...`. Puedes definir otros headers libremente; el
+boundary tiene que venir del runtime.
+</Callout>
+
+<Callout type="warn">
+`Map` y `Set` no reciben un tratamiento especial — caen en la rama de objeto plano, y
+`JSON.stringify` los serializa como `{}`. Devuelve en su lugar un array o un objeto
+plano construido a partir de sus entradas, por ejemplo `Object.fromEntries(myMap)` o
+`[...mySet]`.
+</Callout>
+
+## Status
+
+`ctx.response.status` define el status; por defecto es `200`. Un status fuera de
+`200`–`599` lanza `Invalid response status N: must be between 200 and 599`.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.post('/users', ctx => {
+  ctx.response.status = 201
+  ctx.response.headers.set('Location', '/users/1')
+  return { id: '1' }
+})
+
+app.listen()
+```
+
+<Callout type="warn">
+Define `ctx.response.status` antes de que la response se materialice — en el
+handler, o antes de llamar a `await next()` en el middleware. Definirlo después lanza
+un error, porque para ese momento ya es parte de un `Response` real, cuyo `status` no
+se puede reasignar.
+</Callout>
+
+`204`, `205` y `304` fuerzan un body vacío: se descarta un `Content-Type` inferido,
+pero un `Content-Type` que hayas definido explícitamente sobrevive.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.delete('/users/:id', ctx => {
+  ctx.response.status = 204
+})
+
+app.listen()
+```
+
+## Definiendo cookies
+
+`ctx.response.headers` es un objeto `Headers` real — `.append('Set-Cookie', ...)`
+agrega una cookie sin pisar las que ya estén definidas, así que varias cookies
+funcionan llamándolo más de una vez. Esto funciona tanto si lo haces en el handler
+como en middleware después de `await next()`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  await next()
+  ctx.response.headers.append('Set-Cookie', 'theme=dark; Path=/')
+  ctx.response.headers.append('Set-Cookie', 'session=abc123; HttpOnly; Path=/')
+})
+
+app.get('/', () => ({ ok: true }))
+
+app.listen()
+```
+
+Que la mutación de headers después de `await next()` llegue al cliente de esta forma
+— y que el status solo se pueda definir antes de ese punto — viene de cómo
+`ctx.response` se materializa en una response real a medida que el pipeline se
+desenrolla. Ver [Ciclo de vida de la request](./request-lifecycle.mdx) y
+[Modificando responses](../middleware/modifying-responses.mdx) para ese mecanismo.

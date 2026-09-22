@@ -1,0 +1,209 @@
+---
+title: Listen Options
+description: Configure the port, hostname, adapter and environment label passed to app.listen().
+---
+
+## Starting a server
+
+`app.listen()` takes an optional options object and returns a `RuntimeServer`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen({ port: 8080, hostname: '0.0.0.0' })
+```
+
+Every field is optional:
+
+<TypeTable
+  type={{
+    port: {
+      description: 'Port to listen on.',
+      type: 'number',
+      default: '3000'
+    },
+    hostname: {
+      description: 'Hostname to bind to.',
+      type: 'string'
+    },
+    adapter: {
+      description: 'Which runtime serves the app.',
+      type: 'RuntimeAdapter',
+      default: 'bunAdapter'
+    },
+    env: {
+      description: 'Label shown on the startup banner.',
+      type: 'string',
+      default: "process.env.NODE_ENV ?? 'development'"
+    },
+    maxBodySize: {
+      description: 'Max request body size, in bytes.',
+      type: 'number',
+      default: '134217728 (128MB)'
+    },
+    openapi: {
+      description: 'Serves an OpenAPI document and its UI — see openapi() below.',
+      type: 'OpenAPIIntegration',
+      default: 'undefined'
+    },
+    gracefulShutdown: {
+      description: 'Drains in-flight requests on SIGTERM/SIGINT before exiting — see Graceful shutdown below.',
+      type: 'boolean',
+      default: 'true'
+    },
+    shutdownTimeout: {
+      description: 'Max time (ms) to wait for in-flight requests before forcing the close.',
+      type: 'number',
+      default: '10000'
+    }
+  }}
+/>
+
+Calling `app.listen()` with no arguments starts on port 3000 using the Bun
+adapter:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen()
+```
+
+## Picking a free port
+
+Passing `port: 0` asks the OS for a free port instead of a fixed one. Read the
+actual port back from the returned server:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+const server = app.listen({ port: 0 })
+
+console.log(server.port) // an OS-assigned port
+console.log(server.url) // e.g. http://localhost:54231/
+
+server.stop()
+```
+
+This is exactly the pattern used to test a real app end to end — see
+[Testing overview](../testing/overview.mdx).
+
+## Choosing an adapter
+
+`adapter` selects which runtime serves the app. It defaults to `bunAdapter`.
+Pass `nodeAdapter` to run on Node.js instead:
+
+```ts
+import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen({ adapter: nodeAdapter })
+```
+
+See [Adapters](../api/adapters.mdx) for what an adapter is, and
+[Runtime support](../introduction/runtime-support.mdx) for the concrete
+differences between the two shipped adapters.
+
+## The startup banner and the returned server
+
+`listen()` prints a startup banner — the Arcton wordmark, followed by the
+Arcton version, the runtime name and version, the environment label, and the
+listening URL. The `env` option controls only that label; see
+[Environment](./environment.mdx) for the details.
+
+It returns a `RuntimeServer`:
+
+```ts
+interface RuntimeServer {
+  readonly port: number
+  readonly url: URL
+  stop(closeActiveConnections?: boolean): void | Promise<void>
+}
+```
+
+`stop()` returns `void` on the Bun adapter and a `Promise<void>` on the Node
+adapter, so awaiting it is always safe:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+const server = app.listen({ port: 0 })
+
+await server.stop()
+```
+
+See [listen()](../api/listen.mdx) for the full API reference.
+
+## Documenting the API
+
+`openapi` activates [`@arcton/openapi`](../integrations/openapi.mdx), an
+optional package `@arcton/core` doesn't depend on:
+
+```ts
+import { Arcton } from '@arcton/core'
+import { openapi } from '@arcton/openapi'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen({
+  openapi: openapi({ info: { title: 'API', version: '1.0.0' } })
+})
+```
+
+This serves an OpenAPI 3.1 document at `/openapi.json`, generated from the
+routes registered by the time `listen()` runs, and a [Scalar](https://scalar.com)
+UI reading it at `/docs`. See [OpenAPI & Scalar](../integrations/openapi.mdx)
+for the full guide.
+
+## Graceful shutdown
+
+By default, `listen()` drains the server on `SIGTERM`/`SIGINT` instead of
+leaving termination to the runtime's default behavior: it stops accepting
+new connections, waits for in-flight requests to finish (up to
+`shutdownTimeout`, 10 seconds by default), then exits the process. If a
+request is still running once the timeout elapses, active connections are
+force-closed instead.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => 'Hello, Arcton!')
+
+app.listen({ shutdownTimeout: 5000 })
+```
+
+`gracefulShutdown` is intended for applications where Arcton owns the
+process lifecycle — on signal, it calls `process.exit()`, which ends the
+*whole* process, not just this server. Set it to `false` when the host
+application manages process signals itself (e.g. Arcton embedded inside a
+larger process, or a runtime where OS signals aren't meaningful):
+
+```ts
+app.listen({ gracefulShutdown: false })
+```
+
+A second `SIGTERM`/`SIGINT` received while already shutting down is
+ignored — it doesn't start a second, concurrent drain.

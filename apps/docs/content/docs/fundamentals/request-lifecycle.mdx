@@ -1,0 +1,76 @@
+---
+title: Request Lifecycle
+description: How a request moves from the router through validation to your handler and back to a response.
+---
+
+Every request an Arcton app serves goes through the same sequence of stages:
+
+```text
+match → global steps (snapshot at registration) → validate → route middleware → handler → response mapping
+```
+
+This page walks through each stage at a conceptual level and links to where
+it's covered in depth.
+
+## Match
+
+The incoming method and pathname are matched against the route tree. A match
+carries the handler chain built for that route, plus the params captured along
+the way. No match falls back to a `404`; a match on the path but not the
+method falls back to a `405` — see [Routing Overview](../routing/overview.mdx),
+[Precedence](../routing/precedence.mdx) and [Errors](../errors/overview.mdx).
+
+## The global-steps snapshot
+
+This is the single most important thing to know about how middleware and
+providers compose: **when a route is registered, it captures the `use()` and
+`provide()` calls made so far.** Calls made after registration don't reach it.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/before', () => 'registered with no global steps yet')
+
+app.use(async (ctx, next) => {
+  ctx.response.headers.set('X-Global', 'yes')
+  await next()
+})
+
+app.get('/after', () => 'registered after the middleware above')
+
+app.listen()
+```
+
+`/before` runs with none of the surrounding `use()`/`provide()` calls, because
+none existed yet when it was registered. `/after` runs wrapped by the
+middleware above it, because that middleware was already registered. Reordering
+the two `get()` calls relative to `use()` changes what each route runs — the
+router itself never re-checks this later. See
+[Execution Order](../middleware/execution-order.mdx) for the full ordering
+rules, including scoped middleware and mounted modules.
+
+## Validate
+
+If the route declared `params`, `query` or `body` schemas, they run in that
+order against the current values, replacing `ctx.params` / `ctx.query` /
+`ctx.body` with the validated (and possibly coerced) output. The first failing
+schema stops the request there. See [Validation Overview](../validation/overview.mdx).
+
+## Route middleware
+
+Middleware passed directly to a route runs last, closest to the handler —
+after every global and scoped step, after validation. See
+[Route-level Middleware](../middleware/route-level.mdx).
+
+## Handler
+
+The handler runs with a fully typed `ctx` — see [Context](./context.mdx) for
+what's on it by this point.
+
+## Response mapping
+
+Whatever the handler (or an earlier step that short-circuited) returns is
+mapped to an HTTP `Response`, combined with anything already set on
+`ctx.response`. See [Response](./response.mdx) for the complete mapping.

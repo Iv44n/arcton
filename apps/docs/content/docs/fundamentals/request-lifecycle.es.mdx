@@ -1,0 +1,76 @@
+---
+title: Ciclo de vida de la request
+description: Cómo una request viaja desde el router, pasando por la validación, hasta tu handler y de vuelta a una response.
+---
+
+Toda request que atiende una app de Arcton pasa por la misma secuencia de etapas:
+
+```text
+coincidencia → pasos globales (snapshot al registrar) → validar → route middleware → handler → mapeo de response
+```
+
+Esta página recorre cada etapa a nivel conceptual y enlaza a dónde se cubre en
+profundidad.
+
+## Coincidencia
+
+El método y el pathname entrantes se comparan contra el árbol de rutas. Una
+coincidencia trae la cadena de handlers construida para esa ruta, más los params
+capturados en el camino. Si no hay coincidencia, cae en un `404`; si coincide la ruta
+pero no el método, cae en un `405` — ver [Descripción general de routing](../routing/overview.mdx),
+[Precedencia](../routing/precedence.mdx) y [Errores](../errors/overview.mdx).
+
+## El snapshot de pasos globales
+
+Esto es lo más importante que hay que saber sobre cómo se componen middleware y
+providers: **cuando se registra una ruta, esta captura las llamadas a `use()` y
+`provide()` hechas hasta ese momento.** Las llamadas hechas después del registro no la
+alcanzan.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/before', () => 'registered with no global steps yet')
+
+app.use(async (ctx, next) => {
+  ctx.response.headers.set('X-Global', 'yes')
+  await next()
+})
+
+app.get('/after', () => 'registered after the middleware above')
+
+app.listen()
+```
+
+`/before` corre sin ninguna de las llamadas `use()`/`provide()` de alrededor, porque
+ninguna existía todavía cuando se registró. `/after` corre envuelta por el middleware
+de arriba, porque ese middleware ya estaba registrado. Reordenar las dos llamadas a
+`get()` respecto a `use()` cambia lo que corre cada ruta — el router nunca vuelve a
+revisar esto después. Ver [Orden de ejecución](../middleware/execution-order.mdx) para
+las reglas completas de orden, incluyendo middleware con scope y modules montados.
+
+## Validar
+
+Si la ruta declaró esquemas de `params`, `query` o `body`, corren en ese orden contra
+los valores actuales, reemplazando `ctx.params` / `ctx.query` / `ctx.body` con el
+resultado validado (y posiblemente transformado). El primer esquema que falla detiene
+la request ahí mismo. Ver [Descripción general de validación](../validation/overview.mdx).
+
+## Route middleware
+
+El middleware que se pasa directamente a una ruta corre al final, lo más cerca
+posible del handler — después de cada step global y con scope, después de la
+validación. Ver [Middleware a nivel de ruta](../middleware/route-level.mdx).
+
+## Handler
+
+El handler corre con un `ctx` completamente tipado — ver [Context](./context.mdx) para
+lo que hay en él a esta altura.
+
+## Mapeo de response
+
+Lo que sea que devuelva el handler (o un step anterior que cortó la cadena) se mapea a
+un `Response` HTTP, combinado con lo que ya esté definido en `ctx.response`. Ver
+[Response](./response.mdx) para el mapeo completo.

@@ -1,0 +1,11 @@
+{
+  "title": "Introducción",
+  "icon": "BookOpen",
+  "pages": [
+    "what-is-arcton",
+    "philosophy",
+    "architecture-overview",
+    "runtime-support",
+    "when-to-use"
+  ]
+}

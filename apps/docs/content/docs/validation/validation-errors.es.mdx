@@ -1,0 +1,82 @@
+---
+title: Errores de validación
+description: La response exacta que envía Arcton cuando falla la validación de params, query o body.
+---
+
+Cuando falla un esquema de `params`, `query` o `body`, Arcton responde `400` con un
+body `application/json` que trae los issues que reportó el esquema:
+
+```json
+{
+  "issues": [
+    { "message": "Invalid length: Expected >=1 but received 0", "path": ["..."] }
+  ]
+}
+```
+
+El array `issues` es exactamente lo que tu librería de esquemas devolvió en su propia
+llamada de validación — Arcton no lo reestructura ni lo filtra. Todo issue tiene un
+`message`, y cada librería agrega sus propios campos al lado.
+
+Valibot, por ejemplo, devuelve issues que traen `kind`, `type`, `input`, `expected`,
+`received` y `requirement`, con un `path` de objetos de segmento en lugar de keys
+planas:
+
+```json
+{
+  "issues": [
+    {
+      "kind": "validation",
+      "type": "min_length",
+      "input": "",
+      "expected": ">=1",
+      "received": "0",
+      "message": "Invalid length: Expected >=1 but received 0",
+      "requirement": 1,
+      "path": [{ "type": "object", "origin": "value", "key": "item" }]
+    }
+  ]
+}
+```
+
+Zod y ArkType reportan sus propias formas. Lee `message` cuando necesites algo
+estable entre librerías, y trata el resto como específico de la que elegiste — si un
+cliente depende de los campos exactos, fija la librería de esquemas que los produce.
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/users', {
+  body: v.object({
+    email: v.pipe(v.string(), v.email())
+  }),
+  handler: ctx => ({ created: ctx.body })
+})
+
+app.listen()
+```
+
+Un `POST /users` con un body cuyo campo `email` falla `v.email()` recibe el `400` de
+arriba; una request cuyo `email` pasa llega al handler con `ctx.body.email` ya
+validado.
+
+## Qué corta la cadena y qué no
+
+La validación corre **params → query → body**, y el primer esquema que falla detiene
+la request justo ahí — nada más en ese orden corre después, y tampoco corre ningún
+route middleware ni el handler. Ver [Descripción general de validación](./overview.mdx).
+
+Dos fallas relacionadas pasan por fuera de la validación del esquema en sí, antes de
+que tu esquema llegue a ver un valor:
+
+- Un `Content-Type` de request no soportado para una ruta con un esquema de `body`
+  responde `415`, antes de intentar cualquier parseo o validación.
+- Un parser integrado que no puede interpretar el body en absoluto (JSON malformado,
+  por ejemplo) responde `400` con un
+  `{"issues":[{"message":"Invalid request body"}]}` fijo — este mensaje no viene de
+  tu esquema, porque el esquema nunca llegó a recibir un valor para validar.
+
+Ambas están cubiertas en detalle en [Parsers de Body](./body-parsers.mdx).

@@ -1,0 +1,125 @@
+---
+title: CLI
+description: Scaffold a new Arcton project with arcton create and its two runtime templates.
+---
+
+## Overview
+
+Scaffold a new project interactively:
+
+```bash
+bunx arcton create my-app
+```
+
+or through the package-manager scaffolding convention, which resolves to the same flow via the separate `create-arcton` package:
+
+```bash
+bun create arcton my-app
+npm create arcton my-app
+pnpm create arcton my-app
+```
+
+Passing the name as an argument (as above) skips the name prompt; running without one prompts for it interactively.
+
+## `arcton create`
+
+**Purpose** — interactively scaffolds a new Arcton project: choose a project name, a runtime, and a package manager, then optionally install dependencies.
+
+**Signature**
+
+```bash
+arcton create [name]
+```
+
+**Parameters**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `name` | `string` (optional) | Project directory name. Must contain only letters, digits, dots, dashes and underscores. Prompted for interactively when omitted. |
+
+**Behavior** — the flow, in order:
+
+1. Prompts for a project name (skipped if given as an argument).
+2. Prompts for a runtime: Bun or Node.js.
+3. Prompts for a package manager: `bun`, `pnpm`, or `npm` (defaults to `bun` if the chosen runtime is Bun, otherwise `npm`).
+4. If the target directory already exists and isn't empty, asks to confirm overwriting it.
+5. Copies the chosen runtime's template into the target directory and sets the project's `name` in its `package.json`.
+6. Asks whether to install dependencies now (default yes), and runs the matching install command if so.
+7. Prints the next steps to run.
+
+This is exposed both as the `arcton create` subcommand (from the `arcton` package's `arcton/create` subpath export) and, standalone, as `create-arcton` — a package whose only job is to satisfy the `create-<name>` convention that `npm create arcton` / `pnpm create arcton` / `bun create arcton` rely on, by re-exporting the same implementation.
+
+**Example**
+
+```bash
+bunx arcton create my-app
+```
+
+```bash
+cd my-app
+bun install
+bun run dev
+```
+
+## Templates
+
+Two runtime templates are available; both scaffold a project depending on `@arcton/core`.
+
+### Bun template
+
+`package.json` scripts:
+
+```json
+{
+  "scripts": {
+    "dev": "bun --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "compile": "bun build --compile --minify --sourcemap ./src/index.ts --outfile arcton-app"
+  }
+}
+```
+
+`src/index.ts`:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => {
+  return 'Hello, Arcton!'
+})
+
+app.listen()
+```
+
+### Node template
+
+`package.json` scripts:
+
+```json
+{
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc --build",
+    "start": "node dist/index.js"
+  }
+}
+```
+
+`src/index.ts`:
+
+```ts
+import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/', () => {
+  return 'Hello, Arcton!'
+})
+
+app.listen({ adapter: nodeAdapter })
+```
+
+See [Installation](../getting-started/installation.mdx) for prerequisites and [Development](../getting-started/development.mdx) for running these scripts day to day.

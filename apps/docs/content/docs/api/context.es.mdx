@@ -1,0 +1,133 @@
+---
+title: Context
+description: El objeto que reciben todo handler, provider y función de middleware
+---
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => {
+  return { id: ctx.params.id, page: ctx.query.page ?? '1' }
+})
+
+app.listen()
+```
+
+Todo handler, [provider](../providers/overview.mdx) y función de [middleware](../middleware/overview.mdx) recibe un `Context` como primer argumento (el middleware también recibe un `next`). Esta página es la referencia de tipos; ver [Context](../fundamentals/context.mdx) para la guía orientada al concepto.
+
+## Context
+
+**Propósito:** la forma completa de `ctx` en un punto dado del pipeline.
+
+**Firma**
+```ts
+import type { BaseContext, QueryParams, RouteParams } from '@arcton/contracts'
+
+type Context<P = RouteParams, Q = QueryParams, TBody = {}, TProvided = {}> =
+  BaseContext<P, Q> & TBody & TProvided
+```
+
+**Parámetros**
+
+<TypeTable
+  type={{
+    P: {
+      description: 'Forma de ctx.params, inferida de la ruta o de un schema de params.',
+      type: 'object',
+      default: 'RouteParams'
+    },
+    Q: {
+      description: 'Forma de ctx.query, inferida de un schema de query.',
+      type: 'object',
+      default: 'QueryParams'
+    },
+    TBody: {
+      description: 'Agrega ctx.body cuando una ruta declara un schema de body.',
+      type: 'object',
+      default: '{}'
+    },
+    TProvided: {
+      description: 'Todo lo agregado por provide() hasta el momento.',
+      type: 'object',
+      default: '{}'
+    }
+  }}
+/>
+
+**Comportamiento:** los valores provistos quedan planos sobre `ctx` — no hay namespace. `params` se infiere del literal de ruta pasado a `get`/`post`/etc.: `'/users/:id'` da `{ id: string }`, una ruta sin params da `Record<string, never>`, y un path pasado como variable `string` no literal da `Record<string, string>`. `query` es `Record<string, string>` por defecto, construido de forma perezosa en el primer acceso — las keys repetidas conservan el último valor, y una key sin valor se lee como `''`.
+
+## BaseContext
+
+**Propósito:** los campos presentes en todo `Context`, sin importar qué se haya provisto o validado.
+
+**Firma**
+```ts
+import type { ResponseContext } from '@arcton/contracts'
+
+interface BaseContext<P, Q> {
+  request: Request
+  params: P
+  query: Q
+  response: ResponseContext
+}
+```
+
+**Comportamiento:** `request` es el `Request` crudo, sin modificar. `response` se describe más abajo.
+
+## ResponseContext
+
+**Propósito:** el estado mutable de la response disponible antes de que el body finalice.
+
+**Firma**
+```ts
+interface ResponseContext {
+  status?: number
+  headers: Headers
+}
+```
+
+**Comportamiento:** `ctx.response` comienza como este objeto plano y se materializa en un `Response` real en el momento en que el body finaliza, en cualquier capa (el handler retorna, un step corta la cadena, o una capa reemplaza el body después de `next()`). Antes de la materialización, se puede asignar `ctx.response.status` directamente. Después de la materialización, mutar los headers sigue funcionando y llega al cliente, pero `status` ya no acepta asignación. Ver [Response](../fundamentals/response.mdx).
+
+<Callout>
+Configura `ctx.response.status` desde el handler, o desde middleware antes de llamar a `await next()`. Configurarlo después lanza una excepción, porque para ese momento el body ya se materializó en un `Response` real.
+</Callout>
+
+## RouteParams
+
+**Propósito:** la forma por defecto de `ctx.params` para una ruta sin schema de params.
+
+**Firma**
+```ts
+type RouteParams = Record<string, string>
+```
+
+## QueryParams
+
+**Propósito:** la forma por defecto de `ctx.query` para una ruta sin schema de query.
+
+**Firma**
+```ts
+type QueryParams = Record<string, string>
+```
+
+## Body
+
+**Propósito:** la unión de valores que un handler o middleware puede retornar.
+
+**Firma**
+```ts
+type Body =
+  | object
+  | string
+  | ArrayBufferView
+  | ArrayBuffer
+  | Blob
+  | FormData
+  | URLSearchParams
+  | ReadableStream
+  | Response
+```
+
+**Comportamiento:** cada variante se mapea a una response HTTP distinta — ver [Response](../fundamentals/response.mdx) para la tabla completa de mapeo, incluyendo cómo se derivan el status y los headers en cada caso.

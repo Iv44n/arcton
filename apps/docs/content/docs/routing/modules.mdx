@@ -1,0 +1,243 @@
+---
+title: Modules
+description: Splitting an application into Arcton instances that merge into a single route tree when mounted.
+---
+
+A module is an `Arcton()` instance with a prefix. Mounting it with `use()`
+merges its routes into the parent:
+
+```ts title="users.ts"
+import { Arcton } from '@arcton/core'
+
+export const users = Arcton({ prefix: '/users' })
+
+users.get('/', () => [{ id: '1' }])
+users.get('/:id', ctx => ({ id: ctx.params.id }))
+users.post('/', () => ({ created: true }))
+```
+
+```ts title="index.ts"
+import { Arcton } from '@arcton/core'
+import { users } from './users'
+
+const app = Arcton({ prefix: '/api' })
+
+app.use(users)
+
+app.listen()
+```
+
+That serves `GET /api/users`, `GET /api/users/:id` and `POST /api/users`.
+
+A module is not a special type. It is an application — the same methods, the
+same middleware, the same validation. What makes it a module is that something
+else mounts it.
+
+## Prefixes compose
+
+The path a route ends up at is the parent prefix, then the module prefix, then
+the route path:
+
+```text
+'/api'  +  '/users'  +  '/:id'   →   /api/users/:id
+```
+
+A prefix must be a static path; `:param` and `*wildcard` segments throw when
+the instance is created. `Arcton({ prefix: '/' })` is the same as no prefix.
+
+## Mounting merges the route tree
+
+`app.use(module)` copies the module's routes into the parent's route tree at
+the moment you call it. After mounting there is one tree, and a request costs
+one lookup no matter how many modules the application was assembled from.
+
+Two consequences follow from merging at registration time:
+
+- Routes registered on the module **after** it was mounted do not appear in the
+  parent. Mount a module once it is fully built — typically as the last thing
+  the parent file does.
+- A collision surfaces immediately. If mounting would produce a method and path
+  the parent already has, registration throws, the same as registering a
+  duplicate route directly.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const users = Arcton({ prefix: '/users' })
+users.get('/:id', ctx => ({ id: ctx.params.id }))
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.use(users) // throws: Duplicate route: GET /users/:id is already registered
+
+app.listen()
+```
+
+## Middleware and mounting
+
+The parent's global middleware and providers registered **before** the mount
+wrap every route the module brings in. Anything registered after does not reach
+it — the same registration-order rule that governs
+[middleware](../middleware/execution-order.mdx) everywhere else.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const users = Arcton({ prefix: '/users' })
+
+users.get('/:id', ctx => ({ id: ctx.params.id }))
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  await next()
+  ctx.response.headers.set('X-Request-Id', crypto.randomUUID())
+})
+
+app.use(users) // every route the module brings in gets the header
+
+app.listen()
+```
+
+Each instance is typed on its own, so a module's handlers see the context that
+module declares. When a module's handlers need a typed value, the module
+declares the provider itself:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const users = Arcton({ prefix: '/users' })
+
+users
+  .provide(ctx => ({
+    requestId: ctx.request.headers.get('x-request-id') ?? crypto.randomUUID()
+  }))
+  .get('/:id', ctx => ({ id: ctx.params.id, requestId: ctx.requestId }))
+
+const app = Arcton()
+
+app.use(users)
+
+app.listen()
+```
+
+A module keeps its own middleware too, including path-scoped middleware, which
+keeps comparing against the module-local path — the path as written inside the
+module, not the mounted one:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const api = Arcton({ prefix: '/api' })
+
+api.use('/admin', async (ctx, next) => {
+  if (ctx.request.headers.get('x-admin-key') !== 'secret') {
+    return new Response('Unauthorized', { status: 401 })
+  }
+  await next()
+})
+
+api.get('/admin/stats', () => ({ users: 1 }))
+api.get('/public', () => ({ ok: true }))
+
+const app = Arcton()
+
+app.use(api)
+
+app.listen()
+```
+
+The scope is written `'/admin'`, matching the route as written inside the
+module, while the route is served at `/api/admin/stats`.
+
+<Callout>
+  A parent's path-scoped middleware does not reach a mounted module. Put the
+  scoped middleware inside the module it belongs to, or use global middleware
+  on the parent.
+</Callout>
+
+## Nesting
+
+Modules mount modules, to any depth:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const posts = Arcton({ prefix: '/posts' })
+posts.get('/:postId', ctx => ({ post: ctx.params.postId }))
+
+const users = Arcton({ prefix: '/users' })
+users.get('/:id', ctx => ({ id: ctx.params.id }))
+users.use(posts)
+
+const app = Arcton({ prefix: '/api' })
+app.use(users)
+
+app.listen()
+```
+
+This serves `GET /api/users/:id` and `GET /api/users/posts/:postId`.
+
+## WebSocket routes travel too
+
+A [WebSocket route](./websockets.mdx) registered inside a module picks up both
+prefixes when mounted:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const chat = Arcton({ prefix: '/chat' })
+
+chat.ws('/room', {
+  message(ws, message) {
+    ws.send(`echo: ${message}`)
+  }
+})
+
+const app = Arcton({ prefix: '/api' })
+
+app.use(chat)
+
+app.listen()
+```
+
+The socket is served at `/api/chat/room`.
+
+## Organizing a real application
+
+A common layout is one module per domain, each owning its routes and the
+middleware they need:
+
+```text
+src/
+├── index.ts        # creates the app, mounts modules, calls listen()
+├── users/
+│   └── index.ts    # export const users = Arcton({ prefix: '/users' })
+└── orders/
+    └── index.ts    # export const orders = Arcton({ prefix: '/orders' })
+```
+
+```ts title="src/index.ts" no-check
+import { Arcton } from '@arcton/core'
+import { orders } from './orders'
+import { users } from './users'
+
+const app = Arcton({ prefix: '/api' })
+
+app.use(async (ctx, next) => {
+  console.log(`${ctx.request.method} ${new URL(ctx.request.url).pathname}`)
+  await next()
+})
+
+app.use(users)
+app.use(orders)
+
+app.listen({ port: 3000 })
+```
+
+The logging middleware is registered before the mounts, so it covers every
+route both modules bring in.
+
+See [Module composition](../architecture/module-composition.mdx) for why
+merging happens at registration.

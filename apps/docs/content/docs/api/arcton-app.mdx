@@ -1,0 +1,567 @@
+---
+title: ArctonApp
+description: The interface returned by Arcton() — the surface you register routes, middleware, and providers on
+---
+
+Every registration method on `ArctonApp` returns the app itself, so calls chain:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .get('/', () => 'Hello, Arcton!')
+  .get('/health', () => ({ status: 'ok' }))
+
+app.listen()
+```
+
+`config` holds the exact `ArctonConfig` object passed to [`Arcton()`](./arcton.mdx#arctonconfig):
+
+```ts
+import type { ArctonConfig } from '@arcton/core'
+
+interface ArctonApp<TProvided = {}> {
+  config: ArctonConfig
+  // ...
+}
+```
+
+## get, post, put, delete, patch, head, options
+
+**Purpose:** register a route for one HTTP method. All seven shorthands share the same two call shapes — only the method differs.
+
+**Signature**
+```ts
+import type { Middleware, RouteHandler, StandardSchemaV1 } from '@arcton/contracts'
+import type { ArctonApp, RouteOptions } from '@arcton/core'
+
+interface RouteMethod<TProvided> {
+  <Route extends string>(
+    path: Route,
+    ...args: [...Middleware[], RouteHandler]
+  ): ArctonApp<TProvided>
+  <
+    Route extends string,
+    PSchema extends StandardSchemaV1 | undefined = undefined,
+    QSchema extends StandardSchemaV1 | undefined = undefined,
+    BSchema extends StandardSchemaV1 | undefined = undefined
+  >(
+    path: Route,
+    options: RouteOptions<Route, TProvided, PSchema, QSchema, BSchema>
+  ): ArctonApp<TProvided>
+}
+```
+
+**Parameters**
+
+<TypeTable
+  type={{
+    path: {
+      description: 'The route pattern — static, ":dynamic", or "*wildcard" segments.',
+      type: 'string'
+    },
+    args: {
+      description: 'Zero or more route middleware, followed by the handler.',
+      type: 'Middleware[]'
+    },
+    options: {
+      description: 'A RouteOptions object: params/query/body schemas plus middleware and handler.',
+      type: 'RouteOptions'
+    }
+  }}
+/>
+
+**Return type:** `ArctonApp<TProvided>` — itself, for chaining.
+
+**Behavior:** the first call shape's `path` argument types `ctx.params` for you, from the route literal (`'/users/:id'` gives `{ id: string }`) — see [Context](./context.mdx). The second call shape ([`RouteOptions`](#routeoptions)) additionally validates `params`/`query`/`body` against a schema before the handler runs — see [Validation types](./validation-types.mdx).
+
+**Errors:** registering the same `(method, path)` twice throws `Duplicate route: <METHOD> <path> is already registered`. See [Registration errors](../errors/registration-errors.mdx).
+
+**Example**
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.post('/users/:id/orders', {
+  handler: ctx => ({ userId: ctx.params.id })
+})
+
+app.listen()
+```
+
+## all
+
+**Purpose:** registers a route matched by every HTTP method Arcton supports — the same seven as `get`/`post`/etc. above, not a wildcard for arbitrary or non-standard verbs.
+
+**Signature:** identical to [`RouteMethod<TProvided>`](#get-post-put-delete-patch-head-options) above — same two call shapes, same generics.
+
+**Return type:** `ArctonApp<TProvided>`.
+
+**Behavior:** registers the same handler for `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, and `OPTIONS` on the given path in a single call. Useful for delegating a whole path to an external Request/Response handler. See [HTTP methods](../routing/http-methods.mdx#every-method-on-one-path).
+
+**Errors:** shares one handler across every method on that path — registering a specific method on the same path afterward (or before) throws the same "Duplicate route" error as registering that method twice. See [Registration errors](../errors/registration-errors.mdx).
+
+**Example**
+```ts
+import { Arcton } from '@arcton/core'
+
+declare const auth: { handler: (request: Request) => Promise<Response> }
+
+const app = Arcton()
+
+app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+
+app.listen()
+```
+
+## RouteOptions
+
+**Purpose:** the options object accepted by the second call shape of `get`/`post`/etc., for routes that need request validation.
+
+**Signature**
+```ts
+import type { Middleware, RouteDetail, RouteHandler } from '@arcton/contracts'
+import type { ResponseSchemas } from '@arcton/core'
+
+interface RouteOptions<Route, TProvided, PSchema, QSchema, BSchema> {
+  params?: PSchema
+  query?: QSchema
+  body?: BSchema
+  response?: ResponseSchemas
+  detail?: RouteDetail
+  middleware?: Middleware[]
+  handler: RouteHandler
+}
+```
+
+**Parameters**
+
+<TypeTable
+  type={{
+    params: {
+      description: 'A Standard Schema validating ctx.params.',
+      type: 'StandardSchemaV1',
+      default: 'undefined'
+    },
+    query: {
+      description: 'A Standard Schema validating ctx.query.',
+      type: 'StandardSchemaV1',
+      default: 'undefined'
+    },
+    body: {
+      description: 'A Standard Schema validating the parsed request body.',
+      type: 'StandardSchemaV1',
+      default: 'undefined'
+    },
+    response: {
+      description: 'What this route responds with, per status code. Documentation only.',
+      type: 'ResponseSchemas',
+      default: 'undefined'
+    },
+    detail: {
+      description: 'Documentation metadata — operationId, summary, tags, etc.',
+      type: 'RouteDetail',
+      default: 'undefined'
+    },
+    middleware: {
+      description: 'Route middleware, run after validation, closest to the handler.',
+      type: 'Middleware[]',
+      default: '[]'
+    },
+    handler: {
+      description: 'The route handler.',
+      type: 'RouteHandler'
+    }
+  }}
+/>
+
+**Behavior:** validation runs in the order params → query → body; the first failure short-circuits with a `400`. A schema's output replaces the corresponding `ctx` field. `ctx.body` only exists (and only type-checks) on a route that declares `body`. See [Validation types](./validation-types.mdx) and [Validation errors](../validation/validation-errors.mdx).
+
+`response` and `detail` are documentation only — see [`ResponseSchemas`](#responseschemas) and [`RouteDetail`](#routedetail) below. Neither is read by the request pipeline: a handler returning something other than what `response` declares still responds exactly as it would with no `response` at all (see [Response](../fundamentals/response.mdx) for what actually shapes a reply). Both are read through [`routesOf()`](#routesof) by anything that documents or inspects an app — see [OpenAPI & Scalar](../integrations/openapi.mdx).
+
+**Example**
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/users/:id/orders', {
+  params: v.object({ id: v.string() }),
+  body: v.object({ item: v.string() }),
+  handler: ctx => ({ userId: ctx.params.id, item: ctx.body.item })
+})
+
+app.listen()
+```
+
+## `ResponseSchemas`
+
+**Purpose** — the shape `RouteOptions.response` accepts.
+
+**Signature**
+```ts
+import type { StandardSchemaV1 } from '@arcton/contracts'
+
+type ResponseSchemas = StandardSchemaV1 | Record<number, StandardSchemaV1>
+```
+
+**Behavior:** a bare `StandardSchemaV1` is shorthand for `{ 200: schema }` — the two are told apart at runtime by checking for the `'~standard'` key, since a status → schema map never has one. Either way it's normalized to `Record<number, StandardSchemaV1>` before reaching [`RouteRecord.response`](./openapi.mdx#routerecord).
+
+**Example**
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+// shorthand for { response: { 200: UserSchema } }
+app.get('/users/:id', {
+  response: v.object({ id: v.string() }),
+  handler: ctx => ({ id: ctx.params.id })
+})
+
+app.get('/orders/:id', {
+  response: {
+    200: v.object({ id: v.string() }),
+    404: v.object({ message: v.string() })
+  },
+  handler: ctx => ({ id: ctx.params.id })
+})
+
+app.listen()
+```
+
+## `RouteDetail`
+
+**Purpose** — the documentation metadata `RouteOptions.detail` accepts.
+
+**Signature**
+```ts
+interface RouteDetail {
+  operationId?: string
+  summary?: string
+  description?: string
+  tags?: string[]
+  deprecated?: boolean
+}
+```
+
+**Parameters**
+
+<TypeTable
+  type={{
+    operationId: {
+      description: 'A unique identifier for the operation.',
+      type: 'string',
+      default: 'undefined'
+    },
+    summary: {
+      description: 'A short summary of what the route does.',
+      type: 'string',
+      default: 'undefined'
+    },
+    description: {
+      description: 'A longer description.',
+      type: 'string',
+      default: 'undefined'
+    },
+    tags: {
+      description: 'Groups this route with others sharing a tag.',
+      type: 'string[]',
+      default: 'undefined'
+    },
+    deprecated: {
+      description: 'Marks the route as deprecated.',
+      type: 'boolean',
+      default: 'undefined'
+    }
+  }}
+/>
+
+**Behavior:** every field is documentation only — none of them changes how a request is matched, validated, or handled. All five map directly onto the fields of the same name on an OpenAPI operation — see [OpenAPI & Scalar](../integrations/openapi.mdx).
+
+**Example**
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', {
+  detail: {
+    operationId: 'getUser',
+    summary: 'Get user',
+    tags: ['Users']
+  },
+  handler: ctx => ({ id: ctx.params.id })
+})
+
+app.listen()
+```
+
+## ws
+
+**Purpose:** register a WebSocket route.
+
+**Signature**
+```ts
+import type { RuntimeWebSocketHandler } from '@arcton/contracts'
+import type { ArctonApp } from '@arcton/core'
+
+declare function ws<TProvided>(
+  path: string,
+  handler: RuntimeWebSocketHandler
+): ArctonApp<TProvided>
+```
+
+**Parameters:** `path` — matched exactly, no `:param`/`*wildcard` segments. `handler` — a [`RuntimeWebSocketHandler`](./runtime-types.mdx).
+
+**Return type:** `ArctonApp<TProvided>`.
+
+**Behavior:** ws routes are matched by exact path and don't go through context, middleware, or providers. See [WebSockets](../routing/websockets.mdx) for the full guide.
+
+**Example**
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.ws('/chat', {
+  message(ws, message) {
+    ws.send(`echo: ${message}`)
+  }
+})
+
+app.listen()
+```
+
+## use
+
+**Purpose:** registers global middleware, scoped middleware, or mounts a [module](../routing/modules.mdx). Three overloads, disambiguated by the arguments passed.
+
+**Signature**
+```ts
+import type { Middleware } from '@arcton/contracts'
+import type { ArctonApp } from '@arcton/core'
+
+declare function use<TProvided>(middleware: Middleware): ArctonApp<TProvided>
+declare function use<TProvided>(scope: string, middleware: Middleware): ArctonApp<TProvided>
+declare function use<TProvided, M>(app: ArctonApp<M>): ArctonApp<TProvided>
+```
+
+**Parameters:** `middleware` — a [`Middleware`](./middleware-types.mdx#middleware) function. `scope` — a static path; the middleware only applies to routes at or under it. `app` — another `ArctonApp` instance to mount as a module.
+
+**Return type:** `ArctonApp<TProvided>`.
+
+**Behavior:**
+- `use(middleware)` registers global middleware — see [Global middleware](../middleware/global.mdx).
+- `use(scope, middleware)` is selected per route at registration time by comparing the route's own path against `scope` — see [Scoped middleware](../middleware/scoped.mdx).
+- `use(module)` grafts the module's already-built route tree into this app's tree at registration time — see [Modules](../routing/modules.mdx).
+
+**Errors:** an object argument that isn't an `ArctonApp` throws `use() expects a middleware function, a (scope, middleware) pair, or an Arcton app to mount`. A non-static `scope` throws the same "must be a static path" error as a non-static `ArctonConfig.prefix`. See [Registration errors](../errors/registration-errors.mdx).
+
+**Example**
+```ts
+import { Arcton } from '@arcton/core'
+
+const users = Arcton({ prefix: '/users' })
+users.get('/:id', ctx => ({ id: ctx.params.id }))
+
+const app = Arcton()
+
+app.use(async (ctx, next) => {
+  await next()
+})
+
+app.use('/users', async (ctx, next) => {
+  await next()
+})
+
+app.use(users)
+
+app.listen()
+```
+
+## provide
+
+**Purpose:** composes typed context onto `ctx`, flat, for every middleware and handler registered afterward.
+
+**Signature**
+```ts
+import type { ProvideFn, ReservedKeys } from '@arcton/contracts'
+import type { ArctonApp } from '@arcton/core'
+
+declare function provide<
+  TProvided,
+  R extends Partial<Record<ReservedKeys<TProvided>, never>> & Record<string, unknown>
+>(fn: ProvideFn<TProvided, R>): ArctonApp<TProvided & R>
+```
+
+**Parameters:** `fn` — a [`ProvideFn`](./middleware-types.mdx#providefn) returning the object to merge onto `ctx`.
+
+**Return type:** `ArctonApp<TProvided & R>` — the app, with its provided-context type grown by `R`.
+
+**Behavior:** see [Providers](../providers/overview.mdx) for the full guide.
+
+**Errors:** re-providing a key already on `TProvided`, or one of `request`/`params`/`query`/`response`/`body`, is a compile error (via [`ReservedKeys`](./middleware-types.mdx#reservedkeys)) — it does not throw at runtime.
+
+**Example**
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .provide(() => ({ db: { query: async () => [] as unknown[] } }))
+  .get('/users', async ctx => ctx.db.query())
+
+app.listen()
+```
+
+## parser
+
+**Purpose:** registers a custom body parser for an exact media type.
+
+**Signature**
+```ts
+import type { BodyParser } from '@arcton/contracts'
+import type { ArctonApp } from '@arcton/core'
+
+declare function parser<TProvided>(
+  mediaType: string,
+  parser: BodyParser
+): ArctonApp<TProvided>
+```
+
+**Parameters:** `mediaType` — matched case-insensitively, parameters like `; charset=` ignored. `parser` — a [`BodyParser`](./validation-types.mdx#bodyparser).
+
+**Return type:** `ArctonApp<TProvided>`.
+
+**Behavior:** overrides a built-in parser for the same media type, if there is one. Registering the same media type again replaces the previous parser — it's a flat table with no ordering or snapshot semantics, unlike `use()`/`provide()`. Only consulted for a route declaring a `body` schema. See [Body parsers](../validation/body-parsers.mdx).
+
+**Example**
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.parser('text/csv', async request => {
+  const text = await request.text()
+  return text.trim().split('\n')
+})
+
+app.listen()
+```
+
+## onError
+
+**Purpose:** registers a handler for an otherwise-uncaught error — from a provider, a middleware, validation, or the route handler itself.
+
+**Signature**
+```ts
+import type { ErrorHandler, QueryParams, RouteParams } from '@arcton/contracts'
+import type { ArctonApp } from '@arcton/core'
+
+declare function onError<TProvided>(
+  handler: ErrorHandler<RouteParams, QueryParams, {}, TProvided>
+): ArctonApp<TProvided>
+```
+
+**Parameters:** `handler` — an [`ErrorHandler`](./middleware-types.mdx#errorhandler).
+
+**Return type:** `ArctonApp<TProvided>`.
+
+**Behavior:** only one handler at a time — a later call replaces an earlier one — and only the instance whose own `listen()` ends up serving the request is ever consulted; one registered on a module mounted with `use()` has no effect. `ctx.response.status` defaults to `500` if the handler doesn't set one itself, without overriding a status a step already set before the throw. If the handler itself throws, that error propagates the same way an uncaught error would with no handler registered at all. Without `onError()`, an uncaught error still propagates to the runtime adapter exactly as described in [Uncaught errors](../errors/uncaught-errors.mdx) — this is opt-in. See [Global error handler](../errors/global-error-handler.mdx) for the full guide.
+
+**Example**
+```ts
+import { Arcton, Http, HttpError } from '@arcton/core'
+
+declare function findOrder(id: string): { id: string } | undefined
+
+const app = Arcton()
+
+app.get('/orders/:id', ctx => {
+  const order = findOrder(ctx.params.id)
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
+  return order
+})
+
+app.onError((err, ctx) => {
+  if (err instanceof HttpError) {
+    ctx.response.status = err.status
+    return err.body ?? { code: err.code, message: err.message }
+  }
+  return { code: 'INTERNAL_SERVER_ERROR', message: 'Internal Server Error' }
+})
+
+app.listen()
+```
+
+## listen
+
+**Purpose:** starts serving requests.
+
+**Signature**
+```ts
+import type { ArctonListenOptions } from '@arcton/core'
+import type { RuntimeServer } from '@arcton/contracts'
+
+declare function listen(options?: ArctonListenOptions): RuntimeServer
+```
+
+**Behavior:** see [`listen()`](./listen.mdx) for the full reference, including the returned `RuntimeServer`.
+
+## `routesOf()`
+
+**Purpose:** the read-only view of every route registered on an app — the schemas and metadata each one declared, and its final (prefixed) path. What lets a package outside `@arcton/core` — [`@arcton/openapi`](./openapi.mdx), or anything else that documents or inspects an app — see route contracts without the app exposing its router or pipeline directly.
+
+**Signature**
+```ts
+import type { RouteRecord } from '@arcton/contracts'
+import type { ArctonApp } from '@arcton/core'
+
+declare function routesOf<T>(app: ArctonApp<T>): readonly RouteRecord[]
+```
+
+**Parameters:** `app` — any `ArctonApp` instance, mounted or not.
+
+**Return type:** `readonly RouteRecord[]` — see [`RouteRecord`](./openapi.mdx#routerecord).
+
+**Behavior:** one record per method a route was registered under — `app.all()` produces seven, never an "any method" record — in registration order, each with its final path (every mounting prefix already applied). A module's own records are included once it's mounted with `use()`, prefixed the same way its route tree is; calling `routesOf()` on the module itself still returns its records with only its own prefix, unaffected by where it later gets mounted. A `ws()` route produces no record, having no contract to describe. Routes an `OpenAPIIntegration` registers through `listen({ openapi })` are never included, so a document never documents itself.
+
+**Errors:** throws `routesOf() expects an Arcton app` for anything that isn't one.
+
+**Example**
+```ts
+import { Arcton, routesOf } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.get('/users/:id', {
+  params: v.object({ id: v.string() }),
+  handler: ctx => ({ id: ctx.params.id })
+})
+
+for (const route of routesOf(app)) {
+  console.log(route.method, route.path)
+}
+// GET /users/:id
+```
+
+## HttpMethod
+
+**Purpose:** the union of HTTP methods `ArctonApp`'s route shorthands correspond to.
+
+**Signature**
+```ts
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS'
+```
+
+**Behavior:** used anywhere a method needs naming outside of calling `app.get`/`app.post`/etc. directly — for example, the `Allow` header on a `405` response lists the `HttpMethod`s a matched route does support. See [HTTP methods](../routing/http-methods.mdx).

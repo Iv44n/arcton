@@ -1,0 +1,147 @@
+---
+title: Routing Overview
+description: Registering routes, the three kinds of path segment, and the rules a route path must follow.
+---
+
+Register a route by calling the method you want to answer:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users', () => [{ id: '1' }])
+app.post('/users', () => ({ created: true }))
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+
+app.listen()
+```
+
+Every registration method returns the app, so calls chain:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app
+  .get('/health', () => ({ status: 'ok' }))
+  .get('/version', () => ({ version: '1.0.0' }))
+
+app.listen()
+```
+
+Seven methods are available: `get`, `post`, `put`, `delete`, `patch`, `head`
+and `options`. See [HTTP methods](./http-methods.mdx).
+
+## Three kinds of segment
+
+A path is split on `/`, and each segment is one of three kinds:
+
+| Segment | Written | Matches |
+|---|---|---|
+| Static | `users` | exactly that text |
+| Dynamic | `:id` | any single segment, captured as `ctx.params.id` |
+| Wildcard | `*path` | the rest of the path, captured as `ctx.params.path` |
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/health', () => ({ status: 'ok' }))            // static
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))    // dynamic
+app.get('/files/*path', ctx => ({ path: ctx.params.path })) // wildcard
+
+app.listen()
+```
+
+`GET /files/docs/readme.md` gives `ctx.params.path === 'docs/readme.md'`.
+
+Captured values are typed from the path you wrote — see
+[Path parameters](./path-parameters.mdx). When more than one route could match
+a request, [Precedence](./precedence.mdx) decides.
+
+## Rules for a route path
+
+These are checked when the route is registered, so a mistake throws at startup
+rather than serving a surprise later.
+
+- A path must start with `/`.
+- A path must not contain `//`.
+- A parameter name must start with a letter and contain only letters, digits
+  and `_`.
+- A wildcard must be the last segment.
+- The same parameter name cannot appear twice in one path.
+- The same method and path cannot be registered twice.
+- Two routes cannot use different parameter names in the same slot at the same
+  position — `'/users/:id'` and `'/users/:userId'` conflict.
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get('/users/:id/posts', ctx => ({ user: ctx.params.id }))  // same name, fine
+
+app.listen()
+```
+
+The exact messages are listed in
+[Registration errors](../errors/registration-errors.mdx).
+
+## Trailing slashes
+
+Empty segments are discarded before matching, so a trailing slash and a
+repeated slash resolve to the same route:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/me', () => 'me')
+
+app.listen()
+```
+
+`GET /users/me`, `GET /users/me/` and `GET /users//me` all reach that handler.
+
+## Handlers
+
+A handler receives the [context](../fundamentals/context.mdx) and returns the
+response body. It can be sync or async:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/sync', () => ({ ok: true }))
+
+app.get('/async', async () => {
+  const data = await Promise.resolve({ ok: true })
+  return data
+})
+
+app.listen()
+```
+
+Destructuring works when you only need part of the context:
+
+```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
+app.get('/users/:id', ({ params }) => ({ id: params.id }))
+
+app.listen()
+```
+
+## Beyond a single file
+
+Routes can carry their own [middleware](../middleware/route-level.mdx) and
+[validation schemas](../validation/overview.mdx), and an application can be
+split into [modules](./modules.mdx) that merge into one route tree.

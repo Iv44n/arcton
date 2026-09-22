@@ -1,0 +1,11 @@
+{
+  "title": "Errores",
+  "icon": "TriangleAlert",
+  "pages": [
+    "overview",
+    "responding-with-errors",
+    "uncaught-errors",
+    "global-error-handler",
+    "registration-errors"
+  ]
+}
