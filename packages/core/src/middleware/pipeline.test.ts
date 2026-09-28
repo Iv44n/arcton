@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import type { Context, StandardSchemaV1 } from '@arcton/contracts'
-import { runPipeline, type Step } from './pipeline'
+import { ValidationError } from '../errors'
+import { bindErrorDispatch, runPipeline, type Step } from './pipeline'
 
 function makeCtx(overrides: Partial<Context> = {}): Context {
   return {
@@ -27,6 +28,14 @@ function fakeSchema<Input, Output>(
         }
       }
     }
+  }
+}
+
+function fakeSchemaIssues(
+  issues: ReadonlyArray<StandardSchemaV1.Issue>
+): StandardSchemaV1 {
+  return {
+    '~standard': { version: 1, vendor: 'fake', validate: () => ({ issues }) }
   }
 }
 
@@ -815,6 +824,66 @@ test('validate: a failing params schema short-circuits with 400 and the issues, 
   expect(await (body as Response).json()).toEqual({
     issues: [{ message: 'id must be numeric' }]
   })
+})
+
+test('validate: a bound error dispatch receives the ValidationError, and its Response short-circuits the pipeline', async () => {
+  const issues = [{ message: 'id must be numeric' }]
+  const steps: Step[] = [{ kind: 'validate', params: fakeSchemaIssues(issues) }]
+  const ctx = makeCtx()
+  const dispatched: unknown[] = []
+  bindErrorDispatch(ctx, async err => {
+    dispatched.push(err)
+    return new Response('dispatched', { status: 422 })
+  })
+  let handlerCalled = false
+
+  const body = await runPipeline(
+    steps,
+    () => {
+      handlerCalled = true
+    },
+    ctx
+  )
+
+  expect(handlerCalled).toBe(false)
+  expect(dispatched).toHaveLength(1)
+  expect(dispatched[0]).toBeInstanceOf(ValidationError)
+  expect((dispatched[0] as ValidationError).issues).toBe(issues)
+  expect((body as Response).status).toBe(422)
+})
+
+test('validate: a failure that is not a request error (a throwing custom parser) is not dispatched — it rejects', async () => {
+  const boom = new Error('parser boom')
+  const steps: Step[] = [{ kind: 'validate', body: failingSchema('unused') }]
+  const ctx = makeCtx({
+    request: new Request('http://localhost/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/vnd.foo' },
+      body: 'x'
+    })
+  })
+  let dispatched = false
+  bindErrorDispatch(ctx, async () => {
+    dispatched = true
+    return new Response(null)
+  })
+
+  await expect(
+    runPipeline(
+      steps,
+      () => undefined,
+      ctx,
+      new Map([
+        [
+          'application/vnd.foo',
+          () => {
+            throw boom
+          }
+        ]
+      ])
+    )
+  ).rejects.toBe(boom)
+  expect(dispatched).toBe(false)
 })
 
 test('validate: query schema behaves the same as params', async () => {

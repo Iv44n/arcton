@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { Http, HttpError } from './errors'
+import { Http, HttpError, ValidationError } from './errors'
 
 test('HttpError carries status, code, message and an optional body', () => {
   const err = new HttpError(418, 'TEAPOT', "I'm a Teapot", {
@@ -29,4 +29,15 @@ test('a status factory accepts a custom message and body but keeps its own code'
   expect(err.code).toBe('CONFLICT')
   expect(err.message).toBe('Email already registered')
   expect(err.body).toEqual({ field: 'email' })
+})
+
+test('ValidationError is an HttpError (400) that keeps the exact issues it was given', () => {
+  const issues = [{ message: 'too short', path: ['name'] }]
+  const err = new ValidationError(issues)
+
+  expect(err).toBeInstanceOf(HttpError)
+  expect(err.name).toBe('ValidationError')
+  expect(err.status).toBe(400)
+  expect(err.issues).toBe(issues)
+  expect(err.body).toEqual({ issues })
 })

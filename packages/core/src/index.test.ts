@@ -6,7 +6,7 @@ import type {
   RuntimeRequestContext,
   StandardSchemaV1
 } from '@arcton/contracts'
-import { Arcton, Http, HttpError } from './index'
+import { Arcton, Http, HttpError, ValidationError } from './index'
 
 function fakeSchema<Input, Output>(
   fn: (v: Input) => Output
@@ -1897,6 +1897,375 @@ test('app.parser(): a throwing custom parser propagates uncaught', async () => {
       })
     )
   ).rejects.toBe(err)
+})
+
+// ── unified error lifecycle — request errors go through onError() ────────
+
+function rejecting(
+  issues: StandardSchemaV1.Issue[] = [{ message: 'nope' }]
+): StandardSchemaV1 {
+  return {
+    '~standard': { version: 1, vendor: 'fake', validate: () => ({ issues }) }
+  }
+}
+
+function postJson(path: string, body: string): Request {
+  return new Request(`http://localhost${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body
+  })
+}
+
+test('validation errors: without onError(), the default is a 400 with the schema issues', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.get('/search', { query: rejecting(), handler: () => 'ok' })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/search'))
+  expect(res.status).toBe(400)
+  expect(res.headers.get('content-type')).toBe('application/json')
+  expect(await res.json()).toEqual({ issues: [{ message: 'nope' }] })
+})
+
+test('validation errors: onError() can answer with a custom Response', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  let handlerCalled = false
+  let middlewareCalled = false
+  app.get('/users/:id', {
+    params: rejecting(),
+    middleware: [
+      (_ctx, next) => {
+        middlewareCalled = true
+        return next()
+      }
+    ],
+    handler: () => {
+      handlerCalled = true
+    }
+  })
+  app.onError(() => new Response('custom', { status: 422 }))
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/users/1'))
+  expect(res.status).toBe(422)
+  expect(await res.text()).toBe('custom')
+  expect(handlerCalled).toBe(false)
+  expect(middlewareCalled).toBe(false)
+})
+
+test('validation errors: onError() receives a ValidationError carrying the schema’s original issues', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  const issues: StandardSchemaV1.Issue[] = [
+    { message: 'too short', path: ['name'], code: 'too_small' } as never
+  ]
+  let received: unknown
+  app.get('/search', { query: rejecting(issues), handler: () => 'ok' })
+  app.onError(err => {
+    received = err
+    return { handled: true }
+  })
+  app.listen({ port: 0, adapter })
+
+  await call(handler, new Request('http://localhost/search'))
+  expect(received).toBeInstanceOf(ValidationError)
+  expect(received).toBeInstanceOf(HttpError)
+  expect((received as ValidationError).issues).toBe(issues)
+  expect((received as ValidationError).status).toBe(400)
+})
+
+test('validation errors: params, query and body failures all reach onError()', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  const seen: unknown[] = []
+  app.get('/p/:id', { params: rejecting(), handler: () => 'ok' })
+  app.get('/q', { query: rejecting(), handler: () => 'ok' })
+  app.post('/b', { body: rejecting(), handler: () => 'ok' })
+  app.onError(err => {
+    seen.push(err)
+    return new Response('handled', { status: 422 })
+  })
+  app.listen({ port: 0, adapter })
+
+  for (const request of [
+    new Request('http://localhost/p/1'),
+    new Request('http://localhost/q'),
+    postJson('/b', '{}')
+  ]) {
+    expect((await call(handler, request)).status).toBe(422)
+  }
+  expect(seen).toHaveLength(3)
+  for (const err of seen) expect(err).toBeInstanceOf(ValidationError)
+})
+
+test('validation errors: onError() declining (returning nothing) falls back to the default 400', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  let called = false
+  app.get('/search', { query: rejecting(), handler: () => 'ok' })
+  app.onError(() => {
+    called = true
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/search'))
+  expect(called).toBe(true)
+  expect(res.status).toBe(400)
+  expect(await res.json()).toEqual({ issues: [{ message: 'nope' }] })
+})
+
+test('validation errors: a body returned from onError() defaults to 400, not 500, unless it sets a status', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.get('/search', { query: rejecting(), handler: () => 'ok' })
+  app.get('/other', { query: rejecting(), handler: () => 'ok' })
+  app.onError((_err, ctx) => {
+    if (ctx.request.url.endsWith('/other')) ctx.response.status = 422
+    return { error: 'invalid' }
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/search'))
+  expect(res.status).toBe(400)
+  expect(await res.json()).toEqual({ error: 'invalid' })
+  expect(
+    (await call(handler, new Request('http://localhost/other'))).status
+  ).toBe(422)
+})
+
+test('validation errors: a malformed JSON body reaches onError() as a ValidationError', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  let received: unknown
+  app.post('/users', { body: rejecting(), handler: () => 'ok' })
+  app.onError(err => {
+    received = err
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, postJson('/users', 'not json'))
+  expect(received).toBeInstanceOf(ValidationError)
+  expect((received as ValidationError).issues).toEqual([
+    { message: 'Invalid request body' }
+  ])
+  expect(res.status).toBe(400)
+})
+
+test('request errors: an unsupported body Content-Type reaches onError() as a 415 HttpError', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  let received: unknown
+  app.post('/users', { body: rejecting(), handler: () => 'ok' })
+  app.onError((err, ctx) => {
+    received = err
+    if (err instanceof HttpError) ctx.response.status = err.status
+    return { code: (err as HttpError).code }
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(
+    handler,
+    new Request('http://localhost/users', {
+      method: 'POST',
+      headers: { 'content-type': 'application/xml' },
+      body: '<x/>'
+    })
+  )
+  expect(received).toBeInstanceOf(HttpError)
+  expect(received).not.toBeInstanceOf(ValidationError)
+  expect(res.status).toBe(415)
+  expect(await res.json()).toEqual({ code: 'UNSUPPORTED_MEDIA_TYPE' })
+})
+
+test('request errors: an unsupported Content-Type declined by onError() still answers with the default empty 415', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/users', { body: rejecting(), handler: () => 'ok' })
+  app.onError(() => {})
+  app.listen({ port: 0, adapter })
+
+  const res = await call(
+    handler,
+    new Request('http://localhost/users', {
+      method: 'POST',
+      headers: { 'content-type': 'application/xml' },
+      body: '<x/>'
+    })
+  )
+  expect(res.status).toBe(415)
+  expect(await res.text()).toBe('')
+})
+
+test.each([
+  ['with onError() handling it', true],
+  ['with the default response', false]
+])(
+  'validation errors: enclosing middleware still sees a response, not a rejected next() (%s)',
+  async (_label, withOnError) => {
+    const { adapter, fetch: handler } = createTestAdapter()
+    const app = Arcton()
+    let nextRejected = false
+    app.use(async (ctx, next) => {
+      try {
+        await next()
+      } catch (err) {
+        nextRejected = true
+        throw err
+      }
+      ctx.response.headers.set('X-After-Next', 'yes')
+    })
+    app.get('/search', { query: rejecting(), handler: () => 'ok' })
+    if (withOnError) app.onError(() => ({ error: 'invalid' }))
+    app.listen({ port: 0, adapter })
+
+    const res = await call(handler, new Request('http://localhost/search'))
+    expect(res.status).toBe(400)
+    expect(nextRejected).toBe(false)
+    expect(res.headers.get('X-After-Next')).toBe('yes')
+  }
+)
+
+test('validation errors: if onError() throws, that error propagates uncaught and onError() is not called again', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  const failure = new Error('onError itself failed')
+  let calls = 0
+  app.get('/search', { query: rejecting(), handler: () => 'ok' })
+  app.onError(() => {
+    calls++
+    throw failure
+  })
+  app.listen({ port: 0, adapter })
+
+  await expect(
+    call(handler, new Request('http://localhost/search'))
+  ).rejects.toBe(failure)
+  expect(calls).toBe(1)
+})
+
+test('validation errors: a mounted module’s route is answered by the mounting app’s onError(), not its own', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const users = Arcton()
+  users.get('/users/:id', { params: rejecting(), handler: () => 'ok' })
+  users.onError(() => ({ from: 'module' }))
+
+  const app = Arcton()
+  app.use(users)
+  app.onError(() => ({ from: 'app' }))
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/users/1'))
+  expect(res.status).toBe(400)
+  expect(await res.json()).toEqual({ from: 'app' })
+})
+
+test('validation errors: a module’s own onError() does not apply once mounted — the default 400 does', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const users = Arcton()
+  users.get('/users/:id', { params: rejecting(), handler: () => 'ok' })
+  users.onError(() => ({ from: 'module' }))
+
+  const app = Arcton()
+  app.use(users)
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/users/1'))
+  expect(res.status).toBe(400)
+  expect(await res.json()).toEqual({ issues: [{ message: 'nope' }] })
+})
+
+test('app.onError(): returning nothing for a thrown error falls back to the default — it propagates to the adapter', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  const err = new Error('boom')
+  let received: unknown
+  app.get('/', () => {
+    throw err
+  })
+  app.onError(e => {
+    received = e
+  })
+  app.listen({ port: 0, adapter })
+
+  await expect(call(handler, new Request('http://localhost/'))).rejects.toBe(
+    err
+  )
+  expect(received).toBe(err)
+})
+
+test('app.onError(): catches an error thrown by global middleware on a matched route', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  let handlerCalled = false
+  app.use(async () => {
+    throw new Error('middleware boom')
+  })
+  app.get('/', () => {
+    handlerCalled = true
+  })
+  app.onError((err, ctx) => {
+    ctx.response.status = 503
+    return { message: (err as Error).message }
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/'))
+  expect(res.status).toBe(503)
+  expect(await res.json()).toEqual({ message: 'middleware boom' })
+  expect(handlerCalled).toBe(false)
+})
+
+test('app.onError(): catches an error thrown by route-level middleware', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.get(
+    '/',
+    async () => {
+      throw new Error('route middleware boom')
+    },
+    () => 'ok'
+  )
+  app.onError((err, ctx) => {
+    ctx.response.status = 503
+    return { message: (err as Error).message }
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/'))
+  expect(res.status).toBe(503)
+  expect(await res.json()).toEqual({ message: 'route middleware boom' })
+})
+
+test('app.onError(): catches an error thrown by a custom body parser', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  const err = new Error('custom parser boom')
+  let received: unknown
+  app.parser('application/vnd.foo', () => {
+    throw err
+  })
+  app.post('/foo', { body: rejecting(), handler: () => 'ok' })
+  app.onError((e, ctx) => {
+    received = e
+    ctx.response.status = 502
+    return { parser: 'failed' }
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(
+    handler,
+    new Request('http://localhost/foo', {
+      method: 'POST',
+      headers: { 'content-type': 'application/vnd.foo' },
+      body: 'irrelevant'
+    })
+  )
+  expect(received).toBe(err)
+  expect(res.status).toBe(502)
+  expect(await res.json()).toEqual({ parser: 'failed' })
 })
 
 // ── maxBodySize ──────────────────────────────────────────────────────────

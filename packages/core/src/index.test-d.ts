@@ -10,7 +10,7 @@ import type {
   QueryParams,
   StandardSchemaV1
 } from '@arcton/contracts'
-import { Arcton } from './index'
+import { Arcton, type HttpError, ValidationError } from './index'
 
 interface User {
   id: string
@@ -239,6 +239,15 @@ withAuth.all('/api/auth/*path', ctx => {
 withAuth.onError((err, ctx) => {
   err satisfies unknown
   ctx.user.id satisfies string
+})
+
+// A ValidationError narrows to its issues, still typed as Standard Schema's.
+Arcton().onError(err => {
+  if (err instanceof ValidationError) {
+    err.issues satisfies ReadonlyArray<StandardSchemaV1.Issue>
+    err.status satisfies number
+    err satisfies HttpError
+  }
 })
 
 withAuth

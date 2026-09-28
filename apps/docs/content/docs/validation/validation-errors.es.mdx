@@ -63,6 +63,15 @@ Un `POST /users` con un body cuyo campo `email` falla `v.email()` recibe el `400
 arriba; una request cuyo `email` pasa llega al handler con `ctx.body.email` ya
 validado.
 
+## Manejar tú mismo los fallos de validación
+
+Ese `400` es el comportamiento por defecto. Un fallo de validación es un error
+como cualquier otro, así que llega a
+[`app.onError()`](../errors/global-error-handler.mdx#validation-errors-go-through-it-too)
+como un `ValidationError` con los mismos `issues`: devuelve un valor o una
+`Response` ahí para reemplazar la respuesta, o no devuelvas nada para conservar
+esta.
+
 ## Qué corta la cadena y qué no
 
 La validación corre **params → query → body**, y el primer esquema que falla detiene

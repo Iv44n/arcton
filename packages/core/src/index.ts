@@ -20,14 +20,18 @@ import type {
   StandardSchemaV1
 } from '@arcton/contracts'
 import pkg from '../package.json' with { type: 'json' }
-import { Http } from './errors'
+import { defaultErrorResponse, Http, isRequestError } from './errors'
 import {
   contentLengthExceeds,
   DEFAULT_MAX_BODY_SIZE,
   limitBodySize,
   normalizeMediaType
 } from './middleware/body'
-import { runPipeline, type Step } from './middleware/pipeline'
+import {
+  bindErrorDispatch,
+  runPipeline,
+  type Step
+} from './middleware/pipeline'
 import { parse, type Segment } from './router/parse'
 import { createRouter } from './router/router'
 import { mapResponse } from './router/serialize'
@@ -41,7 +45,10 @@ import {
 // Shared across every listen() call in this process, not per-app — see shutdown.ts.
 const shutdownCoordinator = createShutdownCoordinator()
 
-export { Http, HttpError } from './errors'
+export { Http, HttpError, ValidationError } from './errors'
+
+// Errors thrown by onError() itself, so finalize() doesn't re-handle them.
+const handlerFailures = new WeakMap<Context, { error: unknown }>()
 
 // Built once at module load, not per request — an unmatched route needs no
 // per-request state, so there's nothing to gain from constructing a fresh
@@ -219,10 +226,16 @@ export interface ArctonApp<TProvided = {}> {
   parser(mediaType: string, parser: BodyParser): ArctonApp<TProvided>
   /**
    * Registers a handler for an otherwise-uncaught error — anything thrown by
-   * a provider, a middleware, route validation, or the handler itself.
-   * Without one, an uncaught error propagates to the runtime adapter exactly
-   * as before (a bare 500) — this is opt-in, not a replacement for try/catch
-   * middleware.
+   * a provider, a middleware, a body parser or the handler, plus the errors
+   * Arcton raises itself while reading the request: a `ValidationError` for a
+   * failed `params`/`query`/`body` schema (or an unparsable body), and a 415
+   * `HttpError` for an unsupported body Content-Type. Without one, an
+   * uncaught error propagates to the runtime adapter exactly as before (a
+   * bare 500), and those request errors answer with their default 400/415 —
+   * this is opt-in, not a replacement for try/catch middleware.
+   *
+   * Returning a body (or a `Response`) handles the error. Returning nothing
+   * declines it, falling back to that same default.
    *
    * Only a single handler at a time (a later call replaces an earlier one),
    * and only the instance whose `listen()` you call is ever consulted — one
@@ -231,8 +244,9 @@ export interface ArctonApp<TProvided = {}> {
    * `use(scope, middleware)` instead.
    *
    * `ctx.response.status` defaults to `500` if the handler doesn't set one
-   * itself. If the handler itself throws, that error propagates uncaught,
-   * the same as with no handler registered at all.
+   * itself (`400`/`415` for the request errors above). If the handler itself
+   * throws, that error propagates uncaught, the same as with no handler
+   * registered at all.
    */
   onError(
     handler: ErrorHandler<RouteParams, QueryParams, {}, TProvided>
@@ -516,8 +530,41 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     }
   }
 
+  // onError() first, then the default for Arcton's own request errors;
+  // anything else rethrows to the adapter.
+  async function resolveError(ctx: Context, err: unknown): Promise<Response> {
+    if (errorHandler) {
+      const body = await errorHandler(err, ctx)
+      if (body !== undefined) {
+        if (ctx.response instanceof Response) return ctx.response
+        // Only backfilled if nothing set a status already — before the throw
+        // or in the handler itself.
+        if (ctx.response.status === undefined) {
+          ctx.response.status = isRequestError(err) ? err.status : 500
+        }
+        return mapResponse(body, ctx.response)
+      }
+    }
+    if (isRequestError(err)) return defaultErrorResponse(err)
+    throw err
+  }
+
+  // Lets the 'validate' step resolve request errors in place, so enclosing
+  // middleware still sees a response instead of a rejected next().
+  function bindDispatch(ctx: Context): void {
+    if (!errorHandler) return
+    bindErrorDispatch(ctx, async err => {
+      try {
+        return await resolveError(ctx, err)
+      } catch (failure) {
+        handlerFailures.set(ctx, { error: failure })
+        throw failure
+      }
+    })
+  }
+
   // Shared by both the matched-route and 404/405 branches of fetch() below.
-  // errorHandler runs outside this function's own try — a throw from it
+  // resolveError runs outside this function's own try — a throw from it
   // escapes uncaught rather than being fed back in as a second error.
   async function finalize(
     ctx: Context,
@@ -529,13 +576,8 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
         ? ctx.response
         : mapResponse(body, ctx.response)
     } catch (err) {
-      if (!errorHandler) throw err
-      const body = await errorHandler(err, ctx)
-      if (ctx.response instanceof Response) return ctx.response
-      // Only backfilled if nothing set a status already — before the throw
-      // or in the handler itself.
-      if (ctx.response.status === undefined) ctx.response.status = 500
-      return mapResponse(body, ctx.response)
+      if (handlerFailures.get(ctx)?.error === err) throw err
+      return resolveError(ctx, err)
     }
   }
 
@@ -768,6 +810,8 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
             },
             response: { headers: new Headers() }
           }
+
+          bindDispatch(ctx)
 
           // result.handler already has its global-steps snapshot (as of
           // its own registration) and any route-level middleware baked in.

@@ -110,3 +110,30 @@ import { Http } from '@arcton/core'
 
 throw Http.Conflict('Email already registered', { field: 'email' })
 ```
+
+## `ValidationError`
+
+**Propósito** — el error que Arcton lanza cuando falla un esquema de `params`, `query` o `body` (o no se puede interpretar el body). Llega a [`app.onError()`](./arcton-app.mdx#onerror) como cualquier otro error.
+
+**Firma**
+
+```ts no-check
+class ValidationError extends HttpError {
+  constructor(issues: ReadonlyArray<StandardSchemaV1.Issue>)
+  readonly issues: ReadonlyArray<StandardSchemaV1.Issue>
+}
+```
+
+**Comportamiento** — `status` es `400`, `code` es `'VALIDATION_FAILED'` y `body` es `{ issues }`. `issues` es exactamente el array que devolvió la librería de esquemas, sin modificar. Sin `onError()` (o con uno que no devuelve nada), responde `400` con `{ "issues": [...] }`. Ver [Errores de validación](../validation/validation-errors.mdx).
+
+**Ejemplo**
+
+```ts
+import { Arcton, ValidationError } from '@arcton/core'
+
+const app = Arcton()
+
+app.onError(err => {
+  if (err instanceof ValidationError) return { issues: err.issues }
+})
+```

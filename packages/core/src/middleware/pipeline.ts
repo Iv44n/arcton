@@ -6,8 +6,22 @@ import type {
   RouteHandler,
   StandardSchemaV1
 } from '@arcton/contracts'
+import {
+  defaultErrorResponse,
+  isRequestError,
+  UnsupportedMediaTypeError,
+  ValidationError
+} from '../errors'
 import { mapResponse } from '../router/serialize'
 import { parseBody } from './body'
+
+type ErrorDispatch = (err: unknown) => Promise<Response>
+
+const errorDispatchers = new WeakMap<Context, ErrorDispatch>()
+
+export function bindErrorDispatch(ctx: Context, dispatch: ErrorDispatch): void {
+  errorDispatchers.set(ctx, dispatch)
+}
 
 export type Step =
   | { kind: 'provide'; fn: (ctx: Context) => unknown | Promise<unknown> }
@@ -27,10 +41,12 @@ export type Step =
 // - A 'validate' step runs each declared schema against the current
 //   params/query/body, in that order, and overwrites ctx with the
 //   validated output — never the raw pre-validation value. The first
-//   failing schema short-circuits with a 400 (or 415 for an unsupported
-//   body Content-Type) — same short-circuit mechanism as a middleware that
-//   returns a Body without calling next(): it doesn't call next(), so
-//   nothing downstream (route-level middleware, handler) runs.
+//   failing schema raises a ValidationError (or an UnsupportedMediaTypeError
+//   for an unsupported body Content-Type), answered right there — via the
+//   onError() dispatch bound to ctx, else its default 400/415 — and
+//   short-circuits like a middleware that returns a Body without calling
+//   next(): nothing downstream runs, and enclosing middleware sees a normal
+//   response.
 // Runtime visibility here matches what ArctonApp<TProvided> promises at the
 // type level exactly, not just conservatively: order of registration
 // determines both what each step's type sees and what it actually gets at
@@ -80,14 +96,19 @@ export function runPipeline(
       })
     }
     if (step.kind === 'validate') {
-      return runValidation(step, ctx, customParsers).then(failure => {
-        if (failure !== undefined) {
-          body = failure // short-circuit: no next() call, mapResponse passes it through as-is
-          materialize(failure)
-          return
+      return runValidation(step, ctx, customParsers).then(
+        () => next(),
+        err => {
+          if (!isRequestError(err)) throw err
+          const dispatch = errorDispatchers.get(ctx)
+          return Promise.resolve(
+            dispatch ? dispatch(err) : defaultErrorResponse(err)
+          ).then(response => {
+            body = response // short-circuit: no next() call, mapResponse passes it through as-is
+            materialize(response)
+          })
         }
-        return next()
-      })
+      )
     }
     // A fresh, single-use wrapper per 'use' step — calling it a second time
     // rejects instead of silently re-running everything downstream again.
@@ -168,49 +189,36 @@ export function runPipeline(
   return next().then(() => body)
 }
 
-// Returns a Response if validation failed (the pipeline should short-circuit
-// with it), or undefined on success (ctx has already been overwritten with
-// the validated params/query/body — the caller just continues the chain).
+// Throws a ValidationError / UnsupportedMediaTypeError on the first failure.
 async function runValidation(
   step: Extract<Step, { kind: 'validate' }>,
   ctx: Context,
   customParsers: ReadonlyMap<string, BodyParser>
-): Promise<Response | undefined> {
+): Promise<void> {
   const mutableCtx = ctx as unknown as Record<string, unknown>
 
   if (step.params) {
     const result = await step.params['~standard'].validate(ctx.params)
-    if (result.issues) return issuesResponse(result.issues)
+    if (result.issues) throw new ValidationError(result.issues)
     mutableCtx.params = result.value
   }
 
   if (step.query) {
     const result = await step.query['~standard'].validate(ctx.query)
-    if (result.issues) return issuesResponse(result.issues)
+    if (result.issues) throw new ValidationError(result.issues)
     mutableCtx.query = result.value
   }
 
   if (step.body) {
     const parsed = await parseBody(ctx.request, customParsers)
     if (!parsed.ok) {
-      return parsed.reason === 'invalid-body'
-        ? issuesResponse([{ message: 'Invalid request body' }])
-        : new Response(null, { status: 415 })
+      throw parsed.reason === 'invalid-body'
+        ? new ValidationError([{ message: 'Invalid request body' }])
+        : new UnsupportedMediaTypeError()
     }
 
     const result = await step.body['~standard'].validate(parsed.value)
-    if (result.issues) return issuesResponse(result.issues)
+    if (result.issues) throw new ValidationError(result.issues)
     mutableCtx.body = result.value
   }
-
-  return undefined
-}
-
-function issuesResponse(
-  issues: ReadonlyArray<StandardSchemaV1.Issue>
-): Response {
-  return new Response(JSON.stringify({ issues }), {
-    status: 400,
-    headers: { 'content-type': 'application/json' }
-  })
 }

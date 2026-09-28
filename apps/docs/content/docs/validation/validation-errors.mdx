@@ -64,6 +64,13 @@ A `POST /users` with a body whose `email` field fails `v.email()` gets the
 `400` above; a request whose `email` passes reaches the handler with
 `ctx.body.email` already validated.
 
+## Handling validation failures yourself
+
+That `400` is the default. A validation failure is an ordinary error, so it
+reaches [`app.onError()`](../errors/global-error-handler.mdx#validation-errors-go-through-it-too)
+as a `ValidationError` carrying the same `issues`: return a value or a
+`Response` there to replace the response, or return nothing to keep this one.
+
 ## What short-circuits and what doesn't
 
 Validation runs **params → query → body**, and the first failing schema stops

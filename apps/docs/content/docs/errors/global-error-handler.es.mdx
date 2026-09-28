@@ -71,6 +71,54 @@ Como cualquier handler, `onError()` puede devolver un valor plano (mapeado
 con las mismas reglas de [Response](../fundamentals/response.mdx)) o un
 objeto `Response` directamente, que se envía sin cambios.
 
+## Los errores de validación también pasan por acá
+
+Un esquema de `params`, `query` o `body` que falla — o un body que Arcton no
+puede interpretar en absoluto — llega a `onError()` como un `ValidationError`:
+una subclase de `HttpError` cuyos `issues` son exactamente los que devolvió la
+librería de esquemas. Un `Content-Type` de body no soportado llega como un
+`HttpError` con status `415`.
+
+```ts
+import { Arcton, ValidationError } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/users', {
+  body: v.object({ email: v.pipe(v.string(), v.email()) }),
+  handler: ctx => ({ created: ctx.body })
+})
+
+app.onError((err, ctx) => {
+  if (err instanceof ValidationError) {
+    return { error: 'Invalid request', issues: err.issues }
+  }
+  return { error: 'Something went wrong' }
+})
+
+app.listen()
+```
+
+La respuesta de arriba es un `400` aunque el handler nunca asignó un status:
+para estos dos errores de request el status por defecto es el suyo propio
+(`400`, `415`) en lugar de `500`.
+
+Los errores de validación se responden justo donde ocurren, así que el
+middleware que envuelve la ruta — CORS, logging de requests — sigue viendo una
+respuesta normal después de `await next()`. Cualquier otro error lanzado
+atraviesa primero ese middleware.
+
+## Devolver nada declina el error
+
+`onError()` maneja un error devolviendo un valor o una `Response`. Si no
+devuelve nada, se aplica en su lugar el comportamiento por defecto de Arcton:
+un error de validación responde `400` con el [body de issues](../validation/validation-errors.mdx),
+un `Content-Type` no soportado responde un `415` vacío, y cualquier otro error
+se propaga al adapter exactamente como con ningún handler registrado. Eso
+hace de `onError()` un buen lugar para loguear todo y quedarte solo con las
+respuestas que te interesan.
+
 ## También corre para el fallback de 404/405
 
 El [middleware](../middleware/global.mdx) global corre incluso cuando nada

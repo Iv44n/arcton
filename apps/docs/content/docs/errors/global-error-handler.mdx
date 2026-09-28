@@ -68,6 +68,52 @@ Like any handler, `onError()` can return a plain value (mapped through the
 usual [Response](../fundamentals/response.mdx) rules) or a `Response` object
 directly, which is sent through unchanged.
 
+## Validation errors go through it too
+
+A failed `params`, `query` or `body` schema — or a body Arcton can't parse at
+all — reaches `onError()` as a `ValidationError`: an `HttpError` subclass whose
+`issues` are exactly what the schema library returned. An unsupported body
+`Content-Type` arrives as an `HttpError` with status `415`.
+
+```ts
+import { Arcton, ValidationError } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/users', {
+  body: v.object({ email: v.pipe(v.string(), v.email()) }),
+  handler: ctx => ({ created: ctx.body })
+})
+
+app.onError((err, ctx) => {
+  if (err instanceof ValidationError) {
+    return { error: 'Invalid request', issues: err.issues }
+  }
+  return { error: 'Something went wrong' }
+})
+
+app.listen()
+```
+
+The response above is a `400` even though the handler never set a status: for
+these two request errors the status defaults to their own (`400`, `415`)
+instead of `500`.
+
+Validation errors are answered right where they happen, so middleware wrapping
+the route — CORS, request logging — still sees a normal response after
+`await next()`. Any other thrown error unwinds through that middleware first.
+
+## Returning nothing declines the error
+
+`onError()` handles an error by returning a value or a `Response`. If it
+returns nothing, Arcton's default applies instead: a validation error answers
+`400` with the [issues body](../validation/validation-errors.mdx), an
+unsupported `Content-Type` answers an empty `415`, and any other error
+propagates to the adapter exactly as it would with no handler registered. That
+makes `onError()` a fine place to log everything and only take over the
+responses you care about.
+
 ## Runs for the 404/405 fallback too
 
 Global [middleware](../middleware/global.mdx) runs even when nothing matches
