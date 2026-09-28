@@ -2,11 +2,11 @@
 /**
  * Verifies every internal documentation link.
  *
- * Pages link to each other with relative file paths ending in .mdx, which
- * `createRelativeLink` resolves at render time. This checks that each of those
- * paths points at a page that exists, that every heading anchor exists, and
- * that no page uses an absolute /docs URL (which would bypass the locale
- * prefix).
+ * Markdown links use relative file paths ending in .mdx, which
+ * `createRelativeLink` resolves at render time. Cards use public relative URLs
+ * without the .mdx extension. This checks that each path points at a page that
+ * exists, that every heading anchor exists, and that no page uses an absolute
+ * /docs URL (which would bypass the locale prefix).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
@@ -60,8 +60,11 @@ let checked = 0
 for (const file of files) {
   const rel = relative(CONTENT, file)
   const lines = readFileSync(file, 'utf8').split('\n')
+  let inCard = false
 
   for (const [index, line] of lines.entries()) {
+    if (/<Card(?:\s|$)/.test(line)) inCard = true
+
     const hrefs = [
       ...[...line.matchAll(/\]\(([^)\s]+)\)/g)].map(match => match[1]),
       ...[...line.matchAll(/href="([^"]+)"/g)].map(match => match[1])
@@ -96,9 +99,14 @@ for (const file of files) {
       }
 
       const [path = '', anchor] = href.split('#')
-      const target = resolve(dirname(file), path)
+      const cardPath = inCard
+        ? path.startsWith('../docs/')
+          ? `${path.slice('../docs/'.length)}.mdx`
+          : `${path}.mdx`
+        : path
+      const target = resolve(dirname(file), cardPath)
 
-      if (!path.endsWith('.mdx')) {
+      if (!inCard && !path.endsWith('.mdx')) {
         problems.push({
           file: rel,
           line: index + 1,
@@ -134,6 +142,8 @@ for (const file of files) {
         })
       }
     }
+
+    if (line.includes('/>')) inCard = false
   }
 }
 
