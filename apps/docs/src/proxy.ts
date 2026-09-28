@@ -17,6 +17,13 @@ const { rewrite: rewriteSuffix } = rewritePath(
 )
 
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
+  if (
+    request.nextUrl.pathname === '/llms-full.txt' ||
+    request.nextUrl.pathname === '/llms.txt'
+  ) {
+    return NextResponse.next()
+  }
+
   const result = rewriteSuffix(request.nextUrl.pathname)
   if (result) {
     return NextResponse.rewrite(new URL(result, request.nextUrl))
