@@ -146,17 +146,18 @@ function requestBody(
 function responses(
   record: RouteRecord,
   registry: SchemaRegistry
-): Record<string, unknown> | undefined {
-  if (!record.response) return undefined
+): Record<string, unknown> {
+  // An operation with no declared response still documents a generic 200.
+  const declared = record.response ?? { 200: undefined }
 
   const result: Record<string, unknown> = {}
-  for (const [status, schema] of Object.entries(record.response)) {
+  for (const [status, schema] of Object.entries(declared)) {
     const code = Number(status)
     const response: Record<string, unknown> = {
       description: STATUS_DESCRIPTIONS[code] ?? `Response ${status}`
     }
     // 204 promises no body, so a content schema would contradict the status.
-    if (code !== 204) {
+    if (code !== 204 && schema) {
       response.content = {
         // 'output' — a response carries what a schema produces, which differs
         // from what it accepts wherever there's a transform.
@@ -187,8 +188,7 @@ function operation(
   const body = requestBody(record, registry)
   if (body) result.requestBody = body
 
-  const responded = responses(record, registry)
-  if (responded) result.responses = responded
+  result.responses = responses(record, registry)
 
   return result
 }

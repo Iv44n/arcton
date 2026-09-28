@@ -113,6 +113,15 @@ handler that returns something else still responds exactly as it would
 without them. See [`response`/`detail`](../api/arcton-app.mdx#routeoptions)
 and [`RouteDetail`](../api/arcton-app.mdx#routedetail).
 
+When `response` is omitted, the documentation still includes a generic `200`
+response, but it cannot infer the returned value's shape: TypeScript types do
+not exist at runtime, and executing the handler to sample it could require
+context or cause side effects. Declare `response` when you want to document a
+schema or specific status codes.
+
+A declared `response` is the whole contract: `{ 404: schema }` documents only a
+`404`, with no implicit `200` added.
+
 ## Schema requirements
 
 Converting a schema to OpenAPI relies on [Standard JSON

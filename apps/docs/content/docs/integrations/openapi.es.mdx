@@ -116,6 +116,15 @@ igual que si no existieran. Ver
 [`response`/`detail`](../api/arcton-app.mdx#routeoptions) y
 [`RouteDetail`](../api/arcton-app.mdx#routedetail).
 
+Si omites `response`, la documentación incluye igualmente una respuesta `200`
+genérica, pero no puede deducir la forma del valor retornado: los tipos de
+TypeScript no existen en runtime y ejecutar el handler para muestrearlo podría
+requerir contexto o producir efectos secundarios. Declara `response` cuando
+quieras documentar el schema o códigos de estado concretos.
+
+Un `response` declarado es el contrato completo: `{ 404: schema }` documenta
+solo un `404`, sin agregar un `200` implícito.
+
 ## Requisitos del schema
 
 Convertir un schema a OpenAPI depende de [Standard JSON

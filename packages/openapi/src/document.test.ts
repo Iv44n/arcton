@@ -55,7 +55,24 @@ test('emits an OpenAPI 3.1 document with the given info', () => {
 
   expect(document.openapi).toBe('3.1.0')
   expect(document.info).toEqual(info)
-  expect(document.paths).toEqual({ '/health': { get: {} } })
+  expect(document.paths).toEqual({
+    '/health': {
+      get: { responses: { '200': { description: 'Successful response' } } }
+    }
+  })
+})
+
+test('a declared response is the whole contract: only a 404 declared adds no implicit 200', () => {
+  const document = build([
+    {
+      method: 'GET',
+      path: '/users/:id',
+      response: { 404: z.object({ message: z.string() }) }
+    }
+  ])
+
+  const responses = operation(document, '/users/{id}')?.responses
+  expect(Object.keys(responses ?? {})).toEqual(['404'])
 })
 
 test('converts :param to {param} and marks it required', () => {
@@ -382,10 +399,12 @@ test('detail maps onto the operation', () => {
   })
 })
 
-test('a route with nothing declared produces a bare operation', () => {
+test('a route with nothing declared still documents its generic response', () => {
   const document = build([{ method: 'GET', path: '/health' }])
 
-  expect(operation(document, '/health')).toEqual({})
+  expect(operation(document, '/health')).toEqual({
+    responses: { '200': { description: 'Successful response' } }
+  })
 })
 
 test('servers, tags and security pass through', () => {
