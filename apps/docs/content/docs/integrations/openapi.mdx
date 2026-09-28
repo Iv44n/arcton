@@ -134,9 +134,12 @@ in.
 
 A schema that doesn't implement it — or one whose shape has no JSON Schema
 equivalent, like a Zod transform on the way out — degrades to an empty
-schema (`{}`) rather than failing the build. The parameter or body still
+schema (`{}`) rather than failing the build. A path parameter or a body still
 appears in the document with its name and location; only its type is
-unknown. See [Standard JSON Schema](../api/validation-types.mdx#standardjsonschemav1).
+unknown. A `query` schema is the exception: its parameters are listed by
+reading the schema's properties, so one with no JSON Schema, or one that isn't
+a plain object (a union, for example), adds no query parameters at all. See
+[Standard JSON Schema](../api/validation-types.mdx#standardjsonschemav1).
 
 ## Configuring the paths
 

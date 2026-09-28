@@ -137,8 +137,11 @@ sumarse.
 
 Un schema que no la implementa — o cuya forma no tiene equivalente en JSON
 Schema, como un transform de Zod en la salida — degrada a un schema vacío
-(`{}`) en vez de romper el build. El parámetro o body sigue apareciendo en
-el documento con su nombre y ubicación; solo su tipo queda sin especificar.
+(`{}`) en vez de romper el build. Un parámetro de path o un body sigue
+apareciendo en el documento con su nombre y ubicación; solo su tipo queda sin
+especificar. Un schema de `query` es la excepción: sus parámetros se listan
+leyendo las propiedades del schema, así que uno sin JSON Schema, o que no es
+un objeto plano (una unión, por ejemplo), no agrega ningún parámetro de query.
 Ver [Standard JSON
 Schema](../api/validation-types.mdx#standardjsonschemav1).
 
