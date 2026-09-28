@@ -21,7 +21,9 @@ case-insensitive), runs it, and hands the result to your schema.
 A request whose `Content-Type` isn't one of these — and has no custom parser
 registered either — gets `415` with an empty body. A built-in parser that
 throws on malformed input (invalid JSON, for instance) responds `400` with
-`{"issues":[{"message":"Invalid request body"}]}`.
+`{"issues":[{"message":"Invalid request body"}]}`. A request with no body at
+all never reaches a parser when the route's body is
+[optional](./body.mdx#optional-bodies).
 
 ## Registering your own parser
 

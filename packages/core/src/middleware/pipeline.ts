@@ -31,6 +31,7 @@ export type Step =
       params?: StandardSchemaV1
       query?: StandardSchemaV1
       body?: StandardSchemaV1
+      bodyOptional?: boolean
     }
 
 // provide()/use()/route validation share one registration-order sequence.
@@ -209,7 +210,9 @@ async function runValidation(
     mutableCtx.query = result.value
   }
 
-  if (step.body) {
+  if (step.body && step.bodyOptional && ctx.request.body === null) {
+    mutableCtx.body = undefined
+  } else if (step.body) {
     const parsed = await parseBody(ctx.request, customParsers)
     if (!parsed.ok) {
       throw parsed.reason === 'invalid-body'

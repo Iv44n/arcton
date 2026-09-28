@@ -21,7 +21,9 @@ de minúsculas), lo ejecuta, y le entrega el resultado a tu esquema.
 Una request cuyo `Content-Type` no es ninguno de estos — y tampoco tiene un parser
 personalizado registrado — recibe `415` con un body vacío. Un parser integrado que
 lanza un error con un input malformado (JSON inválido, por ejemplo) responde `400`
-con `{"issues":[{"message":"Invalid request body"}]}`.
+con `{"issues":[{"message":"Invalid request body"}]}`. Una request sin body
+nunca llega a un parser cuando el body de la ruta es
+[opcional](./body.mdx#optional-bodies).
 
 ## Registrando tu propio parser
 

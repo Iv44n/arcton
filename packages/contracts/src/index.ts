@@ -240,6 +240,8 @@ export interface RouteRecord {
   params?: StandardSchemaV1
   query?: StandardSchemaV1
   body?: StandardSchemaV1
+  /** The route accepts a request with no body at all. */
+  bodyOptional?: boolean
   /** Normalized from `RouteOptions.response`, always keyed by status code. */
   response?: Record<number, StandardSchemaV1>
   detail?: RouteDetail
@@ -310,6 +312,8 @@ export interface RuntimeRequestContext {
   upgrade(request: Request, options?: RuntimeUpgradeOptions): boolean
 }
 
+// A request with no body must have `request.body === null` — that is how a
+// route with an optional `body` tells it apart from an empty one.
 export type RuntimeHandler = (
   request: Request,
   context: RuntimeRequestContext

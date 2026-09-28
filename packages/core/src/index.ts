@@ -146,7 +146,7 @@ interface RouteMethod<TProvided> {
     Route extends string,
     PSchema extends StandardSchemaV1 | undefined = undefined,
     QSchema extends StandardSchemaV1 | undefined = undefined,
-    BSchema extends StandardSchemaV1 | undefined = undefined
+    BSchema extends BodyOption | undefined = undefined
   >(
     path: Route,
     options: RouteOptions<Route, TProvided, PSchema, QSchema, BSchema>
@@ -271,13 +271,26 @@ type QueryFor<QSchema extends StandardSchemaV1 | undefined> =
     ? StandardSchemaV1.InferOutput<QSchema>
     : QueryParams
 
+// A bare schema (always required), or `{ schema, optional: true }` to also
+// accept a request with no body at all.
+type BodyOption =
+  | StandardSchemaV1
+  | { schema: StandardSchemaV1; optional?: boolean }
+
 // {} (no `body` key at all) unless a body schema is declared, not a fixed
 // field defaulting to undefined — accessing ctx.body without a schema is a
-// compile error.
-type BodyFor<BSchema extends StandardSchemaV1 | undefined> =
+// compile error. An `optional` key that isn't literally `false` (including a
+// widened `boolean`) adds `| undefined`.
+type BodyFor<BSchema extends BodyOption | undefined> =
   BSchema extends StandardSchemaV1
     ? { body: StandardSchemaV1.InferOutput<BSchema> }
-    : {}
+    : BSchema extends { schema: infer S extends StandardSchemaV1 }
+      ? BSchema extends { optional: false }
+        ? { body: StandardSchemaV1.InferOutput<S> }
+        : 'optional' extends keyof BSchema
+          ? { body: StandardSchemaV1.InferOutput<S> | undefined }
+          : { body: StandardSchemaV1.InferOutput<S> }
+      : {}
 
 /** A bare schema (implicitly `200`), or an explicit status → schema map. */
 export type ResponseSchemas =
@@ -293,12 +306,20 @@ function normalizeResponse(
   return '~standard' in response ? { 200: response } : response
 }
 
+function normalizeBody(body: BodyOption | undefined): {
+  schema?: StandardSchemaV1
+  optional?: boolean
+} {
+  if (!body) return {}
+  return '~standard' in body ? { schema: body } : body
+}
+
 export interface RouteOptions<
   Route extends string,
   TProvided,
   PSchema extends StandardSchemaV1 | undefined = undefined,
   QSchema extends StandardSchemaV1 | undefined = undefined,
-  BSchema extends StandardSchemaV1 | undefined = undefined
+  BSchema extends BodyOption | undefined = undefined
 > {
   params?: PSchema
   query?: QSchema
@@ -461,7 +482,8 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
               kind: 'validate',
               params: contract.params,
               query: contract.query,
-              body: contract.body
+              body: contract.body,
+              bodyOptional: contract.bodyOptional
             }
           ]
         : []
@@ -588,7 +610,7 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
   function isRouteOptions(value: unknown): value is {
     params?: StandardSchemaV1
     query?: StandardSchemaV1
-    body?: StandardSchemaV1
+    body?: BodyOption
     response?: ResponseSchemas
     detail?: RouteDetail
     middleware?: Middleware[]
@@ -611,10 +633,12 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
           `${label} "${path}": RouteOptions requires a "handler" function`
         )
       }
+      const bodyOption = normalizeBody(body)
       return insertRoute(method, path, middleware ?? [], handler, {
         params,
         query,
-        body,
+        body: bodyOption.schema,
+        bodyOptional: bodyOption.optional,
         response: normalizeResponse(response),
         detail
       })

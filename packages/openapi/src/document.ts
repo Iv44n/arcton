@@ -136,7 +136,8 @@ function requestBody(
 ): Record<string, unknown> | undefined {
   if (!record.body) return undefined
   return {
-    required: true,
+    // Omitted when false — that's OpenAPI's own default for a request body.
+    ...(record.bodyOptional ? {} : { required: true }),
     content: {
       [JSON_MEDIA_TYPE]: { schema: convert(record.body, 'input', registry) }
     }

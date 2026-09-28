@@ -1899,6 +1899,166 @@ test('app.parser(): a throwing custom parser propagates uncaught', async () => {
   ).rejects.toBe(err)
 })
 
+// ── optional body ────────────────────────────────────────────────────────
+
+const postDismiss = (init: RequestInit = {}) =>
+  new Request('http://localhost/dismiss', { method: 'POST', ...init })
+
+test('body optional: a request with no body reaches the handler with ctx.body undefined, without running the schema', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  let schemaCalls = 0
+  let seenInMiddleware: unknown = 'unset'
+  app.post('/dismiss', {
+    body: {
+      schema: fakeSchema((b: unknown) => {
+        schemaCalls++
+        return b
+      }),
+      optional: true
+    },
+    middleware: [
+      (ctx, next) => {
+        seenInMiddleware = ctx.body
+        return next()
+      }
+    ],
+    handler: ctx => ({ absent: ctx.body === undefined })
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, postDismiss())
+  expect(res.status).toBe(200)
+  expect(await res.json()).toEqual({ absent: true })
+  expect(seenInMiddleware).toBeUndefined()
+  expect(schemaCalls).toBe(0)
+})
+
+test('body optional: a Content-Type header alone, with no body, still counts as absent', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/dismiss', {
+    body: { schema: rejecting(), optional: true },
+    handler: ctx => ({ absent: ctx.body === undefined })
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(
+    handler,
+    postDismiss({ headers: { 'content-type': 'application/json' } })
+  )
+  expect(await res.json()).toEqual({ absent: true })
+})
+
+test('body optional: a present {} body is validated by the schema like any other', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/dismiss', {
+    body: {
+      schema: fakeSchema((b: { reason?: string }) => ({
+        reason: b.reason ?? 'none'
+      })),
+      optional: true
+    },
+    handler: ctx => ({ body: ctx.body ?? null })
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(
+    handler,
+    postDismiss({
+      headers: { 'content-type': 'application/json' },
+      body: '{}'
+    })
+  )
+  expect(await res.json()).toEqual({ body: { reason: 'none' } })
+})
+
+test('body optional: a present body that fails the schema is still a 400 with the issues', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/dismiss', {
+    body: { schema: rejecting(), optional: true },
+    handler: () => 'ok'
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(
+    handler,
+    postDismiss({
+      headers: { 'content-type': 'application/json' },
+      body: '{}'
+    })
+  )
+  expect(res.status).toBe(400)
+  expect(await res.json()).toEqual({ issues: [{ message: 'nope' }] })
+})
+
+test('body optional: malformed JSON is still a 400, and an unsupported Content-Type still a 415', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/dismiss', {
+    body: { schema: rejecting(), optional: true },
+    handler: () => 'ok'
+  })
+  app.listen({ port: 0, adapter })
+
+  const malformed = await call(
+    handler,
+    postDismiss({
+      headers: { 'content-type': 'application/json' },
+      body: 'not json'
+    })
+  )
+  expect(malformed.status).toBe(400)
+  expect(await malformed.json()).toEqual({
+    issues: [{ message: 'Invalid request body' }]
+  })
+
+  const unsupported = await call(
+    handler,
+    postDismiss({
+      headers: { 'content-type': 'application/xml' },
+      body: '<x/>'
+    })
+  )
+  expect(unsupported.status).toBe(415)
+})
+
+test.each([
+  ['a bare schema', (schema: StandardSchemaV1) => schema],
+  ['{ schema }', (schema: StandardSchemaV1) => ({ schema })],
+  [
+    '{ schema, optional: false }',
+    (schema: StandardSchemaV1) => ({ schema, optional: false })
+  ]
+])(
+  'body %s stays required: no body is a 415, or a 400 when Content-Type says JSON',
+  async (_label, toOption) => {
+    const { adapter, fetch: handler } = createTestAdapter()
+    const app = Arcton()
+    let handlerCalled = false
+    app.post('/dismiss', {
+      body: toOption(rejecting()) as never,
+      handler: () => {
+        handlerCalled = true
+      }
+    })
+    app.listen({ port: 0, adapter })
+
+    expect((await call(handler, postDismiss())).status).toBe(415)
+    expect(
+      (
+        await call(
+          handler,
+          postDismiss({ headers: { 'content-type': 'application/json' } })
+        )
+      ).status
+    ).toBe(400)
+    expect(handlerCalled).toBe(false)
+  }
+)
+
 // ── unified error lifecycle — request errors go through onError() ────────
 
 function rejecting(

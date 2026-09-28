@@ -154,8 +154,8 @@ interface RouteOptions<Route, TProvided, PSchema, QSchema, BSchema> {
       default: 'undefined'
     },
     body: {
-      description: 'A Standard Schema validating the parsed request body.',
-      type: 'StandardSchemaV1',
+      description: 'A Standard Schema validating the parsed request body, or { schema, optional: true } to also accept a request with no body.',
+      type: 'StandardSchemaV1 | { schema: StandardSchemaV1; optional?: boolean }',
       default: 'undefined'
     },
     response: {
@@ -180,7 +180,7 @@ interface RouteOptions<Route, TProvided, PSchema, QSchema, BSchema> {
   }}
 />
 
-**Behavior:** validation runs in the order params → query → body; the first failure short-circuits with a `400`. A schema's output replaces the corresponding `ctx` field. `ctx.body` only exists (and only type-checks) on a route that declares `body`. See [Validation types](./validation-types.mdx) and [Validation errors](../validation/validation-errors.mdx).
+**Behavior:** validation runs in the order params → query → body; the first failure short-circuits with a `400`. A schema's output replaces the corresponding `ctx` field. `ctx.body` only exists (and only type-checks) on a route that declares `body`; with `optional: true` a request with no body skips validation and `ctx.body` is `undefined` (typed `Output | undefined`) — see [Optional bodies](../validation/body.mdx#optional-bodies). See [Validation types](./validation-types.mdx) and [Validation errors](../validation/validation-errors.mdx).
 
 `response` and `detail` are documentation only — see [`ResponseSchemas`](#responseschemas) and [`RouteDetail`](#routedetail) below. Neither is read by the request pipeline: a handler returning something other than what `response` declares still responds exactly as it would with no `response` at all (see [Response](../fundamentals/response.mdx) for what actually shapes a reply). Both are read through [`routesOf()`](#routesof) by anything that documents or inspects an app — see [OpenAPI & Scalar](../integrations/openapi.mdx).
 

@@ -35,6 +35,37 @@ for (const { name, adapter } of adapters) {
     await server.stop()
   })
 
+  test(`${name}: a request with no body reaches fetch with body === null, one with a body does not`, async () => {
+    const server = adapter.serve({
+      port: 0,
+      fetch: async request =>
+        Response.json({
+          absent: request.body === null,
+          text: request.body === null ? null : await request.text()
+        })
+    })
+
+    const read = async (init: RequestInit) =>
+      (await fetch(server.url, { method: 'POST', ...init })).json()
+
+    expect(await read({})).toEqual({ absent: true, text: null })
+    expect(await read({ body: '' })).toEqual({ absent: true, text: null })
+    expect(await read({ body: '{}' })).toEqual({ absent: false, text: '{}' })
+    expect(
+      await read({
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('chunked'))
+            controller.close()
+          }
+        }),
+        duplex: 'half'
+      } as RequestInit)
+    ).toEqual({ absent: false, text: 'chunked' })
+
+    await server.stop()
+  })
+
   test(`${name}: an uncaught exception from fetch becomes a 500, not a crash`, async () => {
     const server = adapter.serve({
       port: 0,

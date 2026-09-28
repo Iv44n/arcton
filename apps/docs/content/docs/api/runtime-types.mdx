@@ -68,7 +68,7 @@ type RuntimeHandler = (
 
 | Parameter | Type | Description |
 |---|---|---|
-| `request` | `Request` | The incoming request. |
+| `request` | `Request` | The incoming request. A request that carries no body must have `request.body === null`, not an empty stream — that is how a route with an [optional body](../validation/body.mdx#optional-bodies) tells the two apart. |
 | `context` | `RuntimeRequestContext` | Runtime-provided helpers, currently just the low-level WebSocket upgrade primitive. |
 
 **Return type** — a `Response`, or `undefined` when the handler has already completed the request another way (for example, a successful WebSocket upgrade).

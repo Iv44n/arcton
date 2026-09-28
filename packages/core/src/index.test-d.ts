@@ -234,6 +234,58 @@ withAuth.all('/api/auth/*path', ctx => {
   ctx.user.id satisfies string
 })
 
+// ── body: { schema, optional } — ctx.body may be undefined ─────────────────
+
+// optional: true adds `| undefined`.
+Arcton().post('/dismiss', {
+  body: { schema: createUserBody, optional: true },
+  middleware: [
+    (ctx, next) => {
+      ctx.body satisfies { name: string } | undefined
+      // @ts-expect-error - ctx.body may be undefined
+      ctx.body.name
+      return next()
+    }
+  ],
+  handler: ({ body }) => {
+    body satisfies { name: string } | undefined
+    // @ts-expect-error - body may be undefined
+    body.name
+    if (body) body.name satisfies string
+  }
+})
+
+// { schema } and optional: false stay required, exactly like a bare schema.
+Arcton().post('/a', {
+  body: { schema: createUserBody },
+  handler: ({ body }) => {
+    body.name satisfies string
+  }
+})
+Arcton().post('/b', {
+  body: { schema: createUserBody, optional: false },
+  handler: ({ body }) => {
+    body.name satisfies string
+  }
+})
+
+// An `optional` typed only as boolean can't be proven absent — stays optional.
+declare const maybeOptional: boolean
+Arcton().post('/c', {
+  body: { schema: createUserBody, optional: maybeOptional },
+  handler: ({ body }) => {
+    // @ts-expect-error - body may be undefined
+    body.name
+  }
+})
+
+// The object form needs a schema.
+Arcton().post('/d', {
+  // @ts-expect-error - `schema` is missing
+  body: { optional: true },
+  handler: () => {}
+})
+
 // ── onError(): TProvided flows through, err is unknown ──────────────────────
 
 withAuth.onError((err, ctx) => {

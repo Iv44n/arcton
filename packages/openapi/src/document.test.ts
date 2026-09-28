@@ -146,6 +146,21 @@ test('query properties become query parameters, required only when required', ()
   ])
 })
 
+test('an optional body is documented without required', () => {
+  const document = build([
+    {
+      method: 'POST',
+      path: '/users',
+      body: z.object({ name: z.string() }),
+      bodyOptional: true
+    }
+  ])
+
+  const requestBody = operation(document, '/users', 'post')?.requestBody
+  expect(requestBody).not.toHaveProperty('required')
+  expect(requestSchema(operation(document, '/users', 'post'))).toBeDefined()
+})
+
 test('a body becomes a JSON requestBody built from the input schema', () => {
   const document = build([
     {

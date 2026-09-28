@@ -64,6 +64,23 @@ test('routesOf keeps the original schemas, not a converted form', () => {
   expect(record?.body).toBe(body)
 })
 
+test('an optional body is recorded as the bare schema plus bodyOptional', () => {
+  const app = Arcton()
+  const body = schema('body')
+
+  app.post('/users', {
+    body: { schema: body, optional: true },
+    handler: () => ({})
+  })
+  app.post('/required', { body, handler: () => ({}) })
+
+  const [optional, required] = routesOf(app)
+  expect(optional?.body).toBe(body)
+  expect(optional?.bodyOptional).toBe(true)
+  expect(required?.body).toBe(body)
+  expect(required?.bodyOptional).toBeUndefined()
+})
+
 test('a bare response schema is normalized to status 200', () => {
   const app = Arcton()
   const user = schema('user')

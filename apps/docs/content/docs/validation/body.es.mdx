@@ -49,6 +49,38 @@ Qué valores de `Content-Type` parsean a qué valor de JavaScript — y qué pas
 el `Content-Type` de la request no es uno que Arcton sepa parsear — está cubierto en
 [Parsers de Body](./body-parsers.mdx).
 
+## Bodies opcionales
+
+Un `body` es obligatorio por defecto: una request sin body se rechaza antes de
+que corra tu schema. Para aceptarla también, pasa `{ schema, optional: true }`
+en lugar de un schema pelado:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/reviews/:id/dismiss', {
+  body: {
+    schema: v.object({ reason: v.optional(v.string()) }),
+    optional: true
+  },
+  handler: ctx => ({ dismissedWith: ctx.body?.reason ?? null })
+})
+
+app.listen()
+```
+
+Una request que no trae body se salta el parseo y la validación, y `ctx.body`
+es `undefined` — no se convierte en `{}`, y el schema nunca lo ve. El tipo lo
+refleja: `ctx.body` es la salida del schema o `undefined`. Una request que sí
+trae body se trata exactamente igual que antes: `{}` pasa por el schema, un JSON
+malformado sigue siendo `400`, un `Content-Type` no soportado sigue siendo `415`.
+
+"Sin body" significa que la request no trae ninguno — un header `Content-Type`
+por sí solo no cuenta como body.
+
 ## Orden
 
 `body` se valida al final, después de `params` y `query` — ver

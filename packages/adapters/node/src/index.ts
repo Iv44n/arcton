@@ -32,12 +32,21 @@ function toWebHeaders(raw: IncomingMessage['headers']): Headers {
   return headers
 }
 
-// GET/HEAD can't carry a body — the Request constructor throws if one is passed.
+function announcesBody(req: IncomingMessage): boolean {
+  return (
+    req.headers['transfer-encoding'] !== undefined ||
+    Number(req.headers['content-length']) > 0
+  )
+}
+
+// GET/HEAD can't carry a body — the Request constructor throws if one is
+// passed. Any other method only gets one if the request announces it, so an
+// absent body is `null` here just as it is on Bun.
 function toWebRequest(req: IncomingMessage, fallbackHost: string): Request {
   const host = req.headers.host ?? fallbackHost
   const url = new URL(req.url ?? '/', `http://${host}`)
   const method = req.method ?? 'GET'
-  const hasBody = method !== 'GET' && method !== 'HEAD'
+  const hasBody = method !== 'GET' && method !== 'HEAD' && announcesBody(req)
 
   return new Request(url.toString(), {
     method,

@@ -886,6 +886,59 @@ test('validate: a failure that is not a request error (a throwing custom parser)
   expect(dispatched).toBe(false)
 })
 
+test('validate: an optional body with no request body skips parsing and the schema, leaving ctx.body undefined', async () => {
+  let schemaCalled = false
+  const steps: Step[] = [
+    {
+      kind: 'validate',
+      body: fakeSchema((b: unknown) => {
+        schemaCalled = true
+        return b
+      }),
+      bodyOptional: true
+    }
+  ]
+  const ctx = makeCtx({
+    request: new Request('http://localhost/', { method: 'POST' })
+  })
+
+  const body = await runPipeline(
+    steps,
+    c => ({ seen: 'body' in c, value: (c as { body?: unknown }).body }),
+    ctx
+  )
+
+  expect(schemaCalled).toBe(false)
+  expect(body).toEqual({ seen: true, value: undefined })
+})
+
+test('validate: an optional body that is present is parsed and validated as usual', async () => {
+  const steps: Step[] = [
+    {
+      kind: 'validate',
+      body: fakeSchema((b: { name: string }) => ({
+        name: b.name.toUpperCase()
+      })),
+      bodyOptional: true
+    }
+  ]
+  const ctx = makeCtx({
+    request: new Request('http://localhost/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'ivan' })
+    })
+  })
+
+  const body = await runPipeline(
+    steps,
+    c => ({ body: (c as unknown as { body: unknown }).body }),
+    ctx
+  )
+
+  expect(body).toEqual({ body: { name: 'IVAN' } })
+})
+
 test('validate: query schema behaves the same as params', async () => {
   const steps: Step[] = [
     {
