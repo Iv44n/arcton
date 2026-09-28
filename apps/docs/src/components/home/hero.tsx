@@ -5,11 +5,15 @@ import { docsRoute } from '@/lib/shared'
 import { CopyCommand } from './copy-command'
 
 const code = `import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
 
 const app = Arcton({ port: 3000 })
 
 app.get('/', () => ({ message: 'Welcome to Arcton' }))
-app.get('/users/:id', (ctx) => ({ id: ctx.params.id }))
+app.post('/echo', {
+  body: v.object({ message: v.string() }),
+  handler: ctx => ({ echoed: ctx.body.message })
+})
 
 app.ws('/chat', {
   message(ws, msg) {
