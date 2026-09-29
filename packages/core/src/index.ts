@@ -273,9 +273,9 @@ type QueryFor<QSchema extends StandardSchemaV1 | undefined> =
 
 type ContentMap = Record<string, StandardSchemaV1>
 
-// A bare schema (always required, any built-in media type), `{ schema,
-// optional }` to also accept a request with no body at all, or `{ content,
-// optional }` to accept exactly the listed media types, each with its schema.
+// A bare schema (always required; application/json only), `{ schema, optional }`
+// to also accept a request with no body at all, or `{ content, optional }` to
+// accept exactly the listed media types, each with its own schema.
 type BodyOption =
   | StandardSchemaV1
   | { schema: StandardSchemaV1; content?: never; optional?: boolean }

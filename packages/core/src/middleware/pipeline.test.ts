@@ -854,7 +854,12 @@ test('validate: a bound error dispatch receives the ValidationError, and its Res
 
 test('validate: a failure that is not a request error (a throwing custom parser) is not dispatched — it rejects', async () => {
   const boom = new Error('parser boom')
-  const steps: Step[] = [{ kind: 'validate', body: failingSchema('unused') }]
+  const steps: Step[] = [
+    {
+      kind: 'validate',
+      bodyContent: { 'application/vnd.foo': failingSchema('unused') }
+    }
+  ]
   const ctx = makeCtx({
     request: new Request('http://localhost/', {
       method: 'POST',

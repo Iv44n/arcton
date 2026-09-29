@@ -154,7 +154,7 @@ interface RouteOptions<Route, TProvided, PSchema, QSchema, BSchema> {
       default: 'undefined'
     },
     body: {
-      description: 'Un Standard Schema que valida el body de la request ya parseado; { schema, optional } para aceptar también una request sin body; o { content, optional } para aceptar exactamente los media types listados, cada uno con su propio schema.',
+      description: 'Un Standard Schema que valida el body de la request ya parseado (solo application/json); { schema, optional } para aceptar también una request sin body; o { content, optional } para aceptar exactamente los media types listados, cada uno con su propio schema.',
       type: 'StandardSchemaV1 | { schema: StandardSchemaV1; optional?: boolean } | { content: Record<string, StandardSchemaV1>; optional?: boolean }',
       default: 'undefined'
     },
@@ -442,7 +442,7 @@ declare function parser<TProvided>(
 
 **Tipo de retorno:** `ArctonApp<TProvided>`.
 
-**Comportamiento:** reemplaza un parser incorporado para el mismo media type, si existe uno. Registrar el mismo media type de nuevo reemplaza al parser anterior — es una tabla plana sin orden ni semántica de snapshot, a diferencia de `use()`/`provide()`. Solo se consulta para una ruta que declara un schema `body`. Ver [Body parsers](../validation/body-parsers.mdx).
+**Comportamiento:** reemplaza un parser incorporado para el mismo media type, si existe uno. Registrar el mismo media type de nuevo reemplaza al parser anterior — es una tabla plana sin orden ni semántica de snapshot, a diferencia de `use()`/`provide()`. Solo se consulta para una ruta que declara un schema `body`, y registrar un parser no hace que una ruta acepte su media type — hay que listarlo en `body.content`. Ver [Body parsers](../validation/body-parsers.mdx).
 
 **Ejemplo**
 ```ts

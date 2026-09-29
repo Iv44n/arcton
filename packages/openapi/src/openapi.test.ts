@@ -75,6 +75,37 @@ test('/openapi.json serves the document as JSON', async () => {
   expect(document.paths['/users/{id}']?.get?.operationId).toBe('getUser')
 })
 
+test('the served document matches what the route accepts: a bare body is JSON only, content lists every media type', async () => {
+  const app = Arcton()
+  const { adapter, fetch } = createTestAdapter()
+
+  app.post('/users', {
+    body: z.object({ name: z.string() }),
+    handler: () => ({ ok: true })
+  })
+  app.post('/webhook', {
+    body: {
+      content: {
+        'application/json': z.object({ event: z.string() }),
+        'text/plain': z.string()
+      }
+    },
+    handler: () => ({ ok: true })
+  })
+  app.listen({ adapter, openapi: openapi({ info }) })
+
+  const document = await fetchDocument(fetch)
+  const mediaTypes = (path: string) => {
+    const requestBody = document.paths[path]?.post?.requestBody as
+      | { content: Record<string, unknown> }
+      | undefined
+    return Object.keys(requestBody?.content ?? {})
+  }
+
+  expect(mediaTypes('/users')).toEqual(['application/json'])
+  expect(mediaTypes('/webhook')).toEqual(['application/json', 'text/plain'])
+})
+
 test('the document describes the final route tree, after modules are mounted', async () => {
   const posts = Arcton({ prefix: '/posts' })
   posts.get('/:postId', () => ({}))

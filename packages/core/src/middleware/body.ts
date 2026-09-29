@@ -70,6 +70,10 @@ export function normalizeMediaType(contentType: string): string {
     .toLowerCase()
 }
 
+// The only media type a route accepts when it declares a bare `body` schema —
+// anything else has to be listed in `body.content`.
+export const DEFAULT_BODY_MEDIA_TYPE = 'application/json'
+
 const JSON_MEDIA_TYPE = /^application\/(?:.+\+)?json$/
 
 // application/x-www-form-urlencoded and multipart/form-data both resolve to

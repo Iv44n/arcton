@@ -28,8 +28,28 @@ esquema de `body` de esta forma. Una ruta sin uno directamente no tiene `ctx.bod
 
 ## Body no es solo JSON
 
-El esquema valida contra el valor al que el `Content-Type` de la request lo haga
-parsear, así que un esquema puede igual de bien describir un body de `FormData`:
+Una ruta acepta `application/json` y nada más por defecto. Cualquier otro media
+type — `text/plain`, un body de formulario, incluso un subtipo `+json` como
+`application/vnd.api+json` — responde `415` antes de parsear nada, a menos que la
+ruta lo declare explícitamente con
+[`content`](#accepting-specific-media-types). El esquema valida contra el valor al
+que ese media type parsee, así que una ruta puede recibir texto plano:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/notes', {
+  body: { content: { 'text/plain': v.pipe(v.string(), v.minLength(1)) } },
+  handler: ctx => ({ length: ctx.body.length })
+})
+
+app.listen()
+```
+
+o describir un body de `FormData`:
 
 ```ts
 import { Arcton } from '@arcton/core'
@@ -38,7 +58,7 @@ import * as v from 'valibot'
 const app = Arcton()
 
 app.post('/upload', {
-  body: v.instance(FormData),
+  body: { content: { 'multipart/form-data': v.instance(FormData) } },
   handler: ctx => ({ received: ctx.body.get('name') })
 })
 
@@ -83,10 +103,10 @@ por sí solo no cuenta como body.
 
 ## Aceptar media types específicos
 
-Un `schema` pelado acepta todos los media types integrados (JSON, texto,
-form-urlencoded, multipart, octet-stream), y el schema valida lo que la request
-haya parseado. Para aceptar exactamente algunos media types, cada uno con su
-propio schema, usa `content` en lugar de `schema`:
+Un `schema` pelado acepta únicamente `application/json`. Para aceptar otros media
+types, o varios, cada uno con su propio schema, usa `content` en lugar de `schema`.
+`content` reemplaza ese valor por defecto, así que lista también `application/json`
+si la ruta debe seguir aceptándolo:
 
 ```ts
 import { Arcton } from '@arcton/core'
@@ -118,7 +138,8 @@ schema de ese media type — por eso su tipo es la unión de las salidas. Acotar
 leer nuevos. Un media type sin parser integrado, como `text/csv`, sigue
 necesitando un
 [`app.parser()`](./body-parsers.mdx#registering-your-own-parser) — sin uno
-responde `415`. `optional: true` funciona igual que con `schema`: una request sin
+responde `415`; registrar uno nunca cambia lo que acepta un `schema` pelado.
+`optional: true` funciona igual que con `schema`: una request sin
 body deja `ctx.body` y `ctx.contentType` en `undefined`. Usa `schema` o
 `content`, nunca ambos. [OpenAPI](../integrations/openapi.mdx) documenta cada
 media type listado con su schema.

@@ -90,9 +90,10 @@ app.use('/api', async (ctx, next) => {
 
 app.get('/api/status', () => ({ api: 'ok' }))
 
-// Built-in body parser beyond JSON — multipart/form-data → FormData.
+// Beyond JSON and text/plain, a media type is declared with `content` —
+// multipart/form-data has a built-in parser and yields a FormData.
 app.post('/upload', {
-  body: v.instance(FormData),
+  body: { content: { 'multipart/form-data': v.instance(FormData) } },
   handler: ctx => ({ received: ctx.body.get('name') })
 })
 
@@ -106,7 +107,9 @@ app.parser('text/csv', async request => {
 })
 
 app.post('/import', {
-  body: v.array(v.record(v.string(), v.string())),
+  body: {
+    content: { 'text/csv': v.array(v.record(v.string(), v.string())) }
+  },
   handler: ctx => ({ imported: ctx.body.length, rows: ctx.body })
 })
 

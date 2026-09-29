@@ -29,8 +29,28 @@ app.listen()
 
 ## Body isn't only JSON
 
-Whatever value the request's `Content-Type` parses to is what your schema
-validates against, so a schema can just as well describe a `FormData` body:
+A route accepts `application/json` and nothing else by default. Any other media
+type — `text/plain`, a form body, even a `+json` subtype like
+`application/vnd.api+json` — answers `415` before anything is parsed, unless the
+route declares it explicitly with
+[`content`](#accepting-specific-media-types). Whatever value that media type
+parses to is what your schema validates against, so a route can take plain text:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/notes', {
+  body: { content: { 'text/plain': v.pipe(v.string(), v.minLength(1)) } },
+  handler: ctx => ({ length: ctx.body.length })
+})
+
+app.listen()
+```
+
+or describe a `FormData` body:
 
 ```ts
 import { Arcton } from '@arcton/core'
@@ -39,7 +59,7 @@ import * as v from 'valibot'
 const app = Arcton()
 
 app.post('/upload', {
-  body: v.instance(FormData),
+  body: { content: { 'multipart/form-data': v.instance(FormData) } },
   handler: ctx => ({ received: ctx.body.get('name') })
 })
 
@@ -84,10 +104,10 @@ doesn't make one.
 
 ## Accepting specific media types
 
-A bare `schema` accepts every built-in media type (JSON, text, form-urlencoded,
-multipart, octet-stream), and the schema validates whatever the request parsed
-to. To accept exactly some media types, each with its own schema, use `content`
-instead of `schema`:
+A bare `schema` accepts only `application/json`. To accept other media types, or
+several, each with its own schema, use `content` instead of `schema`. `content`
+replaces that default, so list `application/json` too if the route should keep
+taking it:
 
 ```ts
 import { Arcton } from '@arcton/core'
@@ -119,7 +139,8 @@ media type's schema — so its type is the union of the outputs. Narrowing
 Arcton to read new ones. A media type with no built-in parser, like
 `text/csv`, still needs an
 [`app.parser()`](./body-parsers.mdx#registering-your-own-parser) — without one
-it answers `415`. `optional: true` works the same way as with `schema`: a
+it answers `415`; registering one never changes what a bare `schema` accepts.
+`optional: true` works the same way as with `schema`: a
 request with no body leaves both `ctx.body` and `ctx.contentType` `undefined`.
 Use either `schema` or `content`, never both. [OpenAPI](../integrations/openapi.mdx)
 documents each listed media type with its schema.

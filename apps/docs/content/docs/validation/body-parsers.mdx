@@ -6,12 +6,15 @@ description: How Arcton parses a request body by Content-Type before validating 
 Body parsing only happens for a route that declared a `body` schema — see
 [Body](./body.mdx). Arcton picks a parser by the request's `Content-Type`
 (parameters like `; charset=` are ignored, and the match is
-case-insensitive), runs it, and hands the result to your schema. A route can
-also list the media types it accepts with `content` — see
-[Accepting specific media types](./body.mdx#accepting-specific-media-types);
-the parsing itself works the same way.
+case-insensitive), runs it, and hands the result to your schema. A route
+accepts only `application/json` by default; any other media type
+has to be listed with `content` — see
+[Accepting specific media types](./body.mdx#accepting-specific-media-types).
 
 ## Built-in parsers
+
+These are the parsers Arcton ships. A route only ever receives a media type it
+accepts: `application/json` by default, or the ones it lists in `content`.
 
 | Content-Type | Parsed value |
 |---|---|
@@ -21,8 +24,8 @@ the parsing itself works the same way.
 | `multipart/form-data` | `FormData` |
 | `application/octet-stream` | `ArrayBuffer` |
 
-A request whose `Content-Type` isn't one of these — and has no custom parser
-registered either — gets `415` with an empty body. A built-in parser that
+A request whose `Content-Type` the route doesn't accept — or that has no
+parser, built-in or custom — gets `415` with an empty body. A built-in parser that
 throws on malformed input (invalid JSON, for instance) responds `400` with
 `{"issues":[{"message":"Invalid request body"}]}`. A request with no body at
 all never reaches a parser when the route's body is
@@ -51,7 +54,9 @@ app.parser('text/csv', async request => {
 })
 
 app.post('/import', {
-  body: v.array(v.record(v.string(), v.string())),
+  body: {
+    content: { 'text/csv': v.array(v.record(v.string(), v.string())) }
+  },
   handler: ctx => ({ imported: ctx.body.length, rows: ctx.body })
 })
 

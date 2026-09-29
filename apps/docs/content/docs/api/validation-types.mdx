@@ -169,7 +169,7 @@ type BodyParser = (request: Request) => unknown | Promise<unknown>
 
 **Return type** — `unknown | Promise<unknown>`: whatever value should become the schema's validation input for that route's `body` option.
 
-**Behavior** — returning `undefined` means "I don't handle this," so the runtime keeps looking (and ultimately responds `415` if nothing else does). Any other value counts as handled, including `false`, `0`, and `''`. A parser is only ever consulted for a route that declares a `body` schema.
+**Behavior** — returning `undefined` means "I don't handle this," so the runtime keeps looking (and ultimately responds `415` if nothing else does). Any other value counts as handled, including `false`, `0`, and `''`. A parser is only ever consulted for a route that declares a `body` schema and lists the media type in `content`.
 
 **Errors** — a parser that throws propagates like any other user code (see [Uncaught errors](../errors/uncaught-errors.mdx)); it is not caught and converted into a `400`.
 
@@ -194,7 +194,9 @@ const app = Arcton()
 app.parser('text/csv', csvParser)
 
 app.post('/import', {
-  body: v.array(v.record(v.string(), v.string())),
+  body: {
+    content: { 'text/csv': v.array(v.record(v.string(), v.string())) }
+  },
   handler: ctx => ({ imported: ctx.body.length, rows: ctx.body })
 })
 

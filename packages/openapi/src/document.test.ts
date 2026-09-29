@@ -146,6 +146,24 @@ test('query properties become query parameters, required only when required', ()
   ])
 })
 
+test('a bare body schema is documented only as application/json — never text/plain', () => {
+  for (const bodyOptional of [false, true]) {
+    const document = build([
+      {
+        method: 'POST',
+        path: '/users',
+        body: z.object({ name: z.string() }),
+        bodyOptional
+      }
+    ])
+
+    const requestBody = operation(document, '/users', 'post')?.requestBody as {
+      content: Record<string, unknown>
+    }
+    expect(Object.keys(requestBody.content)).toEqual(['application/json'])
+  }
+})
+
 test('a content body documents each declared media type with its own schema', () => {
   const document = build([
     {

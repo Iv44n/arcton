@@ -1806,12 +1806,18 @@ test('get(path, handler): plain-handler shape is unaffected — no validate step
 
 // ── app.parser() — body parsers ─────────────────────────────────────────────
 
-test('a body schema against multipart/form-data validates the parsed FormData', async () => {
+test('body content: multipart/form-data must be declared — it accepts multipart, validates the FormData and rejects JSON', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
   const app = Arcton()
 
   app.post('/upload', {
-    body: fakeSchema((f: FormData) => ({ name: f.get('name') })),
+    body: {
+      content: {
+        'multipart/form-data': fakeSchema((f: FormData) => ({
+          name: f.get('name')
+        }))
+      }
+    },
     handler: ctx => ctx.body
   })
   app.listen({ port: 0, adapter })
@@ -1823,6 +1829,16 @@ test('a body schema against multipart/form-data validates the parsed FormData', 
     new Request('http://localhost/upload', { method: 'POST', body: form })
   )
   expect(await res.json()).toEqual({ name: 'Ivan' })
+
+  const asJson = await call(
+    handler,
+    new Request('http://localhost/upload', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}'
+    })
+  )
+  expect(asJson.status).toBe(415)
 })
 
 test('app.parser(): a custom parser handles its registered media type', async () => {
@@ -1834,7 +1850,9 @@ test('app.parser(): a custom parser handles its registered media type', async ()
     return { n: Number(text.split(':')[1]) }
   })
   app.post('/foo', {
-    body: fakeSchema((v: { n: number }) => v),
+    body: {
+      content: { 'application/vnd.foo': fakeSchema((v: { n: number }) => v) }
+    },
     handler: ctx => ctx.body
   })
   app.listen({ port: 0, adapter })
@@ -1882,7 +1900,9 @@ test('app.parser(): a throwing custom parser propagates uncaught', async () => {
     throw err
   })
   app.post('/foo', {
-    body: fakeSchema((v: unknown) => ({ v })),
+    body: {
+      content: { 'application/vnd.foo': fakeSchema((v: unknown) => ({ v })) }
+    },
     handler: ctx => ctx.body
   })
   app.listen({ port: 0, adapter })
@@ -2315,32 +2335,178 @@ test('body content: optional — no body leaves ctx.body and ctx.contentType und
   expect(unlisted.status).toBe(415)
 })
 
-test('body content: a route without it is unchanged — a bare schema still takes every built-in media type and exposes no ctx.contentType', async () => {
+const jsonOnlyForms: [string, (schema: StandardSchemaV1) => unknown][] = [
+  ['body: schema', schema => schema],
+  ['body: { schema, optional: true }', schema => ({ schema, optional: true })]
+]
+
+test.each(jsonOnlyForms)(
+  '%s accepts only application/json — every other media type is a 415',
+  async (_label, toOption) => {
+    const { adapter, fetch: handler } = createTestAdapter()
+    const app = Arcton()
+    let schemaCalls = 0
+    let handlerCalls = 0
+    app.post('/hook', {
+      body: toOption(
+        fakeSchema((b: unknown) => {
+          schemaCalls++
+          return b
+        })
+      ) as never,
+      handler: () => {
+        handlerCalls++
+        return { ok: true }
+      }
+    })
+    app.listen({ port: 0, adapter })
+
+    for (const contentType of [
+      'application/json',
+      'application/json; charset=utf-8',
+      'APPLICATION/JSON'
+    ]) {
+      const res = await call(
+        handler,
+        postTo('/hook', {
+          headers: { 'content-type': contentType },
+          body: '{"a":1}'
+        })
+      )
+      expect([contentType, res.status]).toEqual([contentType, 200])
+    }
+    expect(schemaCalls).toBe(3)
+    expect(handlerCalls).toBe(3)
+
+    const form = new FormData()
+    form.set('a', '1')
+    const noContentType = { body: new Uint8Array([1]) }
+    expect(postTo('/hook', noContentType).headers.has('content-type')).toBe(
+      false
+    )
+
+    const rejected: [string, RequestInit][] = [
+      ...[
+        'TEXT/PLAIN',
+        'text/plain',
+        'application/x-www-form-urlencoded',
+        'application/octet-stream',
+        'application/vnd.api+json',
+        'text/csv'
+      ].map((contentType): [string, RequestInit] => [
+        contentType,
+        { headers: { 'content-type': contentType }, body: 'x' }
+      ]),
+      ['multipart/form-data', { body: form }],
+      ['(no Content-Type)', noContentType]
+    ]
+    for (const [label, init] of rejected) {
+      const res = await call(handler, postTo('/hook', init))
+      expect([label, res.status, await res.text()]).toEqual([label, 415, ''])
+    }
+    expect(schemaCalls).toBe(3)
+    expect(handlerCalls).toBe(3)
+  }
+)
+
+test('body: schema and { schema, optional } expose no ctx.contentType — only content does', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
   const app = Arcton()
-  app.post('/any', {
-    body: fakeSchema((b: unknown) => b),
-    handler: ctx => ({
-      kind: typeof ctx.body,
-      hasContentType: 'contentType' in ctx
-    })
+  const seen = (ctx: object) => ({ hasContentType: 'contentType' in ctx })
+  app.post('/bare', { body: fakeSchema((b: unknown) => b), handler: seen })
+  app.post('/optional', {
+    body: { schema: fakeSchema((b: unknown) => b), optional: true },
+    handler: seen
   })
   app.listen({ port: 0, adapter })
 
-  const asText = await call(
-    handler,
-    postTo('/any', { headers: { 'content-type': 'text/plain' }, body: 'hi' })
-  )
-  expect(await asText.json()).toEqual({ kind: 'string', hasContentType: false })
+  for (const path of ['/bare', '/optional']) {
+    const res = await call(handler, postTo(path, { headers: json, body: '{}' }))
+    expect(await res.json()).toEqual({ hasContentType: false })
+  }
+})
 
-  const asForm = await call(
+test('.parser() teaches Arcton how to parse a media type but does not make a bare body schema accept it', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.parser('text/csv', async request => (await request.text()).split('\n'))
+  app.parser('text/plain', async request => [
+    'overridden',
+    await request.text()
+  ])
+  app.post('/bare', {
+    body: fakeSchema((b: unknown) => b),
+    handler: () => 'ok'
+  })
+  app.post('/optional', {
+    body: { schema: fakeSchema((b: unknown) => b), optional: true },
+    handler: () => 'ok'
+  })
+  app.post('/csv', {
+    body: {
+      content: { 'text/csv': fakeSchema((rows: string[]) => rows.length) }
+    },
+    handler: ctx => ({ rows: ctx.body })
+  })
+  app.listen({ port: 0, adapter })
+
+  for (const path of ['/bare', '/optional']) {
+    for (const contentType of ['text/csv', 'text/plain']) {
+      const res = await call(
+        handler,
+        postTo(path, {
+          headers: { 'content-type': contentType },
+          body: 'a\nb'
+        })
+      )
+      expect([path, contentType, res.status]).toEqual([path, contentType, 415])
+    }
+  }
+
+  const csv = await call(
     handler,
-    postTo('/any', {
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: 'a=1'
-    })
+    postTo('/csv', { headers: { 'content-type': 'text/csv' }, body: 'a\nb' })
   )
-  expect(await asForm.json()).toEqual({ kind: 'object', hasContentType: false })
+  expect(await csv.json()).toEqual({ rows: 2 })
+})
+
+test('body: a media type a bare schema does not accept is refused before any parser runs', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  const parsed: string[] = []
+  for (const mediaType of ['text/plain', 'text/csv']) {
+    app.parser(mediaType, async request => {
+      parsed.push(mediaType)
+      return request.text()
+    })
+  }
+  app.post('/bare', {
+    body: fakeSchema((b: unknown) => b),
+    handler: () => 'ok'
+  })
+  app.listen({ port: 0, adapter })
+
+  // Built-in parsers would throw on these — a 400 here would mean the parser
+  // ran before the media type was checked.
+  for (const init of [
+    { headers: { 'content-type': 'text/plain' }, body: 'x' },
+    { headers: { 'content-type': 'text/csv' }, body: 'x' },
+    {
+      headers: { 'content-type': 'application/vnd.api+json' },
+      body: 'not json'
+    },
+    {
+      headers: { 'content-type': 'multipart/form-data; boundary=x' },
+      body: 'garbage'
+    }
+  ] satisfies RequestInit[]) {
+    const res = await call(handler, postTo('/bare', init))
+    expect([init.headers['content-type'], res.status]).toEqual([
+      init.headers['content-type'],
+      415
+    ])
+  }
+  expect(parsed).toEqual([])
 })
 
 test('body content: an empty content map is rejected at registration', () => {
@@ -2698,7 +2864,10 @@ test('app.onError(): catches an error thrown by a custom body parser', async () 
   app.parser('application/vnd.foo', () => {
     throw err
   })
-  app.post('/foo', { body: rejecting(), handler: () => 'ok' })
+  app.post('/foo', {
+    body: { content: { 'application/vnd.foo': rejecting() } },
+    handler: () => 'ok'
+  })
   app.onError((e, ctx) => {
     received = e
     ctx.response.status = 502
