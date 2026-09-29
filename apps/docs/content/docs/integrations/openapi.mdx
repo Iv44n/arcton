@@ -78,7 +78,11 @@ reading that same document — never a second copy of it).
 
 `params`, `query`, and `body` already document themselves — whatever you
 pass Arcton to validate a route is exactly what ends up in the generated
-document. Two more fields, both documentation only, round out an operation:
+document. A `body` declared as a schema is documented as `application/json`;
+declared with `content`, each media type the route accepts is documented with
+its own schema — see
+[Accepting specific media types](../validation/body.mdx#accepting-specific-media-types).
+Two more fields, both documentation only, round out an operation:
 
 ```ts
 import { Arcton } from '@arcton/core'

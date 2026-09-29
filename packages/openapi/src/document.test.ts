@@ -146,6 +146,51 @@ test('query properties become query parameters, required only when required', ()
   ])
 })
 
+test('a content body documents each declared media type with its own schema', () => {
+  const document = build([
+    {
+      method: 'POST',
+      path: '/hook',
+      bodyContent: {
+        'application/json': z.object({ n: z.number() }),
+        'text/plain': z.string()
+      }
+    }
+  ])
+
+  const requestBody = operation(document, '/hook', 'post')?.requestBody as {
+    required?: boolean
+    content: Record<string, { schema: unknown }>
+  }
+  expect(requestBody.required).toBe(true)
+  expect(Object.keys(requestBody.content)).toEqual([
+    'application/json',
+    'text/plain'
+  ])
+  expect(requestBody.content['application/json']?.schema).toMatchObject({
+    type: 'object',
+    properties: { n: { type: 'number' } }
+  })
+  expect(requestBody.content['text/plain']?.schema).toEqual({
+    type: 'string'
+  })
+})
+
+test('an optional content body is documented without required', () => {
+  const document = build([
+    {
+      method: 'POST',
+      path: '/hook',
+      bodyContent: { 'text/plain': z.string() },
+      bodyOptional: true
+    }
+  ])
+
+  expect(operation(document, '/hook', 'post')?.requestBody).not.toHaveProperty(
+    'required'
+  )
+})
+
 test('an optional body is documented without required', () => {
   const document = build([
     {

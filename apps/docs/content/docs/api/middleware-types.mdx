@@ -119,10 +119,14 @@ interface Router {
 ```ts
 import type { BaseContext } from '@arcton/contracts'
 
-type ReservedKeys<TProvided> = keyof BaseContext | 'body' | keyof TProvided
+type ReservedKeys<TProvided> =
+  | keyof BaseContext
+  | 'body'
+  | 'contentType'
+  | keyof TProvided
 ```
 
-**Behavior:** covers the base `Context` fields (`request`/`params`/`query`/`response`), `'body'`, and any key already provided earlier in the chain. Re-providing one of these is a compile error, not a runtime one.
+**Behavior:** covers the base `Context` fields (`request`/`params`/`query`/`response`), `'body'`, `'contentType'`, and any key already provided earlier in the chain. Re-providing one of these is a compile error, not a runtime one.
 
 ## ProvideFn
 

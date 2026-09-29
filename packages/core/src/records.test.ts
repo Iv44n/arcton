@@ -81,6 +81,30 @@ test('an optional body is recorded as the bare schema plus bodyOptional', () => 
   expect(required?.bodyOptional).toBeUndefined()
 })
 
+test('a content body is recorded as bodyContent with normalized media types, and no body', () => {
+  const app = Arcton()
+  const json = schema('json')
+  const text = schema('text')
+
+  app.post('/hook', {
+    body: {
+      content: { 'Application/JSON': json, 'text/plain': text },
+      optional: true
+    },
+    handler: () => ({})
+  })
+  app.post('/legacy', { body: json, handler: () => ({}) })
+
+  const [content, legacy] = routesOf(app)
+  expect(content?.body).toBeUndefined()
+  expect(content?.bodyContent).toEqual({
+    'application/json': json,
+    'text/plain': text
+  })
+  expect(content?.bodyOptional).toBe(true)
+  expect(legacy?.bodyContent).toBeUndefined()
+})
+
 test('a bare response schema is normalized to status 200', () => {
   const app = Arcton()
   const user = schema('user')

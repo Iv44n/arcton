@@ -154,8 +154,8 @@ interface RouteOptions<Route, TProvided, PSchema, QSchema, BSchema> {
       default: 'undefined'
     },
     body: {
-      description: 'Un Standard Schema que valida el body de la request ya parseado, o { schema, optional: true } para aceptar también una request sin body.',
-      type: 'StandardSchemaV1 | { schema: StandardSchemaV1; optional?: boolean }',
+      description: 'Un Standard Schema que valida el body de la request ya parseado; { schema, optional } para aceptar también una request sin body; o { content, optional } para aceptar exactamente los media types listados, cada uno con su propio schema.',
+      type: 'StandardSchemaV1 | { schema: StandardSchemaV1; optional?: boolean } | { content: Record<string, StandardSchemaV1>; optional?: boolean }',
       default: 'undefined'
     },
     response: {
@@ -180,7 +180,7 @@ interface RouteOptions<Route, TProvided, PSchema, QSchema, BSchema> {
   }}
 />
 
-**Comportamiento:** la validación se ejecuta en el orden params → query → body; el primer fallo corta la cadena de inmediato con un `400`. La salida del schema reemplaza el campo correspondiente de `ctx`. `ctx.body` solo existe (y solo pasa el chequeo de tipos) en una ruta que declara `body`; con `optional: true`, una request sin body se salta la validación y `ctx.body` es `undefined` (tipado `Output | undefined`) — ver [Bodies opcionales](../validation/body.mdx#optional-bodies). Ver [Tipos de validación](./validation-types.mdx) y [Errores de validación](../validation/validation-errors.mdx).
+**Comportamiento:** la validación se ejecuta en el orden params → query → body; el primer fallo corta la cadena de inmediato con un `400`. La salida del schema reemplaza el campo correspondiente de `ctx`. `ctx.body` solo existe (y solo pasa el chequeo de tipos) en una ruta que declara `body`; con `optional: true`, una request sin body se salta la validación y `ctx.body` es `undefined` (tipado `Output | undefined`) — ver [Bodies opcionales](../validation/body.mdx#optional-bodies). Con `content`, solo se aceptan los media types listados (`415` en otro caso) y `ctx.contentType` guarda el que coincidió — ver [Aceptar media types específicos](../validation/body.mdx#accepting-specific-media-types). Ver [Tipos de validación](./validation-types.mdx) y [Errores de validación](../validation/validation-errors.mdx).
 
 `response` y `detail` son solo documentación — ver [`ResponseSchemas`](#responseschemas) y [`RouteDetail`](#routedetail) más abajo. Ninguno de los dos lo lee el pipeline de requests: un handler que devuelve algo distinto de lo que declara `response` responde exactamente igual que si `response` no existiera (ver [Response](../fundamentals/response.mdx) para lo que sí determina la respuesta). Ambos se leen a través de [`routesOf()`](#routesof) desde cualquier cosa que documente o inspeccione una app — ver [OpenAPI & Scalar](../integrations/openapi.mdx).
 
@@ -408,7 +408,7 @@ declare function provide<
 
 **Comportamiento:** ver [Providers](../providers/overview.mdx) para la guía completa.
 
-**Errores:** volver a proveer una key que ya está en `TProvided`, o una de `request`/`params`/`query`/`response`/`body`, es un error de compilación (vía [`ReservedKeys`](./middleware-types.mdx#reservedkeys)) — no lanza una excepción en runtime.
+**Errores:** volver a proveer una key que ya está en `TProvided`, o una de `request`/`params`/`query`/`response`/`body`/`contentType`, es un error de compilación (vía [`ReservedKeys`](./middleware-types.mdx#reservedkeys)) — no lanza una excepción en runtime.
 
 **Ejemplo**
 ```ts

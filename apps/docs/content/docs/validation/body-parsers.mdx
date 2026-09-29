@@ -6,7 +6,10 @@ description: How Arcton parses a request body by Content-Type before validating 
 Body parsing only happens for a route that declared a `body` schema — see
 [Body](./body.mdx). Arcton picks a parser by the request's `Content-Type`
 (parameters like `; charset=` are ignored, and the match is
-case-insensitive), runs it, and hands the result to your schema.
+case-insensitive), runs it, and hands the result to your schema. A route can
+also list the media types it accepts with `content` — see
+[Accepting specific media types](./body.mdx#accepting-specific-media-types);
+the parsing itself works the same way.
 
 ## Built-in parsers
 

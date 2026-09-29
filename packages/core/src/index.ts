@@ -271,26 +271,41 @@ type QueryFor<QSchema extends StandardSchemaV1 | undefined> =
     ? StandardSchemaV1.InferOutput<QSchema>
     : QueryParams
 
-// A bare schema (always required), or `{ schema, optional: true }` to also
-// accept a request with no body at all.
+type ContentMap = Record<string, StandardSchemaV1>
+
+// A bare schema (always required, any built-in media type), `{ schema,
+// optional }` to also accept a request with no body at all, or `{ content,
+// optional }` to accept exactly the listed media types, each with its schema.
 type BodyOption =
   | StandardSchemaV1
-  | { schema: StandardSchemaV1; optional?: boolean }
+  | { schema: StandardSchemaV1; content?: never; optional?: boolean }
+  | { content: ContentMap; schema?: never; optional?: boolean }
+
+// An `optional` key that isn't literally `false` (including a widened
+// `boolean`) adds `| undefined`.
+type OptionalIf<B, T> = B extends { optional: false }
+  ? T
+  : 'optional' extends keyof B
+    ? T | undefined
+    : T
 
 // {} (no `body` key at all) unless a body schema is declared, not a fixed
 // field defaulting to undefined — accessing ctx.body without a schema is a
-// compile error. An `optional` key that isn't literally `false` (including a
-// widened `boolean`) adds `| undefined`.
+// compile error. Only `content` also adds `contentType`.
 type BodyFor<BSchema extends BodyOption | undefined> =
   BSchema extends StandardSchemaV1
     ? { body: StandardSchemaV1.InferOutput<BSchema> }
     : BSchema extends { schema: infer S extends StandardSchemaV1 }
-      ? BSchema extends { optional: false }
-        ? { body: StandardSchemaV1.InferOutput<S> }
-        : 'optional' extends keyof BSchema
-          ? { body: StandardSchemaV1.InferOutput<S> | undefined }
-          : { body: StandardSchemaV1.InferOutput<S> }
-      : {}
+      ? { body: OptionalIf<BSchema, StandardSchemaV1.InferOutput<S>> }
+      : BSchema extends { content: infer C extends ContentMap }
+        ? {
+            body: OptionalIf<
+              BSchema,
+              { [K in keyof C]: StandardSchemaV1.InferOutput<C[K]> }[keyof C]
+            >
+            contentType: OptionalIf<BSchema, keyof C & string>
+          }
+        : {}
 
 /** A bare schema (implicitly `200`), or an explicit status → schema map. */
 export type ResponseSchemas =
@@ -308,10 +323,21 @@ function normalizeResponse(
 
 function normalizeBody(body: BodyOption | undefined): {
   schema?: StandardSchemaV1
+  content?: ContentMap
   optional?: boolean
 } {
   if (!body) return {}
-  return '~standard' in body ? { schema: body } : body
+  if ('~standard' in body) return { schema: body }
+  if (body.content) {
+    const entries = Object.entries(body.content).map(
+      ([mediaType, schema]) => [normalizeMediaType(mediaType), schema] as const
+    )
+    if (entries.length === 0) {
+      throw new Error('body.content must list at least one media type')
+    }
+    return { content: Object.fromEntries(entries), optional: body.optional }
+  }
+  return { schema: body.schema, optional: body.optional }
 }
 
 export interface RouteOptions<
@@ -476,13 +502,18 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     // Only params/query/body become a pipeline step — `response`/`detail`
     // describe the route without affecting how a request runs.
     const validateStep: Step[] =
-      contract && (contract.params || contract.query || contract.body)
+      contract &&
+      (contract.params ||
+        contract.query ||
+        contract.body ||
+        contract.bodyContent)
         ? [
             {
               kind: 'validate',
               params: contract.params,
               query: contract.query,
               body: contract.body,
+              bodyContent: contract.bodyContent,
               bodyOptional: contract.bodyOptional
             }
           ]
@@ -638,6 +669,7 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
         params,
         query,
         body: bodyOption.schema,
+        bodyContent: bodyOption.content,
         bodyOptional: bodyOption.optional,
         response: normalizeResponse(response),
         detail

@@ -13,7 +13,7 @@ import {
   ValidationError
 } from '../errors'
 import { mapResponse } from '../router/serialize'
-import { parseBody } from './body'
+import { normalizeMediaType, parseBody } from './body'
 
 type ErrorDispatch = (err: unknown) => Promise<Response>
 
@@ -31,6 +31,7 @@ export type Step =
       params?: StandardSchemaV1
       query?: StandardSchemaV1
       body?: StandardSchemaV1
+      bodyContent?: Record<string, StandardSchemaV1>
       bodyOptional?: boolean
     }
 
@@ -210,9 +211,26 @@ async function runValidation(
     mutableCtx.query = result.value
   }
 
-  if (step.body && step.bodyOptional && ctx.request.body === null) {
+  if (
+    (step.body || step.bodyContent) &&
+    step.bodyOptional &&
+    ctx.request.body === null
+  ) {
     mutableCtx.body = undefined
-  } else if (step.body) {
+    if (step.bodyContent) mutableCtx.contentType = undefined
+  } else if (step.body || step.bodyContent) {
+    let schema = step.body
+    let mediaType: string | undefined
+    if (step.bodyContent) {
+      mediaType = normalizeMediaType(
+        ctx.request.headers.get('content-type') ?? ''
+      )
+      schema = Object.hasOwn(step.bodyContent, mediaType)
+        ? step.bodyContent[mediaType]
+        : undefined
+    }
+    if (!schema) throw new UnsupportedMediaTypeError()
+
     const parsed = await parseBody(ctx.request, customParsers)
     if (!parsed.ok) {
       throw parsed.reason === 'invalid-body'
@@ -220,8 +238,9 @@ async function runValidation(
         : new UnsupportedMediaTypeError()
     }
 
-    const result = await step.body['~standard'].validate(parsed.value)
+    const result = await schema['~standard'].validate(parsed.value)
     if (result.issues) throw new ValidationError(result.issues)
     mutableCtx.body = result.value
+    if (mediaType !== undefined) mutableCtx.contentType = mediaType
   }
 }

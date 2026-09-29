@@ -82,6 +82,48 @@ malformed JSON is still a `400`, an unsupported `Content-Type` still a `415`.
 "No body" means the request carries none — a `Content-Type` header on its own
 doesn't make one.
 
+## Accepting specific media types
+
+A bare `schema` accepts every built-in media type (JSON, text, form-urlencoded,
+multipart, octet-stream), and the schema validates whatever the request parsed
+to. To accept exactly some media types, each with its own schema, use `content`
+instead of `schema`:
+
+```ts
+import { Arcton } from '@arcton/core'
+import * as v from 'valibot'
+
+const app = Arcton()
+
+app.post('/webhook', {
+  body: {
+    content: {
+      'application/json': v.object({ event: v.string() }),
+      'text/plain': v.pipe(v.string(), v.minLength(1))
+    }
+  },
+  handler: ctx => ({ via: ctx.contentType, received: ctx.body })
+})
+
+app.listen()
+```
+
+A request whose `Content-Type` isn't listed responds `415` before anything is
+parsed. Matching ignores case and parameters like `; charset=`, and is exact
+otherwise: `application/vnd.api+json` doesn't match `application/json`. The
+matched media type is `ctx.contentType`, and `ctx.body` is the output of that
+media type's schema — so its type is the union of the outputs. Narrowing
+`ctx.body` from `ctx.contentType` isn't type-checked yet.
+
+`content` only decides which media types the route accepts; it doesn't teach
+Arcton to read new ones. A media type with no built-in parser, like
+`text/csv`, still needs an
+[`app.parser()`](./body-parsers.mdx#registering-your-own-parser) — without one
+it answers `415`. `optional: true` works the same way as with `schema`: a
+request with no body leaves both `ctx.body` and `ctx.contentType` `undefined`.
+Use either `schema` or `content`, never both. [OpenAPI](../integrations/openapi.mdx)
+documents each listed media type with its schema.
+
 ## Order
 
 `body` validates last, after `params` and `query` — see

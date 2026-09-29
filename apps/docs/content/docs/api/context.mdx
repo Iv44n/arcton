@@ -44,7 +44,7 @@ type Context<P = RouteParams, Q = QueryParams, TBody = {}, TProvided = {}> =
       default: 'QueryParams'
     },
     TBody: {
-      description: 'Adds ctx.body when a route declares a body schema.',
+      description: 'Adds ctx.body when a route declares a body schema (and ctx.contentType for a content body).',
       type: 'object',
       default: '{}'
     },

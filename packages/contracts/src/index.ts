@@ -118,6 +118,7 @@ export type Middleware<
 export type ReservedKeys<TProvided> =
   | keyof BaseContext
   | 'body'
+  | 'contentType'
   | keyof TProvided
 
 // No `next`, no Body semantics — the return value IS the new context slice,
@@ -240,6 +241,8 @@ export interface RouteRecord {
   params?: StandardSchemaV1
   query?: StandardSchemaV1
   body?: StandardSchemaV1
+  /** Media type → schema, when the route lists the media types it accepts. */
+  bodyContent?: Record<string, StandardSchemaV1>
   /** The route accepts a request with no body at all. */
   bodyOptional?: boolean
   /** Normalized from `RouteOptions.response`, always keyed by status code. */

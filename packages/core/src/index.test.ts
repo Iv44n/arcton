@@ -2059,6 +2059,297 @@ test.each([
   }
 )
 
+// ── body content — explicit media types ──────────────────────────────────
+
+const json = { 'content-type': 'application/json' }
+
+const postTo = (path: string, init: RequestInit) =>
+  new Request(`http://localhost${path}`, { method: 'POST', ...init })
+
+test('body content: only the listed media types are accepted, everything else is a 415 before parsing', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  let schemaCalls = 0
+  let handlerCalls = 0
+  app.post('/hook', {
+    body: {
+      content: {
+        'application/json': fakeSchema((b: unknown) => {
+          schemaCalls++
+          return b
+        })
+      }
+    },
+    handler: ctx => {
+      handlerCalls++
+      return { got: ctx.body, contentType: ctx.contentType }
+    }
+  })
+  app.listen({ port: 0, adapter })
+
+  const ok = await call(
+    handler,
+    postTo('/hook', { headers: json, body: '{"a":1}' })
+  )
+  expect(ok.status).toBe(200)
+  expect(await ok.json()).toEqual({
+    got: { a: 1 },
+    contentType: 'application/json'
+  })
+
+  const form = new FormData()
+  form.set('a', '1')
+  for (const init of [
+    { headers: { 'content-type': 'text/plain' }, body: 'hi' },
+    { body: form },
+    {
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: 'a=1'
+    },
+    { body: 'no content-type at all' }
+  ] satisfies RequestInit[]) {
+    const res = await call(handler, postTo('/hook', init))
+    expect(res.status).toBe(415)
+    expect(await res.text()).toBe('')
+  }
+  expect(schemaCalls).toBe(1)
+  expect(handlerCalls).toBe(1)
+})
+
+test('body content: each media type is validated by its own schema, and ctx.contentType says which one ran', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/hook', {
+    body: {
+      content: {
+        'application/json': fakeSchema((b: { n: number }) => ({
+          from: 'json',
+          n: b.n
+        })),
+        'text/plain': fakeSchema((b: string) => ({ from: 'text', n: b.length }))
+      }
+    },
+    handler: ctx => ({ body: ctx.body, contentType: ctx.contentType })
+  })
+  app.listen({ port: 0, adapter })
+
+  const asJson = await call(
+    handler,
+    postTo('/hook', { headers: json, body: '{"n":7}' })
+  )
+  expect(await asJson.json()).toEqual({
+    body: { from: 'json', n: 7 },
+    contentType: 'application/json'
+  })
+
+  const asText = await call(
+    handler,
+    postTo('/hook', { headers: { 'content-type': 'text/plain' }, body: 'four' })
+  )
+  expect(await asText.json()).toEqual({
+    body: { from: 'text', n: 4 },
+    contentType: 'text/plain'
+  })
+})
+
+test('body content: matching ignores case and parameters, and declared keys are normalized too', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/hook', {
+    body: { content: { 'Application/JSON': fakeSchema((b: unknown) => b) } },
+    handler: ctx => ({ contentType: ctx.contentType })
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(
+    handler,
+    postTo('/hook', {
+      headers: { 'content-type': 'APPLICATION/json; charset=utf-8' },
+      body: '{}'
+    })
+  )
+  expect(res.status).toBe(200)
+  expect(await res.json()).toEqual({ contentType: 'application/json' })
+})
+
+test('body content: matching is exact — a +json subtype is not application/json', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/hook', {
+    body: { content: { 'application/json': fakeSchema((b: unknown) => b) } },
+    handler: () => 'ok'
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(
+    handler,
+    postTo('/hook', {
+      headers: { 'content-type': 'application/vnd.api+json' },
+      body: '{}'
+    })
+  )
+  expect(res.status).toBe(415)
+})
+
+test('body content: a Content-Type that resolves to an object property name is a 415, not a schema lookup', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/hook', {
+    body: { content: { 'application/json': fakeSchema((b: unknown) => b) } },
+    handler: () => 'ok'
+  })
+  app.listen({ port: 0, adapter })
+
+  for (const contentType of ['__proto__', 'constructor', 'toString']) {
+    const res = await call(
+      handler,
+      postTo('/hook', { headers: { 'content-type': contentType }, body: 'x' })
+    )
+    expect(res.status).toBe(415)
+  }
+})
+
+test('body content: a listed media type still needs a parser — .parser() is what teaches Arcton to read it', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  const csv = { 'content-type': 'text/csv' }
+  app.post('/import', {
+    body: {
+      content: { 'text/csv': fakeSchema((rows: string[][]) => rows.length) }
+    },
+    handler: ctx => ({ rows: ctx.body, contentType: ctx.contentType })
+  })
+  app.listen({ port: 0, adapter })
+
+  const before = await call(
+    handler,
+    postTo('/import', { headers: csv, body: 'a,b\n1,2' })
+  )
+  expect(before.status).toBe(415)
+
+  app.parser('text/csv', async request =>
+    (await request.text()).split('\n').map(line => line.split(','))
+  )
+  const after = await call(
+    handler,
+    postTo('/import', { headers: csv, body: 'a,b\n1,2' })
+  )
+  expect(await after.json()).toEqual({ rows: 2, contentType: 'text/csv' })
+})
+
+test('body content: a body failing the matched schema is a 400 with that schema’s issues', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/hook', {
+    body: {
+      content: {
+        'application/json': rejecting([{ message: 'bad json' }]),
+        'text/plain': rejecting([{ message: 'bad text' }])
+      }
+    },
+    handler: () => 'ok'
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(
+    handler,
+    postTo('/hook', { headers: { 'content-type': 'text/plain' }, body: 'x' })
+  )
+  expect(res.status).toBe(400)
+  expect(await res.json()).toEqual({ issues: [{ message: 'bad text' }] })
+})
+
+test('body content: an unlisted media type reaches onError() as a 415 HttpError', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  let received: unknown
+  app.post('/hook', {
+    body: { content: { 'application/json': rejecting() } },
+    handler: () => 'ok'
+  })
+  app.onError(err => {
+    received = err
+  })
+  app.listen({ port: 0, adapter })
+
+  const res = await call(
+    handler,
+    postTo('/hook', { headers: { 'content-type': 'text/plain' }, body: 'x' })
+  )
+  expect(received).toBeInstanceOf(HttpError)
+  expect((received as HttpError).status).toBe(415)
+  expect(res.status).toBe(415)
+})
+
+test('body content: optional — no body leaves ctx.body and ctx.contentType undefined, a present body is handled as usual', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/hook', {
+    body: {
+      content: { 'application/json': fakeSchema((b: unknown) => b) },
+      optional: true
+    },
+    handler: ctx => ({
+      body: ctx.body ?? null,
+      contentType: ctx.contentType ?? null
+    })
+  })
+  app.listen({ port: 0, adapter })
+
+  const absent = await call(handler, postTo('/hook', {}))
+  expect(await absent.json()).toEqual({ body: null, contentType: null })
+
+  const present = await call(
+    handler,
+    postTo('/hook', { headers: json, body: '{"a":1}' })
+  )
+  expect(await present.json()).toEqual({
+    body: { a: 1 },
+    contentType: 'application/json'
+  })
+
+  const unlisted = await call(
+    handler,
+    postTo('/hook', { headers: { 'content-type': 'text/plain' }, body: 'x' })
+  )
+  expect(unlisted.status).toBe(415)
+})
+
+test('body content: a route without it is unchanged — a bare schema still takes every built-in media type and exposes no ctx.contentType', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/any', {
+    body: fakeSchema((b: unknown) => b),
+    handler: ctx => ({
+      kind: typeof ctx.body,
+      hasContentType: 'contentType' in ctx
+    })
+  })
+  app.listen({ port: 0, adapter })
+
+  const asText = await call(
+    handler,
+    postTo('/any', { headers: { 'content-type': 'text/plain' }, body: 'hi' })
+  )
+  expect(await asText.json()).toEqual({ kind: 'string', hasContentType: false })
+
+  const asForm = await call(
+    handler,
+    postTo('/any', {
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: 'a=1'
+    })
+  )
+  expect(await asForm.json()).toEqual({ kind: 'object', hasContentType: false })
+})
+
+test('body content: an empty content map is rejected at registration', () => {
+  const app = Arcton()
+  expect(() =>
+    app.post('/hook', { body: { content: {} }, handler: () => 'ok' })
+  ).toThrow(/at least one media type/)
+})
+
 // ── unified error lifecycle — request errors go through onError() ────────
 
 function rejecting(

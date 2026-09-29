@@ -134,13 +134,19 @@ function requestBody(
   record: RouteRecord,
   registry: SchemaRegistry
 ): Record<string, unknown> | undefined {
-  if (!record.body) return undefined
+  const schemas =
+    record.bodyContent ??
+    (record.body ? { [JSON_MEDIA_TYPE]: record.body } : undefined)
+  if (!schemas) return undefined
+
+  const content: Record<string, unknown> = {}
+  for (const [mediaType, schema] of Object.entries(schemas)) {
+    content[mediaType] = { schema: convert(schema, 'input', registry) }
+  }
   return {
     // Omitted when false — that's OpenAPI's own default for a request body.
     ...(record.bodyOptional ? {} : { required: true }),
-    content: {
-      [JSON_MEDIA_TYPE]: { schema: convert(record.body, 'input', registry) }
-    }
+    content
   }
 }
 

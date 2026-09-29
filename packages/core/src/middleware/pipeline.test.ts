@@ -939,6 +939,63 @@ test('validate: an optional body that is present is parsed and validated as usua
   expect(body).toEqual({ body: { name: 'IVAN' } })
 })
 
+test('validate: bodyContent picks the schema by request Content-Type and sets ctx.contentType', async () => {
+  const steps: Step[] = [
+    {
+      kind: 'validate',
+      bodyContent: {
+        'application/json': fakeSchema((b: { n: number }) => ({ json: b.n })),
+        'text/plain': fakeSchema((b: string) => ({ text: b }))
+      }
+    }
+  ]
+  const ctx = makeCtx({
+    request: new Request('http://localhost/', {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain; charset=utf-8' },
+      body: 'hello'
+    })
+  })
+
+  const body = await runPipeline(
+    steps,
+    c => ({
+      body: (c as unknown as { body: unknown }).body,
+      contentType: (c as unknown as { contentType: unknown }).contentType
+    }),
+    ctx
+  )
+
+  expect(body).toEqual({ body: { text: 'hello' }, contentType: 'text/plain' })
+})
+
+test('validate: bodyContent answers an unlisted media type with 415 without parsing or validating', async () => {
+  let schemaCalled = false
+  const steps: Step[] = [
+    {
+      kind: 'validate',
+      bodyContent: {
+        'application/json': fakeSchema((b: unknown) => {
+          schemaCalled = true
+          return b
+        })
+      }
+    }
+  ]
+  const ctx = makeCtx({
+    request: new Request('http://localhost/', {
+      method: 'POST',
+      headers: { 'content-type': 'multipart/form-data; boundary=x' },
+      body: '--x--'
+    })
+  })
+
+  const body = await runPipeline(steps, () => undefined, ctx)
+
+  expect(schemaCalled).toBe(false)
+  expect((body as Response).status).toBe(415)
+})
+
 test('validate: query schema behaves the same as params', async () => {
   const steps: Step[] = [
     {

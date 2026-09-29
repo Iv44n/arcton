@@ -286,6 +286,70 @@ Arcton().post('/d', {
   handler: () => {}
 })
 
+// ── body: { content } — one schema per media type, plus ctx.contentType ────
+
+const noteBody = fakeSchema((v: unknown) => String(v))
+
+Arcton().post('/hook', {
+  body: {
+    content: { 'application/json': createUserBody, 'text/plain': noteBody }
+  },
+  middleware: [
+    ({ body, contentType }, next) => {
+      body satisfies { name: string } | string
+      contentType satisfies 'application/json' | 'text/plain'
+      return next()
+    }
+  ],
+  handler: ({ body, contentType }) => {
+    body satisfies { name: string } | string
+    contentType satisfies 'application/json' | 'text/plain'
+    // @ts-expect-error - body may be a string
+    body.name
+    // @ts-expect-error - only the declared media types are possible
+    contentType satisfies 'application/xml'
+  }
+})
+
+// optional adds `| undefined` to both.
+Arcton().post('/hook-optional', {
+  body: { content: { 'text/plain': noteBody }, optional: true },
+  handler: ({ body, contentType }) => {
+    body satisfies string | undefined
+    // @ts-expect-error - body may be undefined
+    body.length
+    // @ts-expect-error - contentType may be undefined
+    contentType.length
+  }
+})
+
+// Only `content` exposes ctx.contentType — the other forms don't.
+Arcton().post('/legacy', {
+  body: createUserBody,
+  handler: ctx => {
+    // @ts-expect-error - a bare schema has no ctx.contentType
+    ctx.contentType
+  }
+})
+Arcton().post('/legacy-object', {
+  body: { schema: createUserBody, optional: true },
+  handler: ctx => {
+    // @ts-expect-error - { schema } has no ctx.contentType
+    ctx.contentType
+  }
+})
+
+// `schema` and `content` are alternatives, never both.
+Arcton().post('/both', {
+  // @ts-expect-error - use either `schema` or `content`
+  body: { schema: createUserBody, content: { 'text/plain': noteBody } },
+  handler: () => {}
+})
+
+// contentType is reserved on Context, like body.
+// @ts-expect-error - "contentType" collides with the reserved Context field
+Arcton().provide(() => ({ contentType: 'oops' }))
+
 // ── onError(): TProvided flows through, err is unknown ──────────────────────
 
 withAuth.onError((err, ctx) => {

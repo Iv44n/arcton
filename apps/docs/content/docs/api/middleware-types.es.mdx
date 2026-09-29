@@ -119,10 +119,14 @@ interface Router {
 ```ts
 import type { BaseContext } from '@arcton/contracts'
 
-type ReservedKeys<TProvided> = keyof BaseContext | 'body' | keyof TProvided
+type ReservedKeys<TProvided> =
+  | keyof BaseContext
+  | 'body'
+  | 'contentType'
+  | keyof TProvided
 ```
 
-**Comportamiento:** cubre los campos base de `Context` (`request`/`params`/`query`/`response`), `'body'`, y cualquier key ya provista antes en la cadena. Volver a proveer una de estas es un error de compilación, no uno de runtime.
+**Comportamiento:** cubre los campos base de `Context` (`request`/`params`/`query`/`response`), `'body'`, `'contentType'`, y cualquier key ya provista antes en la cadena. Volver a proveer una de estas es un error de compilación, no uno de runtime.
 
 ## ProvideFn
 

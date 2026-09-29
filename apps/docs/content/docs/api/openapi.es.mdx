@@ -264,6 +264,7 @@ interface RouteRecord {
   params?: StandardSchemaV1
   query?: StandardSchemaV1
   body?: StandardSchemaV1
+  bodyContent?: Record<string, StandardSchemaV1>
   bodyOptional?: boolean
   response?: Record<number, StandardSchemaV1>
   detail?: RouteDetail
@@ -277,6 +278,7 @@ interface RouteRecord {
 | `method` | `HttpMethod` | Un método concreto — `app.all()` produce un record por cada método que registra, nunca un record de "cualquier método". |
 | `path` | `string` | El path final de la ruta, con todo prefijo de montaje ya aplicado. |
 | `params`/`query`/`body` | `StandardSchemaV1` | Las instancias de schema originales, no una forma convertida — ver [`StandardSchemaV1`](./validation-types.mdx#standardschemav1). |
+| `bodyContent` | `Record<string, StandardSchemaV1>` | Se define en lugar de `body` cuando la ruta lista los media types que acepta (keys en minúsculas, sin parámetros). Cada uno pasa a ser una entrada de `requestBody.content`. |
 | `bodyOptional` | `boolean` | `true` cuando la ruta acepta una request sin body — su `requestBody` se documenta sin `required`. |
 | `response` | `Record<number, StandardSchemaV1>` | Normalizado desde `RouteOptions.response` — siempre indexado por status, incluso cuando se dio un schema suelto. |
 | `detail` | `RouteDetail` | Ver [`RouteDetail`](./arcton-app.mdx#routedetail). |

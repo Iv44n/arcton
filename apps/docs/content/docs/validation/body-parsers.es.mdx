@@ -6,7 +6,10 @@ description: Cómo Arcton parsea el body de una request según el Content-Type a
 El parseo de body solo pasa para una ruta que declaró un esquema de `body` — ver
 [Body](./body.mdx). Arcton elige un parser según el `Content-Type` de la request
 (los parámetros como `; charset=` se ignoran, y la comparación no distingue mayúsculas
-de minúsculas), lo ejecuta, y le entrega el resultado a tu esquema.
+de minúsculas), lo ejecuta, y le entrega el resultado a tu esquema. Una ruta
+también puede listar los media types que acepta con `content` — ver
+[Aceptar media types específicos](./body.mdx#accepting-specific-media-types);
+el parseo en sí funciona igual.
 
 ## Parsers integrados
 

@@ -79,8 +79,11 @@ ese mismo documento — nunca una segunda copia).
 
 `params`, `query` y `body` ya se documentan solos — lo que le pasás a
 Arcton para validar una ruta es exactamente lo que termina en el documento
-generado. Dos campos más, ambos solo de documentación, completan una
-operación:
+generado. Un `body` declarado como schema se documenta como `application/json`;
+declarado con `content`, se documenta cada media type que acepta la ruta con su
+propio schema — ver
+[Aceptar media types específicos](../validation/body.mdx#accepting-specific-media-types).
+Dos campos más, ambos solo de documentación, completan una operación:
 
 ```ts
 import { Arcton } from '@arcton/core'
