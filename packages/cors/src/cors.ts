@@ -1,10 +1,7 @@
 import type { Middleware } from '@arcton/contracts'
 
 export type CorsOrigin =
-  | '*'
-  | string
-  | string[]
-  | ((origin: string, request: Request) => boolean)
+  '*' | string | string[] | ((origin: string, request: Request) => boolean)
 
 export interface CorsOptions {
   origin?: CorsOrigin

@@ -85,8 +85,7 @@ test('converts :param to {param} and marks it required', () => {
   ])
 
   const parameters = operation(document, '/users/{id}')?.parameters as
-    | Record<string, unknown>[]
-    | undefined
+    Record<string, unknown>[] | undefined
 
   expect(parameters).toHaveLength(1)
   expect(parameters?.[0]).toMatchObject({
@@ -116,8 +115,7 @@ test('a path parameter with no schema still appears, with an empty schema', () =
   const document = build([{ method: 'GET', path: '/users/:id' }])
 
   const parameters = operation(document, '/users/{id}')?.parameters as
-    | Record<string, unknown>[]
-    | undefined
+    Record<string, unknown>[] | undefined
 
   expect(parameters?.[0]).toEqual({
     name: 'id',
@@ -137,8 +135,7 @@ test('query properties become query parameters, required only when required', ()
   ])
 
   const parameters = operation(document, '/users')?.parameters as
-    | Record<string, unknown>[]
-    | undefined
+    Record<string, unknown>[] | undefined
 
   expect(parameters).toEqual([
     { name: 'q', in: 'query', required: true, schema: { type: 'string' } },

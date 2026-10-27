@@ -1,0 +1,16 @@
+[fmt]
+printWidth = 80
+tabWidth = 2
+useTabs = false
+semi = false
+singleQuote = true
+trailingComma = "none"
+arrowParens = "avoid"
+ignorePatterns = ["apps/", "packages/cli/template/", "**/*.md", "**/*.mdx"]
+
+[lint]
+ignorePatterns = ["apps/", "packages/cli/template/", "**/*.test-d.ts"]
+
+[lint.rules]
+"@typescript-eslint/no-empty-object-type" = "off"
+"@typescript-eslint/no-namespace" = "off"
