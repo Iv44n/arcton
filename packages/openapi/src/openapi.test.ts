@@ -97,8 +97,7 @@ test('the served document matches what the route accepts: a bare body is JSON on
   const document = await fetchDocument(fetch)
   const mediaTypes = (path: string) => {
     const requestBody = document.paths[path]?.post?.requestBody as
-      | { content: Record<string, unknown> }
-      | undefined
+      { content: Record<string, unknown> } | undefined
     return Object.keys(requestBody?.content ?? {})
   }
 

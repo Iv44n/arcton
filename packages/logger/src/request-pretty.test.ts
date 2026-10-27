@@ -7,7 +7,7 @@ import {
 
 // Strips ANSI escapes so assertions read the actual text, not raw codes.
 function plain(line: string): string {
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping the escapes this regex targets
+  // eslint-disable-next-line no-control-regex
   return line.replace(/\x1b\[\d+m/g, '')
 }
 

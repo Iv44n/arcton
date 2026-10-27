@@ -214,7 +214,9 @@ export interface ArctonApp<TProvided = {}> {
   provide<
     R extends Partial<Record<ReservedKeys<TProvided>, never>> &
       Record<string, unknown>
-  >(fn: ProvideFn<TProvided, R>): ArctonApp<TProvided & R>
+  >(
+    fn: ProvideFn<TProvided, R>
+  ): ArctonApp<TProvided & R>
   /**
    * Registers a body parser for an exact Content-Type (parameters like
    * "; charset=..." are ignored), overriding a built-in for the same type
@@ -309,8 +311,7 @@ type BodyFor<BSchema extends BodyOption | undefined> =
 
 /** A bare schema (implicitly `200`), or an explicit status → schema map. */
 export type ResponseSchemas =
-  | StandardSchemaV1
-  | Record<number, StandardSchemaV1>
+  StandardSchemaV1 | Record<number, StandardSchemaV1>
 
 // A Standard Schema carries its own marker key; a status → schema map never
 // does, which is what tells the two shorthand shapes apart.

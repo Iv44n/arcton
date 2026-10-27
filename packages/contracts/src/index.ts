@@ -1,13 +1,7 @@
 // ── Router types ────────────────────────────────────────────────────────────
 
 export type HttpMethod =
-  | 'GET'
-  | 'POST'
-  | 'PUT'
-  | 'DELETE'
-  | 'PATCH'
-  | 'HEAD'
-  | 'OPTIONS'
+  'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS'
 
 export type RouteParams = Record<string, string>
 export type QueryParams = Record<string, string>
@@ -116,10 +110,7 @@ export type Middleware<
 // Re-providing an existing key would silently collapse its type to an
 // intersection of both shapes instead of erroring.
 export type ReservedKeys<TProvided> =
-  | keyof BaseContext
-  | 'body'
-  | 'contentType'
-  | keyof TProvided
+  keyof BaseContext | 'body' | 'contentType' | keyof TProvided
 
 // No `next`, no Body semantics — the return value IS the new context slice,
 // merged into TProvided by intersection (ArctonApp.provide() adds R, it
@@ -205,10 +196,7 @@ export namespace StandardJSONSchemaV1 {
     readonly output: (options: Options) => Record<string, unknown>
   }
   export type Target =
-    | 'draft-2020-12'
-    | 'draft-07'
-    | 'openapi-3.0'
-    | ({} & string)
+    'draft-2020-12' | 'draft-07' | 'openapi-3.0' | ({} & string)
   export interface Options {
     readonly target: Target
     readonly libraryOptions?: Record<string, unknown> | undefined

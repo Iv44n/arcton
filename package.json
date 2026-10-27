@@ -13,13 +13,12 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
-    "lint": "biome check --write .",
-    "format": "biome format --write .",
-    "format:check": "biome format .",
-    "check": "biome check ."
+    "lint": "bun lint --no-script --fix",
+    "lint:check": "bun lint --no-script --max-warnings 0",
+    "format": "bun fmt",
+    "format:check": "bun fmt --check"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.10",
     "@types/bun": "latest",
     "turbo": "latest"
   },
