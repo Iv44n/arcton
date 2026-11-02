@@ -5,13 +5,13 @@ import type {
   ErrorHandler,
   HttpMethod,
   Middleware,
-  OpenAPIIntegration,
   ProvideFn,
   QueryParams,
   ReservedKeys,
   RouteDetail,
   RouteHandler,
   RouteParams,
+  RouteAwareMiddleware,
   RouteRecord,
   RuntimeAdapter,
   RuntimeServer,
@@ -92,16 +92,6 @@ export interface ArctonListenOptions {
   env?: string
   /** Max request body size in bytes. Defaults to 128MB (Bun.serve's own default). */
   maxBodySize?: number
-  /**
-   * Serves an OpenAPI document and its UI, from `openapi()` in
-   * `@arcton/openapi`. Configured here rather than at `Arcton()` because
-   * `listen()` is the first point at which every module has been mounted —
-   * the route set it documents is the one about to be served.
-   *
-   * The routes it registers are plain routes: global `use()`/`provide()`
-   * steps do not apply to them.
-   */
-  openapi?: OpenAPIIntegration
   /**
    * Drains in-flight requests on SIGTERM/SIGINT before exiting, process-wide.
    * On signal, it stops accepting new connections, waits (up to
@@ -552,6 +542,15 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     return app as unknown as ArctonApp<never>
   }
 
+  // Hands a route-aware middleware (see RouteAwareMiddleware) the live record
+  // list, so it reads the final set — modules grafted later included.
+  function bindRoutes(mw: Middleware): void {
+    const aware = mw as Partial<RouteAwareMiddleware>
+    if (typeof aware.bindRoutes === 'function') {
+      aware.bindRoutes(() => records)
+    }
+  }
+
   // A scoped 'use' step is dropped here, not carried over: runPipeline
   // never looks at `step.scope` (only insertRoute's own per-route filter
   // does), and a mounted module is grafted whole, with no single path of
@@ -732,9 +731,12 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
       if (args.length >= 2) {
         const [scope, mw] = args as [string, Middleware]
         assertStaticPath(scope, 'Scope')
+        bindRoutes(mw)
         steps.push({ kind: 'use', fn: mw, scope })
       } else {
-        steps.push({ kind: 'use', fn: args[0] as Middleware })
+        const mw = args[0] as Middleware
+        bindRoutes(mw)
+        steps.push({ kind: 'use', fn: mw })
       }
       return app
     },
@@ -787,18 +789,6 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
         (step): step is Step & { kind: 'use' } =>
           step.kind === 'use' && step.scope === undefined
       )
-
-      // Registered here, against the final record set — every module has
-      // been grafted by now, so a documented path is the path being served.
-      // Inserted straight into the router: no prefix (the configured path is
-      // absolute) and no record of their own, so they never document
-      // themselves. A path already taken throws the usual duplicate-route
-      // error.
-      if (options.openapi) {
-        for (const route of options.openapi.routes(records)) {
-          router.insert('GET', route.path, route.handler)
-        }
-      }
 
       const server = adapter.serve({
         port: options.port ?? 3000,

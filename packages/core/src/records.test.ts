@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import type {
-  OpenAPIIntegration,
+  Middleware,
   RuntimeAdapter,
   RuntimeHandler,
   StandardSchemaV1
@@ -250,78 +250,21 @@ test('routesOf rejects anything that is not an Arcton app', () => {
   expect(() => routesOf({} as never)).toThrow(/expects an Arcton app/)
 })
 
-test('listen({ openapi }) hands the integration the final records', () => {
+test('use() hands a route-aware middleware the live records', () => {
+  let read: (() => readonly { path: string }[]) | undefined
+  const middleware = Object.assign(((_ctx, next) => next()) as Middleware, {
+    bindRoutes(routes: () => readonly { path: string }[]) {
+      read = routes
+    }
+  })
+
   const users = Arcton({ prefix: '/users' })
   users.get('/:id', () => ({}))
 
   const app = Arcton()
-  const { adapter } = createTestAdapter()
-  let seen: readonly { method: string; path: string }[] = []
-
-  const integration: OpenAPIIntegration = {
-    routes(records) {
-      seen = records.map(record => ({
-        method: record.method,
-        path: record.path
-      }))
-      return []
-    }
-  }
-
+  app.use(middleware)
   app.get('/health', () => ({}))
   app.use(users)
-  app.listen({ adapter, openapi: integration })
 
-  expect(seen).toEqual([
-    { method: 'GET', path: '/health' },
-    { method: 'GET', path: '/users/:id' }
-  ])
-})
-
-test('listen({ openapi }) serves the routes the integration returns', async () => {
-  const app = Arcton()
-  const { adapter, fetch } = createTestAdapter()
-
-  const integration: OpenAPIIntegration = {
-    routes: () => [
-      { path: '/openapi.json', handler: () => ({ openapi: true }) }
-    ]
-  }
-
-  app.get('/health', () => ({}))
-  app.listen({ adapter, openapi: integration })
-
-  const response = await fetch(new Request('http://localhost/openapi.json'), {
-    upgrade: () => false
-  })
-  expect(await response?.json()).toEqual({ openapi: true })
-})
-
-test('routes an integration registers are not documented themselves', () => {
-  const app = Arcton()
-  const { adapter } = createTestAdapter()
-
-  app.get('/health', () => ({}))
-  app.listen({
-    adapter,
-    openapi: {
-      routes: () => [{ path: '/openapi.json', handler: () => ({}) }]
-    }
-  })
-
-  expect(routesOf(app)).toEqual([{ method: 'GET', path: '/health' }])
-})
-
-test('an integration path colliding with a route throws', () => {
-  const app = Arcton()
-  const { adapter } = createTestAdapter()
-
-  app.get('/docs', () => 'mine')
-
-  expect(() =>
-    app.listen({
-      adapter,
-      openapi: { routes: () => [{ path: '/docs', handler: () => ({}) }] }
-    })
-  ).toThrow(/Duplicate route/)
+  expect(read?.().map(record => record.path)).toEqual(['/health', '/users/:id'])
 })

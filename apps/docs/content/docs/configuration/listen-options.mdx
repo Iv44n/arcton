@@ -45,11 +45,6 @@ Every field is optional:
       type: 'number',
       default: '134217728 (128MB)'
     },
-    openapi: {
-      description: 'Serves an OpenAPI document and its UI — see openapi() below.',
-      type: 'OpenAPIIntegration',
-      default: 'undefined'
-    },
     gracefulShutdown: {
       description: 'Drains in-flight requests on SIGTERM/SIGINT before exiting — see Graceful shutdown below.',
       type: 'boolean',
@@ -153,29 +148,6 @@ await server.stop()
 
 See [listen()](../api/listen.mdx) for the full API reference.
 
-## Documenting the API
-
-`openapi` activates [`@arcton/openapi`](../integrations/openapi.mdx), an
-optional package `@arcton/core` doesn't depend on:
-
-```ts
-import { Arcton } from '@arcton/core'
-import { openapi } from '@arcton/openapi'
-
-const app = Arcton()
-
-app.get('/', () => 'Hello, Arcton!')
-
-app.listen({
-  openapi: openapi({ info: { title: 'API', version: '1.0.0' } })
-})
-```
-
-This serves an OpenAPI 3.1 document at `/openapi.json`, generated from the
-routes registered by the time `listen()` runs, and a [Scalar](https://scalar.com)
-UI reading it at `/docs`. See [OpenAPI & Scalar](../integrations/openapi.mdx)
-for the full guide.
-
 ## Graceful shutdown
 
 By default, `listen()` drains the server on `SIGTERM`/`SIGINT` instead of
@@ -202,6 +174,10 @@ application manages process signals itself (e.g. Arcton embedded inside a
 larger process, or a runtime where OS signals aren't meaningful):
 
 ```ts
+import { Arcton } from '@arcton/core'
+
+const app = Arcton()
+
 app.listen({ gracefulShutdown: false })
 ```
 

@@ -16,9 +16,9 @@ const app = Arcton()
 
 app.get('/users/:id', ctx => ({ id: ctx.params.id }))
 
-app.listen({
-  openapi: openapi({ info: { title: 'API', version: '1.0.0' } })
-})
+app.use(openapi({ info: { title: 'API', version: '1.0.0' } }))
+
+app.listen()
 ```
 
 See [OpenAPI & Scalar](../integrations/openapi.mdx) for the usage-first
@@ -26,15 +26,15 @@ guide.
 
 ## `openapi()`
 
-**Purpose** — builds the [`OpenAPIIntegration`](#openapiintegration)
-`listen({ openapi })` accepts.
+**Purpose** — builds the middleware that serves the document and the Scalar
+page. Register it with `app.use()`.
 
 **Signature**
 
 ```ts no-check
-import type { OpenAPIIntegration } from '@arcton/contracts'
+import type { RouteAwareMiddleware } from '@arcton/contracts'
 
-function openapi(options: OpenAPIOptions): OpenAPIIntegration
+function openapi(options: OpenAPIOptions): RouteAwareMiddleware
 ```
 
 **Parameters**
@@ -43,21 +43,21 @@ function openapi(options: OpenAPIOptions): OpenAPIIntegration
 |---|---|---|
 | `options` | `OpenAPIOptions` | Required — at minimum, `info`. See below for every field. |
 
-**Return type** — an [`OpenAPIIntegration`](#openapiintegration), meant to
-be passed as `listen({ openapi })`.
+**Return type** — a [`RouteAwareMiddleware`](#routeawaremiddleware).
 
-**Behavior** — the document is built once, when `listen()` calls the
-integration's `routes()` with the app's final `RouteRecord[]` — not per
-request, and not before every module has been mounted. It registers up to
-two plain `GET` routes on the app: the document itself (`document.path`,
-default `/openapi.json`) and, unless `docs: false`, a Scalar page
+**Behavior** — answers `GET` requests to the document (`document.path`,
+default `/openapi.json`) and, unless `docs: false`, to a Scalar page
 (`docs.path`, default `/docs`) that loads the document by URL rather than
-embedding a second copy of it.
+embedding a second copy of it. Every other request goes on to `next()`. The
+document is built once, on the first request for it — after every module has
+been mounted — and never per request. It runs in registration order like any
+middleware, so one registered after an auth middleware is protected by it.
 
-**Errors** — if either path collides with a route already registered (or
-with each other), `listen()` throws the same `Duplicate route` error as
-registering any other route twice — see [Registration
-errors](../errors/registration-errors.mdx).
+**Errors** — no registration error: a route at one of the same paths is
+shadowed when `openapi()` was registered before it, and answers normally
+when it was registered after. Using `openapi()` anywhere but `app.use()` (a route's own middleware,
+for example) throws `openapi() must be registered with app.use()` on the
+first request for the document.
 
 **Example**
 
@@ -75,13 +75,14 @@ app.get('/users/:id', {
   handler: ctx => ({ id: ctx.params.id })
 })
 
-app.listen({
-  port: 3000,
-  openapi: openapi({
+app.use(
+  openapi({
     info: { title: 'Users API', version: '1.0.0' },
     docs: { path: '/reference' }
   })
-})
+)
+
+app.listen({ port: 3000 })
 ```
 
 ## `OpenAPIOptions`
@@ -247,7 +248,7 @@ await Bun.write('openapi.json', JSON.stringify(document, null, 2))
 **Purpose** — what a route declared, kept alongside the route tree so it
 survives after registration — the tree itself stores only composed
 handlers. Read through [`routesOf(app)`](./arcton-app.mdx#routesof); this is
-also what an `OpenAPIIntegration`'s `routes()` receives.
+also what a [`RouteAwareMiddleware`](#routeawaremiddleware) reads.
 
 **Signature**
 
@@ -283,47 +284,20 @@ interface RouteRecord {
 describe. See [`routesOf()`](./arcton-app.mdx#routesof) for how records
 compose across mounted modules.
 
-## `OpenAPIIntegration`
+## `RouteAwareMiddleware`
 
-**Purpose** — the single extension point `listen({ openapi })` accepts.
-`@arcton/core` knows this interface and never `@arcton/openapi` itself,
-which is what keeps the dependency pointing `@arcton/openapi` →
-`@arcton/core` and not the other way around.
+**Purpose** — a `Middleware` that documents or inspects the app it is
+registered on. `openapi()` returns one.
 
 **Signature**
 
 ```ts no-check
-interface OpenAPIIntegration {
-  routes(records: readonly RouteRecord[]): DocumentRoute[]
+interface RouteAwareMiddleware extends Middleware {
+  bindRoutes(routes: () => readonly RouteRecord[]): void
 }
 ```
 
-**Behavior** — `listen()` calls `routes()` once, after every module has
-been grafted into the final route tree, and registers each returned
-`DocumentRoute` as a plain `GET` route — global `use()`/`provide()` steps
-don't apply to them. `openapi()` is the only implementation Arcton ships;
-the interface itself has nothing OpenAPI-specific about it; a different
-package could implement it to serve some other kind of generated
-documentation from the same `RouteRecord[]`.
-
-## `DocumentRoute`
-
-**Purpose** — a route an `OpenAPIIntegration` asks `listen()` to register.
-
-**Signature**
-
-```ts
-import type { RouteHandler } from '@arcton/contracts'
-
-interface DocumentRoute {
-  path: string
-  handler: RouteHandler
-}
-```
-
-**Fields**
-
-| Field | Type | Description |
-|---|---|---|
-| `path` | `string` | An absolute path — not prefixed by the app's own `ArctonConfig.prefix`. |
-| `handler` | `RouteHandler` | Registered as `GET`, the only method `openapi()`'s own routes use. |
+**Behavior** — when it is passed to `use()` (scoped or not), the app calls
+`bindRoutes` once with a reader of its own `RouteRecord[]`. The reader is
+live, so calling it at request time sees every module mounted by then;
+`@arcton/core` never needs to know which package is on the other end.

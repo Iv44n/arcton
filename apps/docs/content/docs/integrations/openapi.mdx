@@ -9,9 +9,9 @@ UI that reads it. There is no separate schema to maintain — the document is
 generated from the same `params`/`query`/`body` schemas a route already
 validates against, plus an optional `response` contract.
 
-`@arcton/core` doesn't know this package exists. It's activated entirely
-through `listen({ openapi })`, at the one point the framework has the final,
-fully-mounted route tree.
+`@arcton/core` doesn't know this package exists. `openapi()` is an ordinary
+[middleware](../middleware/overview.mdx): register it with `app.use()` and it
+answers `GET /openapi.json` and `GET /docs` itself.
 
 ## Installation
 
@@ -48,7 +48,7 @@ yarn add @arcton/openapi
 
 ## Basic usage
 
-Pass `openapi()` to `listen()`, after every route and module is registered:
+Register `openapi()` with `app.use()`:
 
 ```ts title="index.ts"
 import { Arcton } from '@arcton/core'
@@ -63,16 +63,21 @@ app.get('/users/:id', {
   handler: ctx => ({ id: ctx.params.id, name: 'Ada' })
 })
 
-app.listen({
-  port: 3000,
-  openapi: openapi({
+app.use(
+  openapi({
     info: { title: 'Users API', version: '1.0.0' }
   })
-})
+)
+
+app.listen({ port: 3000 })
 ```
 
 This serves `GET /openapi.json` (the document) and `GET /docs` (Scalar,
 reading that same document — never a second copy of it).
+
+Because it's a middleware, it runs in registration order like any other: one
+registered after an auth middleware is protected by it, one registered before
+is public.
 
 ## Documenting a route
 
@@ -157,13 +162,15 @@ const app = Arcton()
 
 app.get('/users', () => [])
 
-app.listen({
-  openapi: openapi({
+app.use(
+  openapi({
     info: { title: 'Users API', version: '1.0.0' },
     document: { path: '/schema.json' },
     docs: { path: '/reference' }
   })
-})
+)
+
+app.listen()
 ```
 
 ```ts
@@ -174,12 +181,14 @@ const app = Arcton()
 
 app.get('/users', () => [])
 
-app.listen({
-  openapi: openapi({
+app.use(
+  openapi({
     info: { title: 'Users API', version: '1.0.0' },
     docs: false // only /openapi.json is served
   })
-})
+)
+
+app.listen()
 ```
 
 ## Configuring Scalar
@@ -195,15 +204,17 @@ const app = Arcton()
 
 app.get('/users', () => [])
 
-app.listen({
-  openapi: openapi({
+app.use(
+  openapi({
     info: { title: 'Users API', version: '1.0.0' },
     docs: {
       pageTitle: 'Users API Reference',
       configuration: { theme: 'purple' }
     }
   })
-})
+)
+
+app.listen()
 ```
 
 `configuration` is passed straight through to Scalar — see [Scalar's own
@@ -213,8 +224,8 @@ pass `cdn` to point at a self-hosted build instead.
 
 ## Modules and the final route tree
 
-The document reflects the app exactly as `listen()` sees it — including
-routes pulled in through [modules](../routing/modules.mdx), correctly
+The document reflects the app's final route tree, read the first time it's
+requested — including routes pulled in through [modules](../routing/modules.mdx), correctly
 prefixed:
 
 ```ts
@@ -232,7 +243,9 @@ users.get('/:id', {
 const app = Arcton({ prefix: '/api' })
 app.use(users)
 
-app.listen({ openapi: openapi({ info: { title: 'API', version: '1.0.0' } }) })
+app.use(openapi({ info: { title: 'API', version: '1.0.0' } }))
+
+app.listen()
 // documents GET /api/users/{id}
 ```
 

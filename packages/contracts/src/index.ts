@@ -101,6 +101,16 @@ export type Middleware<
   next: NextFunction
 ) => Promise<Body | void> | Body | void
 
+/**
+ * A middleware that documents or inspects the app it is registered on. When
+ * it is passed to `use()`, the app calls `bindRoutes` with a reader of its
+ * route records — read at request time, so every module mounted by then is
+ * included. Nothing else about the middleware changes.
+ */
+export interface RouteAwareMiddleware extends Middleware {
+  bindRoutes(routes: () => readonly RouteRecord[]): void
+}
+
 // Keys a provide() call is not allowed to add — the base Context fields
 // (request/params/query/response), 'body' (owned by route()'s TBody slot,
 // see BodyFor<> in index.ts — a provide()d "body" would type as an
@@ -178,7 +188,7 @@ export namespace StandardSchemaV1 {
 // detected by feature, not by vendor: `'jsonSchema' in schema['~standard']`.
 // Declared here rather than depending on @standard-schema/spec, same as
 // StandardSchemaV1 above. Nothing in the framework reads this; it exists so
-// packages built on Arcton (see OpenAPIIntegration) can derive documentation
+// packages built on Arcton (see routesOf in @arcton/core) can derive documentation
 // from the very schemas already used for validation.
 export interface StandardJSONSchemaV1 {
   readonly '~standard': StandardJSONSchemaV1.Props
@@ -236,25 +246,6 @@ export interface RouteRecord {
   /** Normalized from `RouteOptions.response`, always keyed by status code. */
   response?: Record<number, StandardSchemaV1>
   detail?: RouteDetail
-}
-
-// ── OpenAPI integration ──────────────────────────────────────────────────
-
-/** A route an integration asks `listen()` to register, always as `GET`. */
-export interface DocumentRoute {
-  path: string
-  handler: RouteHandler
-}
-
-// The single extension point `listen({ openapi })` accepts — deliberately not
-// a plugin registry. Core knows this interface and never the implementation,
-// exactly as it knows RuntimeAdapter without knowing any adapter, which keeps
-// the dependency pointing @arcton/openapi → @arcton/core.
-//
-// Called once during listen(), after every module has been grafted, so
-// `records` is the final route set.
-export interface OpenAPIIntegration {
-  routes(records: readonly RouteRecord[]): DocumentRoute[]
 }
 
 export interface RuntimeWebSocket {

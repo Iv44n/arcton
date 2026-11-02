@@ -45,7 +45,7 @@ declare function listen(options?: ArctonListenOptions): RuntimeServer
 
 **Firma**
 ```ts
-import type { OpenAPIIntegration, RuntimeAdapter } from '@arcton/contracts'
+import type { RuntimeAdapter } from '@arcton/contracts'
 
 interface ArctonListenOptions {
   port?: number
@@ -53,7 +53,6 @@ interface ArctonListenOptions {
   adapter?: RuntimeAdapter
   env?: string
   maxBodySize?: number
-  openapi?: OpenAPIIntegration
   gracefulShutdown?: boolean
   shutdownTimeout?: number
 }
@@ -87,11 +86,6 @@ interface ArctonListenOptions {
       type: 'number',
       default: '134217728 (128MB)'
     },
-    openapi: {
-      description: 'Sirve un documento OpenAPI y su UI, desde openapi() en @arcton/openapi.',
-      type: 'OpenAPIIntegration',
-      default: 'undefined'
-    },
     gracefulShutdown: {
       description: 'Drena las requests en curso al recibir SIGTERM/SIGINT antes de llamar a process.exit().',
       type: 'boolean',
@@ -107,7 +101,6 @@ interface ArctonListenOptions {
 
 **Comportamiento:** ver [Entorno](../configuration/environment.mdx) para lo que hace `env` (y solo eso), [Tipos de runtime](./runtime-types.mdx) para la interfaz `RuntimeAdapter`, y [Adapters](./adapters.mdx) para los valores `bunAdapter`/`nodeAdapter`.
 
-`openapi` es el único campo que `@arcton/core` acepta sin saber qué hay del otro lado — solo conoce la interfaz [`OpenAPIIntegration`](./openapi.mdx#openapiintegration), nunca `@arcton/openapi` en sí. Se lee acá, en vez de aceptarse en `Arcton()`, porque `listen()` es el primer punto en el que todo módulo montado ya es parte del árbol de rutas final — el conjunto de rutas que documenta una integración es el que está a punto de servirse. Ver [OpenAPI & Scalar](../integrations/openapi.mdx).
 
 `gracefulShutdown` y `shutdownTimeout` controlan el manejo process-wide de `SIGTERM`/`SIGINT` descrito en [Apagado elegante](../configuration/listen-options.mdx#apagado-elegante). `gracefulShutdown: false` excluye por completo a una llamada de `listen()` dada — útil cuando la aplicación anfitriona maneja las señales del proceso por su cuenta, ya que un apagado elegante termina llamando a `process.exit()`, lo que termina todo el proceso, no solo este servidor.
 

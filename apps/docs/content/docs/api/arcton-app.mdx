@@ -533,7 +533,7 @@ declare function routesOf<T>(app: ArctonApp<T>): readonly RouteRecord[]
 
 **Return type:** `readonly RouteRecord[]` — see [`RouteRecord`](./openapi.mdx#routerecord).
 
-**Behavior:** one record per method a route was registered under — `app.all()` produces seven, never an "any method" record — in registration order, each with its final path (every mounting prefix already applied). A module's own records are included once it's mounted with `use()`, prefixed the same way its route tree is; calling `routesOf()` on the module itself still returns its records with only its own prefix, unaffected by where it later gets mounted. A `ws()` route produces no record, having no contract to describe. Routes an `OpenAPIIntegration` registers through `listen({ openapi })` are never included, so a document never documents itself.
+**Behavior:** one record per method a route was registered under — `app.all()` produces seven, never an "any method" record — in registration order, each with its final path (every mounting prefix already applied). A module's own records are included once it's mounted with `use()`, prefixed the same way its route tree is; calling `routesOf()` on the module itself still returns its records with only its own prefix, unaffected by where it later gets mounted. A `ws()` route produces no record, having no contract to describe. Responses an `openapi()` middleware answers are never included, so a document never documents itself.
 
 **Errors:** throws `routesOf() expects an Arcton app` for anything that isn't one.
 

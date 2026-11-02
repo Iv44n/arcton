@@ -6,7 +6,7 @@ import { openapi } from './openapi'
 
 function createTestAdapter(): {
   adapter: RuntimeAdapter
-  fetch: (path: string) => Promise<Response>
+  fetch: (path: string, init?: RequestInit) => Promise<Response>
 } {
   let captured: RuntimeHandler | undefined
   const adapter: RuntimeAdapter = {
@@ -23,11 +23,12 @@ function createTestAdapter(): {
     }
   }
 
-  async function fetch(path: string) {
+  async function fetch(path: string, init?: RequestInit) {
     if (!captured) throw new Error('app.listen() was not called')
-    const response = await captured(new Request(`http://localhost${path}`), {
-      upgrade: () => false
-    })
+    const response = await captured(
+      new Request(`http://localhost${path}`, init),
+      { upgrade: () => false }
+    )
     if (!response) throw new Error('expected a Response')
     return response
   }
@@ -60,7 +61,8 @@ test('/openapi.json serves the document as JSON', async () => {
     detail: { operationId: 'getUser', tags: ['Users'] },
     handler: () => ({ id: '1' })
   })
-  app.listen({ adapter, openapi: openapi({ info }) })
+  app.use(openapi({ info }))
+  app.listen({ adapter })
 
   const response = await fetch('/openapi.json')
 
@@ -92,7 +94,8 @@ test('the served document matches what the route accepts: a bare body is JSON on
     },
     handler: () => ({ ok: true })
   })
-  app.listen({ adapter, openapi: openapi({ info }) })
+  app.use(openapi({ info }))
+  app.listen({ adapter })
 
   const document = await fetchDocument(fetch)
   const mediaTypes = (path: string) => {
@@ -117,7 +120,8 @@ test('the document describes the final route tree, after modules are mounted', a
   const { adapter, fetch } = createTestAdapter()
 
   app.use(users)
-  app.listen({ adapter, openapi: openapi({ info }) })
+  app.use(openapi({ info }))
+  app.listen({ adapter })
 
   const document = await fetchDocument(fetch)
 
@@ -132,7 +136,8 @@ test('/docs serves HTML pointing at the document', async () => {
   const { adapter, fetch } = createTestAdapter()
 
   app.get('/users', () => [])
-  app.listen({ adapter, openapi: openapi({ info }) })
+  app.use(openapi({ info }))
+  app.listen({ adapter })
 
   const response = await fetch('/docs')
   const html = await response.text()
@@ -150,14 +155,14 @@ test('both paths are configurable', async () => {
   const { adapter, fetch } = createTestAdapter()
 
   app.get('/users', () => [])
-  app.listen({
-    adapter,
-    openapi: openapi({
+  app.use(
+    openapi({
       info,
       document: { path: '/schema.json' },
       docs: { path: '/reference' }
     })
-  })
+  )
+  app.listen({ adapter })
 
   expect((await fetch('/schema.json')).status).toBe(200)
   expect((await fetch('/reference')).status).toBe(200)
@@ -170,7 +175,8 @@ test('docs: false serves the document without a UI', async () => {
   const { adapter, fetch } = createTestAdapter()
 
   app.get('/users', () => [])
-  app.listen({ adapter, openapi: openapi({ info, docs: false }) })
+  app.use(openapi({ info, docs: false }))
+  app.listen({ adapter })
 
   expect((await fetch('/openapi.json')).status).toBe(200)
   expect((await fetch('/docs')).status).toBe(404)
@@ -181,13 +187,13 @@ test('Scalar configuration is passed through, separately from the document', asy
   const { adapter, fetch } = createTestAdapter()
 
   app.get('/users', () => [])
-  app.listen({
-    adapter,
-    openapi: openapi({
+  app.use(
+    openapi({
       info,
       docs: { pageTitle: 'Users Reference', configuration: { theme: 'purple' } }
     })
-  })
+  )
+  app.listen({ adapter })
 
   const html = await (await fetch('/docs')).text()
   expect(html).toContain('Users Reference')
@@ -201,7 +207,8 @@ test('WebSocket and wildcard routes stay out of the document', async () => {
   app.get('/health', () => ({}))
   app.get('/files/*rest', () => ({}))
   app.ws('/chat', { message: () => {} })
-  app.listen({ adapter, openapi: openapi({ info }) })
+  app.use(openapi({ info }))
+  app.listen({ adapter })
 
   const document = await fetchDocument(fetch)
   expect(Object.keys(document.paths)).toEqual(['/health'])
@@ -212,7 +219,8 @@ test('app.all() documents every method it registers', async () => {
   const { adapter, fetch } = createTestAdapter()
 
   app.all('/any', () => 'ok')
-  app.listen({ adapter, openapi: openapi({ info }) })
+  app.use(openapi({ info }))
+  app.listen({ adapter })
 
   const document = await fetchDocument(fetch)
   expect(Object.keys(document.paths['/any'] ?? {})).toEqual([
@@ -231,7 +239,8 @@ test('the documentation routes do not document themselves', async () => {
   const { adapter, fetch } = createTestAdapter()
 
   app.get('/health', () => ({}))
-  app.listen({ adapter, openapi: openapi({ info }) })
+  app.use(openapi({ info }))
+  app.listen({ adapter })
 
   const document = await fetchDocument(fetch)
   expect(Object.keys(document.paths)).toEqual(['/health'])
@@ -245,7 +254,8 @@ test('the document is serialized once, not rebuilt per request', async () => {
     response: z.object({ id: z.string() }),
     handler: () => ({})
   })
-  app.listen({ adapter, openapi: openapi({ info }) })
+  app.use(openapi({ info }))
+  app.listen({ adapter })
 
   const first = await (await fetch('/openapi.json')).text()
   const second = await (await fetch('/openapi.json')).text()
@@ -261,7 +271,63 @@ test('documented routes keep serving normally', async () => {
     response: z.object({ id: z.string() }),
     handler: ctx => ({ id: ctx.params.id })
   })
-  app.listen({ adapter, openapi: openapi({ info }) })
+  app.use(openapi({ info }))
+  app.listen({ adapter })
 
   expect(await (await fetch('/users/42')).json()).toEqual({ id: '42' })
+})
+
+test('a route registered after the middleware is still documented', async () => {
+  const app = Arcton()
+  const { adapter, fetch } = createTestAdapter()
+
+  app.use(openapi({ info }))
+  app.get('/late', () => ({}))
+  app.listen({ adapter })
+
+  const document = await fetchDocument(fetch)
+  expect(Object.keys(document.paths)).toEqual(['/late'])
+})
+
+test('only GET is served; other methods fall through', async () => {
+  const app = Arcton()
+  const { adapter, fetch } = createTestAdapter()
+
+  app.get('/users', () => [])
+  app.use(openapi({ info }))
+  app.listen({ adapter })
+
+  expect((await fetch('/openapi.json', { method: 'POST' })).status).toBe(404)
+})
+
+test('a trailing slash reaches the same page', async () => {
+  const app = Arcton()
+  const { adapter, fetch } = createTestAdapter()
+
+  app.get('/users', () => [])
+  app.use(openapi({ info }))
+  app.listen({ adapter })
+
+  expect((await fetch('/docs/')).status).toBe(200)
+  expect((await fetch('/openapi.json/')).status).toBe(200)
+})
+
+test('earlier middleware guards the documentation paths', async () => {
+  const app = Arcton()
+  const { adapter, fetch } = createTestAdapter()
+
+  app.get('/users', () => [])
+  app.use((ctx, next) => {
+    if (!ctx.request.headers.has('authorization')) {
+      return new Response(null, { status: 401 })
+    }
+    return next()
+  })
+  app.use(openapi({ info }))
+  app.listen({ adapter })
+
+  expect((await fetch('/openapi.json')).status).toBe(401)
+  expect(
+    (await fetch('/openapi.json', { headers: { authorization: 'x' } })).status
+  ).toBe(200)
 })
