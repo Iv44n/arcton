@@ -16,19 +16,19 @@ Los params de ruta siempre llegan como strings — un esquema de `params` es la 
 de convertir `:id` en algo más útil:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', {
+app.get("/users/:id", {
   params: v.object({
-    id: v.pipe(v.string(), v.transform(Number), v.number())
+    id: v.pipe(v.string(), v.transform(Number), v.number()),
   }),
-  handler: ctx => ({ id: ctx.params.id, doubled: ctx.params.id * 2 })
-})
+  handler: (ctx) => ({ id: ctx.params.id, doubled: ctx.params.id * 2 }),
+});
 
-app.listen()
+app.listen();
 ```
 
 `ctx.params.id` está tipado y valuado como `number`, así que las operaciones
@@ -40,22 +40,20 @@ Los valores de query también son strings, y a menudo opcionales — un esquema 
 query es donde conviertes `?limit=10` en un number real con un default real:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/search', {
+app.get("/search", {
   query: v.object({
     q: v.pipe(v.string(), v.minLength(1)),
-    limit: v.optional(
-      v.pipe(v.string(), v.transform(Number), v.number())
-    )
+    limit: v.optional(v.pipe(v.string(), v.transform(Number), v.number())),
   }),
-  handler: ctx => ({ query: ctx.query.q, limit: ctx.query.limit ?? 10 })
-})
+  handler: (ctx) => ({ query: ctx.query.q, limit: ctx.query.limit ?? 10 }),
+});
 
-app.listen()
+app.listen();
 ```
 
 `limit` se mantiene como `number | undefined` porque es opcional — el fallback con

@@ -17,14 +17,14 @@ tiempo de request.
 Registrar el mismo método y path dos veces lanza:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/x', () => 'first')
-app.get('/x', () => 'second')
+app.get("/x", () => "first");
+app.get("/x", () => "second");
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -40,14 +40,14 @@ Dos nombres de parámetro distintos no pueden ocupar la misma posición en el
 árbol de rutas:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ctx.params.id)
-app.get('/users/:userId', ctx => ctx.params.userId)
+app.get("/users/:id", (ctx) => ctx.params.id);
+app.get("/users/:userId", (ctx) => ctx.params.userId);
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -64,13 +64,13 @@ Un nombre `:param` o `*wildcard` debe empezar con una letra y contener solo
 letras, dígitos o `_`:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:1id', ctx => ctx.params)
+app.get("/users/:1id", (ctx) => ctx.params);
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -85,13 +85,13 @@ segmentos `*name`.
 El mismo nombre de parámetro no puede aparecer dos veces en una sola ruta:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/pair/:a/:a', ctx => ctx.params.a)
+app.get("/pair/:a/:a", (ctx) => ctx.params.a);
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -103,13 +103,13 @@ Duplicate parameter name "a" in route "/pair/:a/:a"
 Un segmento `*wildcard` debe ser el último segmento de la ruta:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/files/*path/edit', ctx => ctx.params.path)
+app.get("/files/*path/edit", (ctx) => ctx.params.path);
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -122,13 +122,13 @@ Todo path de ruta debe empezar con `/` y no puede contener un segmento
 vacío:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('users', () => 'nope')
+app.get("users", () => "nope");
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -136,13 +136,13 @@ Route path must start with "/", got "users"
 ```
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users//profile', () => 'nope')
+app.get("/users//profile", () => "nope");
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -155,11 +155,11 @@ Route path must not contain empty segments ("//"): "/users//profile"
 ambos paths estáticos — sin segmentos `:param` ni `*wildcard`:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton({ prefix: '/api/:version' })
+const app = Arcton({ prefix: "/api/:version" });
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -167,15 +167,15 @@ Prefix "/api/:version" must be a static path — dynamic/wildcard segments aren'
 ```
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use('/users/:id', async (ctx, next) => {
-  await next()
-})
+app.use("/users/:id", async (ctx, next) => {
+  await next();
+});
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -189,13 +189,13 @@ una app de Arcton para montar como módulo — cualquier otra cosa lanza una
 excepción:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use({} as never)
+app.use({} as never);
 
-app.listen()
+app.listen();
 ```
 
 ```

@@ -10,13 +10,13 @@ description: What the env option does and how to read environment variables in e
 label printed on the startup banner.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => 'Hello, Arcton!')
+app.get("/", () => "Hello, Arcton!");
 
-app.listen({ env: 'staging' })
+app.listen({ env: "staging" });
 ```
 
 The banner then prints `Environment  staging` instead of the default. See
@@ -33,15 +33,15 @@ On Bun, `.env` files are loaded automatically, so `process.env` already has
 whatever a `.env` file defines by the time your code runs:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-const databaseUrl = process.env.DATABASE_URL
+const databaseUrl = process.env.DATABASE_URL;
 
-app.get('/health', () => ({ ok: databaseUrl !== undefined }))
+app.get("/health", () => ({ ok: databaseUrl !== undefined }));
 
-app.listen()
+app.listen();
 ```
 
 On Node.js, read `process.env` the same way. Load a `.env` file first if you
@@ -53,16 +53,16 @@ node --env-file=.env dist/index.js
 ```
 
 ```ts
-import { nodeAdapter } from '@arcton/adapter-node'
-import { Arcton } from '@arcton/core'
+import { nodeAdapter } from "@arcton/adapter-node";
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-const databaseUrl = process.env.DATABASE_URL
+const databaseUrl = process.env.DATABASE_URL;
 
-app.get('/health', () => ({ ok: databaseUrl !== undefined }))
+app.get("/health", () => ({ ok: databaseUrl !== undefined }));
 
-app.listen({ adapter: nodeAdapter })
+app.listen({ adapter: nodeAdapter });
 ```
 
 <Callout>

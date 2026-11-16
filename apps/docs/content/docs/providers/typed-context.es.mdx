@@ -4,25 +4,25 @@ description: Cómo provide() hace crecer el tipo de ctx para todo lo que se regi
 ---
 
 Cada llamada a `provide()` devuelve un nuevo valor de app cuyo tipo trae el campo
-agregado, para lo que sea que se registre sobre *ese valor devuelto* después:
+agregado, para lo que sea que se registre sobre _ese valor devuelto_ después:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app
-  .get('/before', () => {
+  .get("/before", () => {
     // ctx has no `user` here — the provide() below hasn't run yet
     // in registration order
-    return { ok: true }
+    return { ok: true };
   })
-  .provide(ctx => ({
-    user: ctx.request.headers.get('authorization') ? { id: 1 } : null
+  .provide((ctx) => ({
+    user: ctx.request.headers.get("authorization") ? { id: 1 } : null,
   }))
-  .get('/after', ctx => ({ user: ctx.user }))
+  .get("/after", (ctx) => ({ user: ctx.user }));
 
-app.listen()
+app.listen();
 ```
 
 `ctx.user` pasa el type-check en `/after` y no en `/before`, porque `/after` se
@@ -43,15 +43,15 @@ Un valor provisto queda directo sobre `ctx` — no hay ningún objeto envoltorio
 atravesar:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app
-  .provide(() => ({ user: { id: 1, name: 'Alice' } }))
-  .get('/me', ctx => ctx.user)
+  .provide(() => ({ user: { id: 1, name: "Alice" } }))
+  .get("/me", (ctx) => ctx.user);
 
-app.listen()
+app.listen();
 ```
 
 ## Keys reservadas

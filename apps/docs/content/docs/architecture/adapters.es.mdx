@@ -8,13 +8,13 @@ una función estilo `fetch` y una lista de rutas WebSocket, arranca un
 servidor real, y retorna un handle.
 
 ```ts
-import type { RuntimeServeOptions, RuntimeServer } from '@arcton/contracts'
+import type { RuntimeServeOptions, RuntimeServer } from "@arcton/contracts";
 
 interface RuntimeAdapter {
-  readonly name: string
-  readonly version: string
-  readonly capabilities: { readonly websocket: boolean }
-  serve(options: RuntimeServeOptions): RuntimeServer
+  readonly name: string;
+  readonly version: string;
+  readonly capabilities: { readonly websocket: boolean };
+  serve(options: RuntimeServeOptions): RuntimeServer;
 }
 ```
 
@@ -97,11 +97,11 @@ que son idénticas sería un trade peor que nombrarlas.
 Implementa `RuntimeAdapter` y pásale la instancia a `listen()`:
 
 ```ts
-import type { RuntimeAdapter } from '@arcton/contracts'
+import type { RuntimeAdapter } from "@arcton/contracts";
 
 export const myAdapter: RuntimeAdapter = {
-  name: 'my-runtime',
-  version: '1.0.0',
+  name: "my-runtime",
+  version: "1.0.0",
   capabilities: { websocket: false },
   serve(options) {
     // start a server that calls options.fetch(request, context)
@@ -109,10 +109,10 @@ export const myAdapter: RuntimeAdapter = {
     return {
       port: options.port,
       url: new URL(`http://localhost:${options.port}/`),
-      stop() {}
-    }
-  }
-}
+      stop() {},
+    };
+  },
+};
 ```
 
 La implementación de `serve()` tiene que llamar a `options.fetch` en

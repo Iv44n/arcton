@@ -39,16 +39,16 @@ yarn add @arcton/cors
 Then register it as global middleware:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(cors())
+app.use(cors());
 
-app.get('/users', () => [{ id: '1' }])
+app.get("/users", () => [{ id: "1" }]);
 
-app.listen()
+app.listen();
 ```
 
 With no options the middleware allows any origin. Register it before your
@@ -60,50 +60,50 @@ routes, so every route below is covered — see
 `origin` accepts a string, an array, or a function:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(cors({ origin: 'https://app.example.com' }))
+app.use(cors({ origin: "https://app.example.com" }));
 
-app.get('/users', () => [{ id: '1' }])
+app.get("/users", () => [{ id: "1" }]);
 
-app.listen()
+app.listen();
 ```
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(
   cors({
-    origin: ['https://app.example.com', 'https://admin.example.com']
-  })
-)
+    origin: ["https://app.example.com", "https://admin.example.com"],
+  }),
+);
 
-app.get('/users', () => [{ id: '1' }])
+app.get("/users", () => [{ id: "1" }]);
 
-app.listen()
+app.listen();
 ```
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(
   cors({
-    origin: origin => origin.endsWith('.example.com')
-  })
-)
+    origin: (origin) => origin.endsWith(".example.com"),
+  }),
+);
 
-app.get('/users', () => [{ id: '1' }])
+app.get("/users", () => [{ id: "1" }]);
 
-app.listen()
+app.listen();
 ```
 
 The function receives the request's origin and the `Request` itself, so a
@@ -116,15 +116,15 @@ CORS headers added, and the browser blocks the result on the client side.
 
 ## Options
 
-| Option | Default | Effect |
-|---|---|---|
-| `origin` | `'*'` | which origins are allowed |
-| `methods` | echoes the request | `Access-Control-Allow-Methods` on preflight |
-| `allowedHeaders` | echoes the request | `Access-Control-Allow-Headers` on preflight |
-| `exposedHeaders` | — | `Access-Control-Expose-Headers` on the response |
-| `credentials` | `false` | adds `Access-Control-Allow-Credentials` |
-| `maxAge` | — | `Access-Control-Max-Age` on preflight, in seconds |
-| `preflight` | `true` | whether to answer preflight requests |
+| Option           | Default            | Effect                                            |
+| ---------------- | ------------------ | ------------------------------------------------- |
+| `origin`         | `'*'`              | which origins are allowed                         |
+| `methods`        | echoes the request | `Access-Control-Allow-Methods` on preflight       |
+| `allowedHeaders` | echoes the request | `Access-Control-Allow-Headers` on preflight       |
+| `exposedHeaders` | —                  | `Access-Control-Expose-Headers` on the response   |
+| `credentials`    | `false`            | adds `Access-Control-Allow-Credentials`           |
+| `maxAge`         | —                  | `Access-Control-Max-Age` on preflight, in seconds |
+| `preflight`      | `true`             | whether to answer preflight requests              |
 
 ## Credentialed requests
 
@@ -132,25 +132,25 @@ Browsers reject a credentialed response that allows every origin, so name the
 origins you trust:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(
   cors({
-    origin: 'https://app.example.com',
+    origin: "https://app.example.com",
     credentials: true,
-    exposedHeaders: ['X-Total-Count']
-  })
-)
+    exposedHeaders: ["X-Total-Count"],
+  }),
+);
 
-app.get('/users', ctx => {
-  ctx.response.headers.set('X-Total-Count', '1')
-  return [{ id: '1' }]
-})
+app.get("/users", (ctx) => {
+  ctx.response.headers.set("X-Total-Count", "1");
+  return [{ id: "1" }];
+});
 
-app.listen()
+app.listen();
 ```
 
 Combining `origin: '*'` with `credentials: true` throws a `TypeError` when
@@ -163,23 +163,23 @@ cross-origin requests. `cors()` answers those itself with `204` and the
 computed headers:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(
   cors({
-    origin: 'https://app.example.com',
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    maxAge: 600
-  })
-)
+    origin: "https://app.example.com",
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    maxAge: 600,
+  }),
+);
 
-app.post('/users', () => ({ created: true }))
+app.post("/users", () => ({ created: true }));
 
-app.listen()
+app.listen();
 ```
 
 With `methods` or `allowedHeaders` omitted, the preflight response echoes what
@@ -201,17 +201,17 @@ report the real status instead of a CORS failure. See
 To apply CORS to one section only, give it a scope:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use('/public', cors({ origin: '*' }))
+app.use("/public", cors({ origin: "*" }));
 
-app.get('/public/status', () => ({ ok: true }))
-app.get('/internal/status', () => ({ ok: true }))
+app.get("/public/status", () => ({ ok: true }));
+app.get("/internal/status", () => ({ ok: true }));
 
-app.listen()
+app.listen();
 ```
 
 A [scoped](./scoped.mdx) registration covers matched routes under that path.

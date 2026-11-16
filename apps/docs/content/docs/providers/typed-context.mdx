@@ -4,25 +4,25 @@ description: How provide() grows the type of ctx for everything registered after
 ---
 
 Every `provide()` call returns a new app value whose type carries the added
-field, for whatever gets registered on *that returned value* afterward:
+field, for whatever gets registered on _that returned value_ afterward:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app
-  .get('/before', () => {
+  .get("/before", () => {
     // ctx has no `user` here — the provide() below hasn't run yet
     // in registration order
-    return { ok: true }
+    return { ok: true };
   })
-  .provide(ctx => ({
-    user: ctx.request.headers.get('authorization') ? { id: 1 } : null
+  .provide((ctx) => ({
+    user: ctx.request.headers.get("authorization") ? { id: 1 } : null,
   }))
-  .get('/after', ctx => ({ user: ctx.user }))
+  .get("/after", (ctx) => ({ user: ctx.user }));
 
-app.listen()
+app.listen();
 ```
 
 `ctx.user` type-checks on `/after` and not on `/before`, because `/after` is
@@ -43,15 +43,15 @@ A provided value sits directly on `ctx` — there's no wrapper object to reach
 through:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app
-  .provide(() => ({ user: { id: 1, name: 'Alice' } }))
-  .get('/me', ctx => ctx.user)
+  .provide(() => ({ user: { id: 1, name: "Alice" } }))
+  .get("/me", (ctx) => ctx.user);
 
-app.listen()
+app.listen();
 ```
 
 ## Reserved keys

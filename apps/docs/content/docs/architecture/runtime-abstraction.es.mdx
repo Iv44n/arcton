@@ -89,12 +89,12 @@ Tipar un middleware o handler independiente significa importar desde
 contracts:
 
 ```ts
-import type { Middleware } from '@arcton/contracts'
+import type { Middleware } from "@arcton/contracts";
 
 export const requestId: Middleware = async (ctx, next) => {
-  ctx.response.headers.set('X-Request-Id', crypto.randomUUID())
-  await next()
-}
+  ctx.response.headers.set("X-Request-Id", crypto.randomUUID());
+  await next();
+};
 ```
 
 Como el paquete es solo-tipos, ese import desaparece del output del

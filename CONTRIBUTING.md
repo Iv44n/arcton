@@ -27,16 +27,16 @@ docs/                internal design notes
 
 ### Where things live in `core`
 
-| Path | Responsibility |
-|---|---|
-| `src/index.ts` | `Arcton()`, the app surface, registration, `listen()` |
-| `src/router/parse.ts` | route string → validated segments |
-| `src/router/tree.ts` | the route tree, insertion, grafting for modules |
-| `src/router/match.ts` | matching, priority and backtracking |
-| `src/router/serialize.ts` | returned value → `Response` |
-| `src/router/types.ts` | `ExtractParams`, the type-level route parser |
-| `src/middleware/pipeline.ts` | the step sequence and its execution |
-| `src/middleware/body.ts` | body parsing by `Content-Type` |
+| Path                         | Responsibility                                        |
+| ---------------------------- | ----------------------------------------------------- |
+| `src/index.ts`               | `Arcton()`, the app surface, registration, `listen()` |
+| `src/router/parse.ts`        | route string → validated segments                     |
+| `src/router/tree.ts`         | the route tree, insertion, grafting for modules       |
+| `src/router/match.ts`        | matching, priority and backtracking                   |
+| `src/router/serialize.ts`    | returned value → `Response`                           |
+| `src/router/types.ts`        | `ExtractParams`, the type-level route parser          |
+| `src/middleware/pipeline.ts` | the step sequence and its execution                   |
+| `src/middleware/body.ts`     | body parsing by `Content-Type`                        |
 
 ## Development setup
 
@@ -70,25 +70,25 @@ Tests use `bun test` and live beside the code they cover.
   implementation disagree, the tests decide.
 - `*.test-d.ts` — types. Checked by `tsc`, not by the test runner, so they only
   run as part of `bun run build`. `@ts-expect-error` marks a case that must
-  *not* compile.
+  _not_ compile.
 
 Serving in a test binds port `0` and reads the real port back:
 
 ```ts
-import { expect, test } from 'bun:test'
-import { Arcton } from '@arcton/core'
+import { expect, test } from "bun:test";
+import { Arcton } from "@arcton/core";
 
-test('serves a route', async () => {
-  const app = Arcton()
-  app.get('/', () => ({ ok: true }))
+test("serves a route", async () => {
+  const app = Arcton();
+  app.get("/", () => ({ ok: true }));
 
-  const server = app.listen({ port: 0 })
-  const res = await fetch(server.url)
+  const server = app.listen({ port: 0 });
+  const res = await fetch(server.url);
 
-  expect(await res.json()).toEqual({ ok: true })
+  expect(await res.json()).toEqual({ ok: true });
 
-  server.stop()
-})
+  server.stop();
+});
 ```
 
 Both an assertion about behavior and one about types are expected for a change

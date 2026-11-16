@@ -7,18 +7,18 @@ description: Setting headers and status from middleware, replacing the body afte
 response. Middleware can read and change it on the way in and on the way out:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  await next()
-  ctx.response.headers.set('X-Powered-By', 'Arcton')
-})
+  await next();
+  ctx.response.headers.set("X-Powered-By", "Arcton");
+});
 
-app.get('/', () => ({ ok: true }))
+app.get("/", () => ({ ok: true }));
 
-app.listen()
+app.listen();
 ```
 
 ## Headers
@@ -27,21 +27,21 @@ app.listen()
 `append()` adds another value:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  await next()
+  await next();
 
-  ctx.response.headers.set('X-Request-Id', crypto.randomUUID())
-  ctx.response.headers.append('Set-Cookie', 'session=abc; Path=/; HttpOnly')
-  ctx.response.headers.append('Set-Cookie', 'theme=dark; Path=/')
-})
+  ctx.response.headers.set("X-Request-Id", crypto.randomUUID());
+  ctx.response.headers.append("Set-Cookie", "session=abc; Path=/; HttpOnly");
+  ctx.response.headers.append("Set-Cookie", "theme=dark; Path=/");
+});
 
-app.get('/', () => ({ ok: true }))
+app.get("/", () => ({ ok: true }));
 
-app.listen()
+app.listen();
 ```
 
 Header changes work both before and after `await next()`, and both send the
@@ -54,25 +54,24 @@ Set `ctx.response.status` before the body is produced — in the handler, or in
 a middleware before `await next()`:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/users', ctx => {
-  ctx.response.status = 201
-  ctx.response.headers.set('Location', '/users/42')
+app.post("/users", (ctx) => {
+  ctx.response.status = 201;
+  ctx.response.headers.set("Location", "/users/42");
 
-  return { id: '42' }
-})
+  return { id: "42" };
+});
 
-app.listen()
+app.listen();
 ```
 
 <Callout type="warn">
   The status is fixed once the response body is produced. Assigning
   `ctx.response.status` after `await next()` throws a `TypeError`. To change a
-  status on the way out, return a new value or a `Response` instead — see
-  below.
+  status on the way out, return a new value or a `Response` instead — see below.
 </Callout>
 
 ## Replacing the body after next()
@@ -81,19 +80,19 @@ Returning a value after `await next()` replaces the body. The headers and
 status accumulated so far carry over:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  await next()
+  await next();
 
-  return { wrapped: true, at: new Date().toISOString() }
-})
+  return { wrapped: true, at: new Date().toISOString() };
+});
 
-app.get('/', () => ({ ok: true }))
+app.get("/", () => ({ ok: true }));
 
-app.listen()
+app.listen();
 ```
 
 The client receives the wrapper object.
@@ -102,27 +101,27 @@ To replace the status as well, return a `Response`. It wins outright — no
 headers are merged in from `ctx.response`:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  await next()
+  await next();
 
-  if (ctx.response.headers.get('X-Deprecated') === 'yes') {
-    return new Response(JSON.stringify({ error: 'gone' }), {
+  if (ctx.response.headers.get("X-Deprecated") === "yes") {
+    return new Response(JSON.stringify({ error: "gone" }), {
       status: 410,
-      headers: { 'content-type': 'application/json' }
-    })
+      headers: { "content-type": "application/json" },
+    });
   }
-})
+});
 
-app.get('/legacy', ctx => {
-  ctx.response.headers.set('X-Deprecated', 'yes')
-  return { ok: true }
-})
+app.get("/legacy", (ctx) => {
+  ctx.response.headers.set("X-Deprecated", "yes");
+  return { ok: true };
+});
 
-app.listen()
+app.listen();
 ```
 
 ## Short-circuiting
@@ -131,43 +130,43 @@ Returning a value **without** calling `next()` answers the request immediately,
 and nothing further in the chain runs:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  if (ctx.request.headers.get('x-api-key') !== 'secret') {
-    return new Response('Unauthorized', { status: 401 })
+  if (ctx.request.headers.get("x-api-key") !== "secret") {
+    return new Response("Unauthorized", { status: 401 });
   }
 
-  await next()
-})
+  await next();
+});
 
-app.get('/private', () => ({ secret: true }))
+app.get("/private", () => ({ secret: true }));
 
-app.listen()
+app.listen();
 ```
 
 A short-circuit can also return a plain value, which is mapped the same way a
 handler's return value is:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  if (!ctx.request.headers.has('authorization')) {
-    ctx.response.status = 401
-    return { error: 'missing authorization' }
+  if (!ctx.request.headers.has("authorization")) {
+    ctx.response.status = 401;
+    return { error: "missing authorization" };
   }
 
-  await next()
-})
+  await next();
+});
 
-app.get('/private', () => ({ secret: true }))
+app.get("/private", () => ({ secret: true }));
 
-app.listen()
+app.listen();
 ```
 
 ## Caching and conditional responses
@@ -176,18 +175,18 @@ Because middleware sees the response on the way out, it can add cache headers
 across a whole section of the API:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use('/static', async (ctx, next) => {
-  await next()
-  ctx.response.headers.set('Cache-Control', 'public, max-age=3600')
-})
+app.use("/static", async (ctx, next) => {
+  await next();
+  ctx.response.headers.set("Cache-Control", "public, max-age=3600");
+});
 
-app.get('/static/config', () => ({ theme: 'dark' }))
+app.get("/static/config", () => ({ theme: "dark" }));
 
-app.listen()
+app.listen();
 ```
 
 ## Complete example
@@ -195,31 +194,32 @@ app.listen()
 Timing, a request id and cookies together:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  const start = performance.now()
-  const requestId = ctx.request.headers.get('x-request-id') ?? crypto.randomUUID()
+  const start = performance.now();
+  const requestId =
+    ctx.request.headers.get("x-request-id") ?? crypto.randomUUID();
 
-  await next()
+  await next();
 
-  ctx.response.headers.set('X-Request-Id', requestId)
+  ctx.response.headers.set("X-Request-Id", requestId);
   ctx.response.headers.set(
-    'X-Response-Time',
-    `${(performance.now() - start).toFixed(2)}ms`
-  )
-})
+    "X-Response-Time",
+    `${(performance.now() - start).toFixed(2)}ms`,
+  );
+});
 
-app.get('/', ctx => {
-  ctx.response.status = 200
-  ctx.response.headers.append('Set-Cookie', 'visited=1; Path=/')
+app.get("/", (ctx) => {
+  ctx.response.status = 200;
+  ctx.response.headers.append("Set-Cookie", "visited=1; Path=/");
 
-  return { ok: true }
-})
+  return { ok: true };
+});
 
-app.listen()
+app.listen();
 ```
 
 For how a returned value becomes a `Response`, see

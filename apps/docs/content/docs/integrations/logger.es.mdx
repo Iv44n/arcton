@@ -43,45 +43,53 @@ yarn add @arcton/logger
 ## Uso básico
 
 ```ts title="index.ts"
-import { Arcton } from '@arcton/core'
-import { logger } from '@arcton/logger'
+import { Arcton } from "@arcton/core";
+import { logger } from "@arcton/logger";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(logger())
+app.use(logger());
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
 
-app.listen()
+app.listen();
 ```
 
 Cada request ahora produce una línea de JSON, una vez que se conoce la
 respuesta:
 
 ```json
-{"level":"info","time":"2026-09-14T16:00:00.000Z","msg":"GET /users/1 200 0.4ms","method":"GET","path":"/users/1","status":200,"durationMs":0.4}
+{
+  "level": "info",
+  "time": "2026-09-14T16:00:00.000Z",
+  "msg": "GET /users/1 200 0.4ms",
+  "method": "GET",
+  "path": "/users/1",
+  "status": 200,
+  "durationMs": 0.4
+}
 ```
 
 ## El status decide el nivel
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { logger } from '@arcton/logger'
+import { Arcton } from "@arcton/core";
+import { logger } from "@arcton/logger";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(logger())
+app.use(logger());
 
-app.get('/ok', () => ({ ok: true })) // logueado a info
-app.get('/missing', ctx => {
-  ctx.response.status = 404 // logueado a warn (4xx)
-  return { error: 'not found' }
-})
-app.get('/boom', () => {
-  throw new Error('kaboom') // logueado a error
-})
+app.get("/ok", () => ({ ok: true })); // logueado a info
+app.get("/missing", (ctx) => {
+  ctx.response.status = 404; // logueado a warn (4xx)
+  return { error: "not found" };
+});
+app.get("/boom", () => {
+  throw new Error("kaboom"); // logueado a error
+});
 
-app.listen()
+app.listen();
 ```
 
 Una respuesta `2xx`/`3xx` se loguea a `info`, una `4xx` a `warn`, una `5xx`
@@ -98,16 +106,16 @@ exactamente igual que sin el logger.
 una terminal — sin dependencia que instalar, sin transport que configurar:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { logger } from '@arcton/logger'
+import { Arcton } from "@arcton/core";
+import { logger } from "@arcton/logger";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(logger({ pretty: process.env.NODE_ENV !== 'production' }))
+app.use(logger({ pretty: process.env.NODE_ENV !== "production" }));
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
 
-app.listen()
+app.listen();
 ```
 
 Un request ahora imprime dos líneas en vez de una — `→` cuando llega, `←`
@@ -141,12 +149,12 @@ cada record que escriba de ahí en adelante — útil para etiquetar cada
 línea de una parte de la app sin repetir esos campos en cada llamada:
 
 ```ts
-import { createLogger } from '@arcton/logger'
+import { createLogger } from "@arcton/logger";
 
-const log = createLogger()
-const dbLog = log.child({ component: 'database' })
+const log = createLogger();
+const dbLog = log.child({ component: "database" });
 
-dbLog.info('query executed', { table: 'users' })
+dbLog.info("query executed", { table: "users" });
 // { "component": "database", "table": "users", "msg": "query executed", ... }
 ```
 
@@ -164,18 +172,18 @@ un Worker). Pasá el tuyo propio para redirigir la salida, por ejemplo para
 capturar líneas de log en un test:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { logger } from '@arcton/logger'
+import { Arcton } from "@arcton/core";
+import { logger } from "@arcton/logger";
 
-const lines: string[] = []
+const lines: string[] = [];
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(logger({ sink: line => lines.push(line) }))
+app.use(logger({ sink: (line) => lines.push(line) }));
 
-app.get('/', () => 'ok')
+app.get("/", () => "ok");
 
-app.listen()
+app.listen();
 ```
 
 ## Loguear fuera del ciclo de request
@@ -185,17 +193,17 @@ app.listen()
 de tu app — por ejemplo, justo después de `listen()`:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { logger } from '@arcton/logger'
+import { Arcton } from "@arcton/core";
+import { logger } from "@arcton/logger";
 
-const app = Arcton()
-const log = logger()
+const app = Arcton();
+const log = logger();
 
-app.use(log)
-app.get('/', () => 'ok')
+app.use(log);
+app.get("/", () => "ok");
 
-const server = app.listen({ port: 0 })
-log.logger.info(`listening on ${server.url}`)
+const server = app.listen({ port: 0 });
+log.logger.info(`listening on ${server.url}`);
 ```
 
 Ver [`logger()`](../api/logger.mdx) para la referencia completa de la API.

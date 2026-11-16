@@ -6,13 +6,13 @@ description: The factory function that creates an application instance
 Every Arcton application starts with a single call to this function:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => 'Hello, Arcton!')
+app.get("/", () => "Hello, Arcton!");
 
-app.listen()
+app.listen();
 ```
 
 ## Arcton()
@@ -20,10 +20,11 @@ app.listen()
 **Purpose:** creates a new application instance — an [`ArctonApp`](./arcton-app.mdx) — that you register routes, middleware, and providers on.
 
 **Signature**
-```ts
-import type { ArctonApp, ArctonConfig } from '@arcton/core'
 
-declare function Arcton(config?: ArctonConfig): ArctonApp<{}>
+```ts
+import type { ArctonApp, ArctonConfig } from "@arcton/core";
+
+declare function Arcton(config?: ArctonConfig): ArctonApp<{}>;
 ```
 
 **Parameters**
@@ -31,10 +32,10 @@ declare function Arcton(config?: ArctonConfig): ArctonApp<{}>
 <TypeTable
   type={{
     config: {
-      description: 'Optional configuration for this instance.',
-      type: 'ArctonConfig',
-      default: '{}'
-    }
+      description: "Optional configuration for this instance.",
+      type: "ArctonConfig",
+      default: "{}",
+    },
   }}
 />
 
@@ -49,9 +50,10 @@ declare function Arcton(config?: ArctonConfig): ArctonApp<{}>
 **Purpose:** the configuration object passed to `Arcton()`.
 
 **Signature**
+
 ```ts
 interface ArctonConfig {
-  prefix?: string
+  prefix?: string;
 }
 ```
 
@@ -60,10 +62,11 @@ interface ArctonConfig {
 <TypeTable
   type={{
     prefix: {
-      description: "A static path prepended to every route and ws route registered directly on this instance.",
-      type: 'string',
-      default: 'undefined'
-    }
+      description:
+        "A static path prepended to every route and ws route registered directly on this instance.",
+      type: "string",
+      default: "undefined",
+    },
   }}
 />
 
@@ -72,12 +75,13 @@ interface ArctonConfig {
 **Errors:** a non-static prefix throws `Prefix "<value>" must be a static path — dynamic/wildcard segments aren't supported (e.g. app.use('/api', mw), not app.use('/api/:id', mw))`. See [Registration errors](../errors/registration-errors.mdx).
 
 **Example**
+
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton({ prefix: '/api' })
+const app = Arcton({ prefix: "/api" });
 
-app.get('/users', () => [])
+app.get("/users", () => []);
 
-app.listen()
+app.listen();
 ```

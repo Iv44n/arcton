@@ -10,20 +10,20 @@ merge de headers, sin validación de status. Es la forma más directa de
 responder a una request que no puede tener éxito:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/profile', ctx => {
-  const token = ctx.request.headers.get('authorization')
-  if (token !== 'secret') {
-    return new Response('Unauthorized', { status: 401 })
+app.get("/profile", (ctx) => {
+  const token = ctx.request.headers.get("authorization");
+  if (token !== "secret") {
+    return new Response("Unauthorized", { status: 401 });
   }
 
-  return { user: 'Alice' }
-})
+  return { user: "Alice" };
+});
 
-app.listen()
+app.listen();
 ```
 
 ## Configurar ctx.response.status y devolver un valor plano
@@ -33,49 +33,49 @@ JSON, se configura el status en `ctx.response` antes de que el handler
 retorne:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/orders', ctx => {
-  ctx.response.status = 201
-  return { created: true }
-})
+app.post("/orders", (ctx) => {
+  ctx.response.status = 201;
+  return { created: true };
+});
 
-app.listen()
+app.listen();
 ```
 
 <Callout>
-`ctx.response.status` solo se puede configurar antes de que el body de la
-respuesta finalice — dentro del handler, o antes de `await next()` en un
-middleware global o de ruta. Una vez que el body finaliza (el handler
-retorna, un step corta la cadena, o una capa reemplaza el body después de
-`next()`), `ctx.response` ya se convirtió en un `Response` real, cuyo
-`status` no tiene setter — asignarle un valor lanza
-`TypeError: Attempted to assign to readonly property.`. La mutación de
-headers es distinta: `ctx.response.headers.set(...)` / `.append(...)` sigue
-funcionando después de `await next()` y llega igual al cliente.
+  `ctx.response.status` solo se puede configurar antes de que el body de la
+  respuesta finalice — dentro del handler, o antes de `await next()` en un
+  middleware global o de ruta. Una vez que el body finaliza (el handler retorna,
+  un step corta la cadena, o una capa reemplaza el body después de `next()`),
+  `ctx.response` ya se convirtió en un `Response` real, cuyo `status` no tiene
+  setter — asignarle un valor lanza `TypeError: Attempted to assign to readonly
+  property.`. La mutación de headers es distinta:
+  `ctx.response.headers.set(...)` / `.append(...)` sigue funcionando después de
+  `await next()` y llega igual al cliente.
 </Callout>
 
 ```ts
-import type { Middleware } from '@arcton/contracts'
-import { Arcton } from '@arcton/core'
+import type { Middleware } from "@arcton/contracts";
+import { Arcton } from "@arcton/core";
 
 const timing: Middleware = async (ctx, next) => {
-  const start = performance.now()
-  await next()
+  const start = performance.now();
+  await next();
   ctx.response.headers.set(
-    'X-Response-Time',
-    `${(performance.now() - start).toFixed(2)}ms`
-  )
-}
+    "X-Response-Time",
+    `${(performance.now() - start).toFixed(2)}ms`,
+  );
+};
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(timing)
-app.get('/health', () => ({ status: 'ok' }))
+app.use(timing);
+app.get("/health", () => ({ status: "ok" }));
 
-app.listen()
+app.listen();
 ```
 
 ## Capturar un error lanzado dentro de un middleware
@@ -85,27 +85,27 @@ en un try/catch convierte en una respuesta normal cualquier cosa que el
 resto de la cadena lance:
 
 ```ts
-import type { Middleware } from '@arcton/contracts'
-import { Arcton } from '@arcton/core'
+import type { Middleware } from "@arcton/contracts";
+import { Arcton } from "@arcton/core";
 
 const catchErrors: Middleware = async (ctx, next) => {
   try {
-    await next()
+    await next();
   } catch (error) {
-    ctx.response.status = 500
-    return { error: error instanceof Error ? error.message : 'Unknown error' }
+    ctx.response.status = 500;
+    return { error: error instanceof Error ? error.message : "Unknown error" };
   }
-}
+};
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(catchErrors)
+app.use(catchErrors);
 
-app.get('/risky', () => {
-  throw new Error('boom')
-})
+app.get("/risky", () => {
+  throw new Error("boom");
+});
 
-app.listen()
+app.listen();
 ```
 
 Como el throw ocurre antes de que el valor de retorno del propio handler
@@ -113,8 +113,8 @@ finalice la respuesta, `ctx.response.status` todavía se puede escribir
 cuando se ejecuta el bloque `catch`.
 
 <Callout>
-Para un único catch-all en lugar de un try/catch en cada middleware, ver
-[Global error handler](./global-error-handler.mdx).
+  Para un único catch-all en lugar de un try/catch en cada middleware, ver
+  [Global error handler](./global-error-handler.mdx).
 </Callout>
 
 ## Lanzar un HttpError ya armado en lugar de construirlo a mano
@@ -130,19 +130,19 @@ status/mensaje vive en un solo lugar en vez de en cada punto donde se
 lanza:
 
 ```ts
-import { Arcton, Http } from '@arcton/core'
+import { Arcton, Http } from "@arcton/core";
 
-declare function findOrder(id: string): { id: string } | undefined
+declare function findOrder(id: string): { id: string } | undefined;
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/orders/:id', ctx => {
-  const order = findOrder(ctx.params.id)
-  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
-  return order
-})
+app.get("/orders/:id", (ctx) => {
+  const order = findOrder(ctx.params.id);
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`);
+  return order;
+});
 
-app.listen()
+app.listen();
 ```
 
 Cada factory es una función simple, no una clase — se llama, no se
@@ -158,17 +158,17 @@ lleva:
   del default `{ code, message }`
 
 ```ts
-import { Http } from '@arcton/core'
+import { Http } from "@arcton/core";
 
-throw Http.Conflict('Email already registered', { field: 'email' })
+throw Http.Conflict("Email already registered", { field: "email" });
 ```
 
 <Callout type="warn">
-`throw Http.NotFound` — la referencia a la función pelada, sin `()` — lanza
-la función misma, no un `HttpError`. Un bloque catch que chequea
-`instanceof HttpError` no la va a reconocer, y llega al adapter como un
-`500` sin diferenciar (ver [Errores no capturados](./uncaught-errors.mdx)).
-Siempre hay que llamar a la factory.
+  `throw Http.NotFound` — la referencia a la función pelada, sin `()` — lanza la
+  función misma, no un `HttpError`. Un bloque catch que chequea `instanceof
+  HttpError` no la va a reconocer, y llega al adapter como un `500` sin
+  diferenciar (ver [Errores no capturados](./uncaught-errors.mdx)). Siempre hay
+  que llamar a la factory.
 </Callout>
 
 Por sí solo, lanzar uno de estos sigue siendo un error no capturado.
@@ -177,34 +177,34 @@ Capturalo con el mismo patrón try/catch de arriba, chequeando
 arman la respuesta:
 
 ```ts
-import type { Middleware } from '@arcton/contracts'
-import { Arcton, Http, HttpError } from '@arcton/core'
+import type { Middleware } from "@arcton/contracts";
+import { Arcton, Http, HttpError } from "@arcton/core";
 
-declare function findOrder(id: string): { id: string } | undefined
+declare function findOrder(id: string): { id: string } | undefined;
 
 const catchHttpErrors: Middleware = async (ctx, next) => {
   try {
-    await next()
+    await next();
   } catch (err) {
     if (err instanceof HttpError) {
-      ctx.response.status = err.status
-      return err.body ?? { code: err.code, message: err.message }
+      ctx.response.status = err.status;
+      return err.body ?? { code: err.code, message: err.message };
     }
-    throw err
+    throw err;
   }
-}
+};
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(catchHttpErrors)
+app.use(catchHttpErrors);
 
-app.get('/orders/:id', ctx => {
-  const order = findOrder(ctx.params.id)
-  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
-  return order
-})
+app.get("/orders/:id", (ctx) => {
+  const order = findOrder(ctx.params.id);
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`);
+  return order;
+});
 
-app.listen()
+app.listen();
 ```
 
 Un status sin factory con nombre también funciona — construí `HttpError`

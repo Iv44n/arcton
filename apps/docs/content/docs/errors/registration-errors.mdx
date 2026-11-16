@@ -16,14 +16,14 @@ a confusing match at request time.
 Registering the same method and path twice throws:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/x', () => 'first')
-app.get('/x', () => 'second')
+app.get("/x", () => "first");
+app.get("/x", () => "second");
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -39,14 +39,14 @@ Two different parameter names can't occupy the same position in the route
 tree:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ctx.params.id)
-app.get('/users/:userId', ctx => ctx.params.userId)
+app.get("/users/:id", (ctx) => ctx.params.id);
+app.get("/users/:userId", (ctx) => ctx.params.userId);
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -63,13 +63,13 @@ A `:param` or `*wildcard` name must start with a letter and contain only
 letters, digits or `_`:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:1id', ctx => ctx.params)
+app.get("/users/:1id", (ctx) => ctx.params);
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -84,13 +84,13 @@ segments.
 The same param name can't appear twice in a single route:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/pair/:a/:a', ctx => ctx.params.a)
+app.get("/pair/:a/:a", (ctx) => ctx.params.a);
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -102,13 +102,13 @@ Duplicate parameter name "a" in route "/pair/:a/:a"
 A `*wildcard` segment must be the last segment in the route:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/files/*path/edit', ctx => ctx.params.path)
+app.get("/files/*path/edit", (ctx) => ctx.params.path);
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -120,13 +120,13 @@ Wildcard segment must be the last segment in route "/files/*path/edit"
 Every route path must start with `/` and must not contain an empty segment:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('users', () => 'nope')
+app.get("users", () => "nope");
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -134,13 +134,13 @@ Route path must start with "/", got "users"
 ```
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users//profile', () => 'nope')
+app.get("/users//profile", () => "nope");
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -153,11 +153,11 @@ Route path must not contain empty segments ("//"): "/users//profile"
 be static paths — no `:param` or `*wildcard` segments:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton({ prefix: '/api/:version' })
+const app = Arcton({ prefix: "/api/:version" });
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -165,15 +165,15 @@ Prefix "/api/:version" must be a static path — dynamic/wildcard segments aren'
 ```
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use('/users/:id', async (ctx, next) => {
-  await next()
-})
+app.use("/users/:id", async (ctx, next) => {
+  await next();
+});
 
-app.listen()
+app.listen();
 ```
 
 ```
@@ -186,13 +186,13 @@ Scope "/users/:id" must be a static path — dynamic/wildcard segments aren't su
 Arcton app to mount as a module — anything else throws:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use({} as never)
+app.use({} as never);
 
-app.listen()
+app.listen();
 ```
 
 ```

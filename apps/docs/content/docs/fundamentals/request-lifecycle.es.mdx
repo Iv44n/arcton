@@ -28,20 +28,20 @@ providers: **cuando se registra una ruta, esta captura las llamadas a `use()` y
 alcanzan.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/before', () => 'registered with no global steps yet')
+app.get("/before", () => "registered with no global steps yet");
 
 app.use(async (ctx, next) => {
-  ctx.response.headers.set('X-Global', 'yes')
-  await next()
-})
+  ctx.response.headers.set("X-Global", "yes");
+  await next();
+});
 
-app.get('/after', () => 'registered after the middleware above')
+app.get("/after", () => "registered after the middleware above");
 
-app.listen()
+app.listen();
 ```
 
 `/before` corre sin ninguna de las llamadas `use()`/`provide()` de alrededor, porque

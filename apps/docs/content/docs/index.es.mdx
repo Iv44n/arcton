@@ -8,15 +8,15 @@ retornan valores, compones comportamiento con middleware, y organizas una
 aplicación en módulos que se fusionan en un único árbol de rutas.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => ({ message: 'Welcome to Arcton' }))
+app.get("/", () => ({ message: "Welcome to Arcton" }));
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
 
-app.listen({ port: 3000 })
+app.listen({ port: 3000 });
 ```
 
 `ctx.params.id` está tipado como `string` porque el literal de la ruta lo

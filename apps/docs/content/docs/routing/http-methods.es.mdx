@@ -6,19 +6,19 @@ description: Los siete métodos abreviados, registrar varios métodos en un mism
 Cada método HTTP tiene su propio método de registro:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
-app.post('/users', () => ({ created: true }))
-app.put('/users/:id', ctx => ({ replaced: ctx.params.id }))
-app.patch('/users/:id', ctx => ({ updated: ctx.params.id }))
-app.delete('/users/:id', ctx => ({ deleted: ctx.params.id }))
-app.head('/users/:id', () => {})
-app.options('/users', () => {})
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
+app.post("/users", () => ({ created: true }));
+app.put("/users/:id", (ctx) => ({ replaced: ctx.params.id }));
+app.patch("/users/:id", (ctx) => ({ updated: ctx.params.id }));
+app.delete("/users/:id", (ctx) => ({ deleted: ctx.params.id }));
+app.head("/users/:id", () => {});
+app.options("/users", () => {});
 
-app.listen()
+app.listen();
 ```
 
 Los siete disponibles son `get`, `post`, `put`, `delete`, `patch`, `head`
@@ -33,16 +33,16 @@ Regístralos uno por uno. Como cada llamada retorna la app, un recurso se
 lee como un bloque:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app
-  .get('/users/:id', ctx => ({ id: ctx.params.id }))
-  .put('/users/:id', ctx => ({ replaced: ctx.params.id }))
-  .delete('/users/:id', ctx => ({ deleted: ctx.params.id }))
+  .get("/users/:id", (ctx) => ({ id: ctx.params.id }))
+  .put("/users/:id", (ctx) => ({ replaced: ctx.params.id }))
+  .delete("/users/:id", (ctx) => ({ deleted: ctx.params.id }));
 
-app.listen()
+app.listen();
 ```
 
 Registrar el mismo método y path dos veces tira un error al registrarse
@@ -56,15 +56,15 @@ veces un subárbol wildcard — a un handler externo de Request/Response, por
 ejemplo montar una librería como [better-auth](https://www.better-auth.com):
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-declare const auth: { handler: (request: Request) => Promise<Response> }
+declare const auth: { handler: (request: Request) => Promise<Response> };
 
-const app = Arcton()
+const app = Arcton();
 
-app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+app.all("/api/auth/*path", (ctx) => auth.handler(ctx.request));
 
-app.listen()
+app.listen();
 ```
 
 `all` no es un comodín para verbos HTTP arbitrarios o no estándar — expande
@@ -87,14 +87,14 @@ Arcton responde `405` con un header `Allow` listando los métodos que ese
 path sí responde:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
-app.post('/users/:id', ctx => ({ updated: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
+app.post("/users/:id", (ctx) => ({ updated: ctx.params.id }));
 
-app.listen()
+app.listen();
 ```
 
 `DELETE /users/42` retorna `405` con `Allow: GET, POST` y el cuerpo
@@ -109,22 +109,22 @@ sigue buscando más allá de él otro patrón que soporte el método —
 Acá ambos son métodos ordinarios: responden cuando los registras.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
 
-app.head('/users/:id', ctx => {
-  ctx.response.headers.set('Content-Type', 'application/json')
-})
+app.head("/users/:id", (ctx) => {
+  ctx.response.headers.set("Content-Type", "application/json");
+});
 
-app.options('/users/:id', ctx => {
-  ctx.response.status = 204
-  ctx.response.headers.set('Allow', 'GET, HEAD, OPTIONS')
-})
+app.options("/users/:id", (ctx) => {
+  ctx.response.status = 204;
+  ctx.response.headers.set("Allow", "GET, HEAD, OPTIONS");
+});
 
-app.listen()
+app.listen();
 ```
 
 Para requests de preflight cross-origin,
@@ -139,22 +139,22 @@ Un handler responde `200` a menos que digas lo contrario. Asigna
 `ctx.response.status` antes de retornar:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/users', ctx => {
-  ctx.response.status = 201
-  ctx.response.headers.set('Location', '/users/42')
+app.post("/users", (ctx) => {
+  ctx.response.status = 201;
+  ctx.response.headers.set("Location", "/users/42");
 
-  return { id: '42' }
-})
+  return { id: "42" };
+});
 
-app.delete('/users/:id', ctx => {
-  ctx.response.status = 204
-})
+app.delete("/users/:id", (ctx) => {
+  ctx.response.status = 204;
+});
 
-app.listen()
+app.listen();
 ```
 
 `204`, `205` y `304` siempre envían el cuerpo vacío, sea lo que sea que

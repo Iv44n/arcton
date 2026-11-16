@@ -80,12 +80,12 @@ alongside everything else, so even that is not a dependency.
 Typing a standalone middleware or handler means importing from contracts:
 
 ```ts
-import type { Middleware } from '@arcton/contracts'
+import type { Middleware } from "@arcton/contracts";
 
 export const requestId: Middleware = async (ctx, next) => {
-  ctx.response.headers.set('X-Request-Id', crypto.randomUUID())
-  await next()
-}
+  ctx.response.headers.set("X-Request-Id", crypto.randomUUID());
+  await next();
+};
 ```
 
 Since the package is types-only, that import vanishes from the build output.

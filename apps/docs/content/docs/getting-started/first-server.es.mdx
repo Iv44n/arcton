@@ -7,13 +7,13 @@ Una aplicación de Arcton empieza con una sola llamada a `Arcton()`. Registra un
 en ella y luego llama a `listen()`:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => 'Hello, Arcton!')
+app.get("/", () => "Hello, Arcton!");
 
-app.listen()
+app.listen();
 ```
 
 Ejecútalo con `bun src/index.ts` (o `tsx src/index.ts` en Node.js) y escucha
@@ -26,13 +26,13 @@ Lo que sea que el handler devuelva se convierte en el body de la response. Devue
 o array y se serializa como JSON automáticamente:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/health', () => ({ status: 'ok' }))
+app.get("/health", () => ({ status: "ok" }));
 
-app.listen()
+app.listen();
 ```
 
 El conjunto completo de tipos de retorno que Arcton entiende — strings, objetos, datos
@@ -43,13 +43,13 @@ binarios, streams, un `Response` en crudo — está en [Response](../fundamental
 Un segmento `:param` en la ruta se captura y se tipa en `ctx.params`:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
 
-app.listen()
+app.listen();
 ```
 
 Ver [Parámetros de ruta](../routing/path-parameters.mdx) para saber cómo se hace match de
@@ -61,13 +61,13 @@ hacer una instancia de app.
 `listen()` recibe un objeto de opciones:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => 'Hello, Arcton!')
+app.get("/", () => "Hello, Arcton!");
 
-app.listen({ port: 4000 })
+app.listen({ port: 4000 });
 ```
 
 La lista completa de opciones está en [Opciones de listen](../configuration/listen-options.mdx).

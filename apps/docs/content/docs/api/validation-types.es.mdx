@@ -15,40 +15,40 @@ Dos contratos a nivel de tipos hacen que la validación de requests y el parsing
 
 ```ts
 interface StandardSchemaV1<Input = unknown, Output = Input> {
-  readonly '~standard': StandardSchemaV1.Props<Input, Output>
+  readonly "~standard": StandardSchemaV1.Props<Input, Output>;
 }
 
 namespace StandardSchemaV1 {
   export interface Props<Input = unknown, Output = Input> {
-    readonly version: 1
-    readonly vendor: string
+    readonly version: 1;
+    readonly vendor: string;
     readonly validate: (
-      value: unknown
-    ) => Result<Output> | Promise<Result<Output>>
-    readonly types?: Types<Input, Output> | undefined
+      value: unknown,
+    ) => Result<Output> | Promise<Result<Output>>;
+    readonly types?: Types<Input, Output> | undefined;
   }
   export interface Types<Input = unknown, Output = Input> {
-    readonly input: Input
-    readonly output: Output
+    readonly input: Input;
+    readonly output: Output;
   }
-  export type Result<Output> = SuccessResult<Output> | FailureResult
+  export type Result<Output> = SuccessResult<Output> | FailureResult;
   export interface SuccessResult<Output> {
-    readonly value: Output
-    readonly issues?: undefined
+    readonly value: Output;
+    readonly issues?: undefined;
   }
   export interface FailureResult {
-    readonly issues: ReadonlyArray<Issue>
+    readonly issues: ReadonlyArray<Issue>;
   }
   export interface Issue {
-    readonly message: string
-    readonly path?: ReadonlyArray<PropertyKey | PathSegment> | undefined
+    readonly message: string;
+    readonly path?: ReadonlyArray<PropertyKey | PathSegment> | undefined;
   }
   export interface PathSegment {
-    readonly key: PropertyKey
+    readonly key: PropertyKey;
   }
   export type InferOutput<Schema extends StandardSchemaV1> = NonNullable<
-    Schema['~standard']['types']
-  >['output']
+    Schema["~standard"]["types"]
+  >["output"];
 }
 ```
 
@@ -59,43 +59,43 @@ namespace StandardSchemaV1 {
 **Ejemplo**
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/users/:id/orders', {
+app.post("/users/:id/orders", {
   body: v.object({
     item: v.pipe(v.string(), v.minLength(1)),
-    quantity: v.pipe(v.number(), v.integer(), v.minValue(1))
+    quantity: v.pipe(v.number(), v.integer(), v.minValue(1)),
   }),
-  handler: ctx => ({
+  handler: (ctx) => ({
     userId: ctx.params.id,
-    order: ctx.body
-  })
-})
+    order: ctx.body,
+  }),
+});
 
-app.listen()
+app.listen();
 ```
 
 Este fragmento muestra la interfaz directamente, sin una librería de schemas, implementándola a mano:
 
 ```ts
-import type { StandardSchemaV1 } from '@arcton/contracts'
+import type { StandardSchemaV1 } from "@arcton/contracts";
 
 function positiveNumber(): StandardSchemaV1<unknown, number> {
   return {
-    '~standard': {
+    "~standard": {
       version: 1,
-      vendor: 'example',
+      vendor: "example",
       validate(value) {
-        const n = Number(value)
+        const n = Number(value);
         return n > 0
           ? { value: n }
-          : { issues: [{ message: 'must be a positive number' }] }
-      }
-    }
-  }
+          : { issues: [{ message: "must be a positive number" }] };
+      },
+    },
+  };
 }
 ```
 
@@ -107,25 +107,22 @@ function positiveNumber(): StandardSchemaV1<unknown, number> {
 
 ```ts
 interface StandardJSONSchemaV1 {
-  readonly '~standard': StandardJSONSchemaV1.Props
+  readonly "~standard": StandardJSONSchemaV1.Props;
 }
 
 namespace StandardJSONSchemaV1 {
   export interface Props {
-    readonly jsonSchema: Converter
+    readonly jsonSchema: Converter;
   }
   export interface Converter {
-    readonly input: (options: Options) => Record<string, unknown>
-    readonly output: (options: Options) => Record<string, unknown>
+    readonly input: (options: Options) => Record<string, unknown>;
+    readonly output: (options: Options) => Record<string, unknown>;
   }
   export type Target =
-    | 'draft-2020-12'
-    | 'draft-07'
-    | 'openapi-3.0'
-    | ({} & string)
+    "draft-2020-12" | "draft-07" | "openapi-3.0" | ({} & string);
   export interface Options {
-    readonly target: Target
-    readonly libraryOptions?: Record<string, unknown> | undefined
+    readonly target: Target;
+    readonly libraryOptions?: Record<string, unknown> | undefined;
   }
 }
 ```
@@ -137,17 +134,17 @@ namespace StandardJSONSchemaV1 {
 Este fragmento muestra la interfaz directamente, sin una librería de schemas, implementándola a mano:
 
 ```ts
-import type { StandardJSONSchemaV1 } from '@arcton/contracts'
+import type { StandardJSONSchemaV1 } from "@arcton/contracts";
 
 function jsonString(): StandardJSONSchemaV1 {
   return {
-    '~standard': {
+    "~standard": {
       jsonSchema: {
-        input: () => ({ type: 'string' }),
-        output: () => ({ type: 'string' })
-      }
-    }
-  }
+        input: () => ({ type: "string" }),
+        output: () => ({ type: "string" }),
+      },
+    },
+  };
 }
 ```
 
@@ -158,13 +155,13 @@ function jsonString(): StandardJSONSchemaV1 {
 **Firma**
 
 ```ts
-type BodyParser = (request: Request) => unknown | Promise<unknown>
+type BodyParser = (request: Request) => unknown | Promise<unknown>;
 ```
 
 **Parámetros**
 
-| Parámetro | Tipo | Descripción |
-|---|---|---|
+| Parámetro | Tipo      | Descripción                                                                                                                 |
+| --------- | --------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `request` | `Request` | El request entrante crudo — no `ctx`, ya que el parsing ocurre antes de que los params/query de un context sean relevantes. |
 
 **Tipo de retorno** — `unknown | Promise<unknown>`: el valor que deba convertirse en el input de validación del schema para la opción `body` de esa ruta.
@@ -176,31 +173,31 @@ type BodyParser = (request: Request) => unknown | Promise<unknown>
 **Ejemplo**
 
 ```ts
-import { Arcton } from '@arcton/core'
-import type { BodyParser } from '@arcton/contracts'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import type { BodyParser } from "@arcton/contracts";
+import * as v from "valibot";
 
-const csvParser: BodyParser = async request => {
-  const text = await request.text()
-  const [header = '', ...rows] = text.trim().split('\n')
-  const keys = header.split(',')
-  return rows.map(row =>
-    Object.fromEntries(keys.map((key, i) => [key, row.split(',')[i]]))
-  )
-}
+const csvParser: BodyParser = async (request) => {
+  const text = await request.text();
+  const [header = "", ...rows] = text.trim().split("\n");
+  const keys = header.split(",");
+  return rows.map((row) =>
+    Object.fromEntries(keys.map((key, i) => [key, row.split(",")[i]])),
+  );
+};
 
-const app = Arcton()
+const app = Arcton();
 
-app.parser('text/csv', csvParser)
+app.parser("text/csv", csvParser);
 
-app.post('/import', {
+app.post("/import", {
   body: {
-    content: { 'text/csv': v.array(v.record(v.string(), v.string())) }
+    content: { "text/csv": v.array(v.record(v.string(), v.string())) },
   },
-  handler: ctx => ({ imported: ctx.body.length, rows: ctx.body })
-})
+  handler: (ctx) => ({ imported: ctx.body.length, rows: ctx.body }),
+});
 
-app.listen()
+app.listen();
 ```
 
 Ver [Body parsers](../validation/body-parsers.mdx) para la tabla de parsers built-in y cómo el schema `body` de una ruta selecciona uno.

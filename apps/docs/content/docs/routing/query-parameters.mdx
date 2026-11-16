@@ -6,16 +6,16 @@ description: Reading the query string from the context, how repeated keys behave
 Query parameters arrive on `ctx.query`:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/search', ctx => ({
+app.get("/search", (ctx) => ({
   term: ctx.query.q,
-  page: ctx.query.page
-}))
+  page: ctx.query.page,
+}));
 
-app.listen()
+app.listen();
 ```
 
 `GET /search?q=arcton&page=2` returns `{"term":"arcton","page":"2"}`.
@@ -26,18 +26,18 @@ app.listen()
 `undefined`, so handle absence explicitly:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/search', ctx => {
-  const term = ctx.query.q ?? ''
-  const page = Number(ctx.query.page ?? '1')
+app.get("/search", (ctx) => {
+  const term = ctx.query.q ?? "";
+  const page = Number(ctx.query.page ?? "1");
 
-  return { term, page }
-})
+  return { term, page };
+});
 
-app.listen()
+app.listen();
 ```
 
 Two details worth knowing:
@@ -56,23 +56,20 @@ Converting by hand gets repetitive once a route takes more than one parameter.
 A `query` schema does the conversion and typing in one place:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/search', {
+app.get("/search", {
   query: v.object({
     q: v.string(),
-    page: v.optional(
-      v.pipe(v.string(), v.transform(Number), v.number()),
-      '1'
-    )
+    page: v.optional(v.pipe(v.string(), v.transform(Number), v.number()), "1"),
   }),
-  handler: ctx => ({ term: ctx.query.q, page: ctx.query.page })
-})
+  handler: (ctx) => ({ term: ctx.query.q, page: ctx.query.page }),
+});
 
-app.listen()
+app.listen();
 ```
 
 `ctx.query.page` is a `number` here, and a request missing `q` is answered with
@@ -86,24 +83,24 @@ app.listen()
 repeated keys you want to keep, for example:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/filter', ctx => {
-  const url = new URL(ctx.request.url)
-  const tags = url.searchParams.getAll('tag')
+app.get("/filter", (ctx) => {
+  const url = new URL(ctx.request.url);
+  const tags = url.searchParams.getAll("tag");
 
-  return { tags }
-})
+  return { tags };
+});
 
-app.listen()
+app.listen();
 ```
 
 `GET /filter?tag=a&tag=b` returns `{"tags":["a","b"]}`.
 
 <Callout>
-  Query parameters are not part of route matching. `/search` and
-  `/search?q=x` reach the same route, and two routes cannot be distinguished by
-  their query string.
+  Query parameters are not part of route matching. `/search` and `/search?q=x`
+  reach the same route, and two routes cannot be distinguished by their query
+  string.
 </Callout>

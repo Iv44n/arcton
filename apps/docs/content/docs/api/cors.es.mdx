@@ -8,21 +8,21 @@ description: La factory de middleware cors() y sus opciones, de @arcton/cors.
 Agrega headers de CORS y maneja preflight requests con un solo middleware global:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(
   cors({
-    origin: ['https://app.example.com'],
-    credentials: true
-  })
-)
+    origin: ["https://app.example.com"],
+    credentials: true,
+  }),
+);
 
-app.get('/', () => ({ hello: 'world' }))
+app.get("/", () => ({ hello: "world" }));
 
-app.listen()
+app.listen();
 ```
 
 Como `cors()` retorna middleware global sin scope, también cubre las respuestas `404`/`405` (ver [Global middleware](../middleware/global.mdx)).
@@ -34,13 +34,13 @@ Como `cors()` retorna middleware global sin scope, también cubre las respuestas
 **Firma**
 
 ```ts no-check
-function cors(options?: CorsOptions): Middleware
+function cors(options?: CorsOptions): Middleware;
 ```
 
 **Parámetros**
 
-| Parámetro | Tipo | Descripción |
-|---|---|---|
+| Parámetro | Tipo          | Descripción                                        |
+| --------- | ------------- | -------------------------------------------------- |
 | `options` | `CorsOptions` | Opcional. Ver más abajo los campos y sus defaults. |
 
 **Tipo de retorno** — un [`Middleware`](./middleware-types.mdx), pensado para pasarse a `app.use()`.
@@ -71,27 +71,27 @@ Una respuesta con credenciales no puede usar el origin wildcard; el navegador la
 
 ```ts no-check
 interface CorsOptions {
-  origin?: CorsOrigin
-  methods?: string[]
-  allowedHeaders?: string[]
-  exposedHeaders?: string[]
-  credentials?: boolean
-  maxAge?: number
-  preflight?: boolean
+  origin?: CorsOrigin;
+  methods?: string[];
+  allowedHeaders?: string[];
+  exposedHeaders?: string[];
+  credentials?: boolean;
+  maxAge?: number;
+  preflight?: boolean;
 }
 ```
 
 **Campos**
 
-| Campo | Tipo | Default | Descripción |
-|---|---|---|---|
-| `origin` | `CorsOrigin` | `'*'` | Qué origins están permitidos. Ver `CorsOrigin` más abajo. |
-| `methods` | `string[]` | — | Se envía como `Access-Control-Allow-Methods` en un preflight. Si se omite, el preflight repite el propio `Access-Control-Request-Method` del request. |
-| `allowedHeaders` | `string[]` | — | Se envía como `Access-Control-Allow-Headers` en un preflight. Si se omite, el preflight repite el propio `Access-Control-Request-Headers` del request. |
-| `exposedHeaders` | `string[]` | — | Se envía como `Access-Control-Expose-Headers` en la respuesta real. |
-| `credentials` | `boolean` | `false` | Agrega `Access-Control-Allow-Credentials: true`. No se puede combinar con `origin: '*'`. |
-| `maxAge` | `number` | — | Se envía como `Access-Control-Max-Age` en un preflight. |
-| `preflight` | `boolean` | `true` | Si un preflight real se responde automáticamente con `204`. |
+| Campo            | Tipo         | Default | Descripción                                                                                                                                            |
+| ---------------- | ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `origin`         | `CorsOrigin` | `'*'`   | Qué origins están permitidos. Ver `CorsOrigin` más abajo.                                                                                              |
+| `methods`        | `string[]`   | —       | Se envía como `Access-Control-Allow-Methods` en un preflight. Si se omite, el preflight repite el propio `Access-Control-Request-Method` del request.  |
+| `allowedHeaders` | `string[]`   | —       | Se envía como `Access-Control-Allow-Headers` en un preflight. Si se omite, el preflight repite el propio `Access-Control-Request-Headers` del request. |
+| `exposedHeaders` | `string[]`   | —       | Se envía como `Access-Control-Expose-Headers` en la respuesta real.                                                                                    |
+| `credentials`    | `boolean`    | `false` | Agrega `Access-Control-Allow-Credentials: true`. No se puede combinar con `origin: '*'`.                                                               |
+| `maxAge`         | `number`     | —       | Se envía como `Access-Control-Max-Age` en un preflight.                                                                                                |
+| `preflight`      | `boolean`    | `true`  | Si un preflight real se responde automáticamente con `204`.                                                                                            |
 
 ## `CorsOrigin`
 
@@ -101,10 +101,7 @@ interface CorsOptions {
 
 ```ts
 type CorsOrigin =
-  | '*'
-  | string
-  | string[]
-  | ((origin: string, request: Request) => boolean)
+  "*" | string | string[] | ((origin: string, request: Request) => boolean);
 ```
 
 **Comportamiento** — `'*'` permite cualquier origin (y no se puede combinar con `credentials: true`). Un `string` permite exactamente ese origin. Un `string[]` permite cualquier origin de la lista. Una función recibe el valor del header `Origin` del request y el `Request` mismo, y retorna si está permitido — evaluada por cada request.
@@ -112,19 +109,19 @@ type CorsOrigin =
 **Ejemplo**
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(
   cors({
     origin: (origin, request) =>
-      origin.endsWith('.example.com') || request.headers.has('x-internal')
-  })
-)
+      origin.endsWith(".example.com") || request.headers.has("x-internal"),
+  }),
+);
 
-app.get('/status', () => ({ ok: true }))
+app.get("/status", () => ({ ok: true }));
 
-app.listen()
+app.listen();
 ```

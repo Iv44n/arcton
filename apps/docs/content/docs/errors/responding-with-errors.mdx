@@ -10,20 +10,20 @@ header merge, no status validation. It's the most direct way to answer a
 request that can't succeed:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/profile', ctx => {
-  const token = ctx.request.headers.get('authorization')
-  if (token !== 'secret') {
-    return new Response('Unauthorized', { status: 401 })
+app.get("/profile", (ctx) => {
+  const token = ctx.request.headers.get("authorization");
+  if (token !== "secret") {
+    return new Response("Unauthorized", { status: 401 });
   }
 
-  return { user: 'Alice' }
-})
+  return { user: "Alice" };
+});
 
-app.listen()
+app.listen();
 ```
 
 ## Set ctx.response.status and return a plain value
@@ -32,48 +32,48 @@ If you'd rather keep returning a plain object and let Arcton serialize it to
 JSON, set the status on `ctx.response` before the handler returns:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/orders', ctx => {
-  ctx.response.status = 201
-  return { created: true }
-})
+app.post("/orders", (ctx) => {
+  ctx.response.status = 201;
+  return { created: true };
+});
 
-app.listen()
+app.listen();
 ```
 
 <Callout>
-`ctx.response.status` can only be set before the response body finalizes —
-inside the handler, or before `await next()` in a global or route middleware.
-Once the body finalizes (the handler returns, a step short-circuits, or a
-layer replaces the body after `next()`), `ctx.response` has become a real
-`Response`, whose `status` has no setter — assigning to it throws
-`TypeError: Attempted to assign to readonly property.`. Header mutation is
-different: `ctx.response.headers.set(...)` / `.append(...)` keeps working
-after `await next()` and still reaches the client.
+  `ctx.response.status` can only be set before the response body finalizes —
+  inside the handler, or before `await next()` in a global or route middleware.
+  Once the body finalizes (the handler returns, a step short-circuits, or a
+  layer replaces the body after `next()`), `ctx.response` has become a real
+  `Response`, whose `status` has no setter — assigning to it throws `TypeError:
+  Attempted to assign to readonly property.`. Header mutation is different:
+  `ctx.response.headers.set(...)` / `.append(...)` keeps working after `await
+  next()` and still reaches the client.
 </Callout>
 
 ```ts
-import type { Middleware } from '@arcton/contracts'
-import { Arcton } from '@arcton/core'
+import type { Middleware } from "@arcton/contracts";
+import { Arcton } from "@arcton/core";
 
 const timing: Middleware = async (ctx, next) => {
-  const start = performance.now()
-  await next()
+  const start = performance.now();
+  await next();
   ctx.response.headers.set(
-    'X-Response-Time',
-    `${(performance.now() - start).toFixed(2)}ms`
-  )
-}
+    "X-Response-Time",
+    `${(performance.now() - start).toFixed(2)}ms`,
+  );
+};
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(timing)
-app.get('/health', () => ({ status: 'ok' }))
+app.use(timing);
+app.get("/health", () => ({ status: "ok" }));
 
-app.listen()
+app.listen();
 ```
 
 ## Catch a thrown error inside middleware
@@ -82,27 +82,27 @@ A middleware is a plain async function, so wrapping `await next()` in a
 try/catch turns whatever the rest of the chain throws into a normal response:
 
 ```ts
-import type { Middleware } from '@arcton/contracts'
-import { Arcton } from '@arcton/core'
+import type { Middleware } from "@arcton/contracts";
+import { Arcton } from "@arcton/core";
 
 const catchErrors: Middleware = async (ctx, next) => {
   try {
-    await next()
+    await next();
   } catch (error) {
-    ctx.response.status = 500
-    return { error: error instanceof Error ? error.message : 'Unknown error' }
+    ctx.response.status = 500;
+    return { error: error instanceof Error ? error.message : "Unknown error" };
   }
-}
+};
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(catchErrors)
+app.use(catchErrors);
 
-app.get('/risky', () => {
-  throw new Error('boom')
-})
+app.get("/risky", () => {
+  throw new Error("boom");
+});
 
-app.listen()
+app.listen();
 ```
 
 Because the throw happens before the handler's own return value finalizes the
@@ -110,8 +110,8 @@ response, `ctx.response.status` is still writable when the `catch` block
 runs.
 
 <Callout>
-For a single catch-all instead of a try/catch in every middleware, see
-[Global error handler](./global-error-handler.mdx).
+  For a single catch-all instead of a try/catch in every middleware, see [Global
+  error handler](./global-error-handler.mdx).
 </Callout>
 
 ## Throw a ready-made HttpError instead of hand-rolling one
@@ -126,19 +126,19 @@ namespace with a factory for each common status — `Http.BadRequest`,
 status/message pairing lives in one place instead of at every throw site:
 
 ```ts
-import { Arcton, Http } from '@arcton/core'
+import { Arcton, Http } from "@arcton/core";
 
-declare function findOrder(id: string): { id: string } | undefined
+declare function findOrder(id: string): { id: string } | undefined;
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/orders/:id', ctx => {
-  const order = findOrder(ctx.params.id)
-  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
-  return order
-})
+app.get("/orders/:id", (ctx) => {
+  const order = findOrder(ctx.params.id);
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`);
+  return order;
+});
 
-app.listen()
+app.listen();
 ```
 
 Each factory is a plain function, not a class — call it, don't `new` it. It
@@ -153,17 +153,17 @@ returns an `HttpError` (a subclass of `Error`) carrying:
   of the default `{ code, message }`
 
 ```ts
-import { Http } from '@arcton/core'
+import { Http } from "@arcton/core";
 
-throw Http.Conflict('Email already registered', { field: 'email' })
+throw Http.Conflict("Email already registered", { field: "email" });
 ```
 
 <Callout type="warn">
-`throw Http.NotFound` — the bare function reference, with no `()` — throws
-the function itself, not an `HttpError`. A catch block checking
-`instanceof HttpError` won't recognize it, and it reaches the adapter as an
-undifferentiated `500` instead (see [Uncaught errors](./uncaught-errors.mdx)).
-Always call the factory.
+  `throw Http.NotFound` — the bare function reference, with no `()` — throws the
+  function itself, not an `HttpError`. A catch block checking `instanceof
+  HttpError` won't recognize it, and it reaches the adapter as an
+  undifferentiated `500` instead (see [Uncaught errors](./uncaught-errors.mdx)).
+  Always call the factory.
 </Callout>
 
 On its own, throwing one of these is still an uncaught error. Catch it with
@@ -171,34 +171,34 @@ the same try/catch pattern as above, keyed off `instanceof HttpError` so the
 status and body it carries drive the response:
 
 ```ts
-import type { Middleware } from '@arcton/contracts'
-import { Arcton, Http, HttpError } from '@arcton/core'
+import type { Middleware } from "@arcton/contracts";
+import { Arcton, Http, HttpError } from "@arcton/core";
 
-declare function findOrder(id: string): { id: string } | undefined
+declare function findOrder(id: string): { id: string } | undefined;
 
 const catchHttpErrors: Middleware = async (ctx, next) => {
   try {
-    await next()
+    await next();
   } catch (err) {
     if (err instanceof HttpError) {
-      ctx.response.status = err.status
-      return err.body ?? { code: err.code, message: err.message }
+      ctx.response.status = err.status;
+      return err.body ?? { code: err.code, message: err.message };
     }
-    throw err
+    throw err;
   }
-}
+};
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(catchHttpErrors)
+app.use(catchHttpErrors);
 
-app.get('/orders/:id', ctx => {
-  const order = findOrder(ctx.params.id)
-  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
-  return order
-})
+app.get("/orders/:id", (ctx) => {
+  const order = findOrder(ctx.params.id);
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`);
+  return order;
+});
 
-app.listen()
+app.listen();
 ```
 
 A status without a named factory still works — construct `HttpError`

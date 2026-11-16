@@ -16,13 +16,13 @@ has to be listed with `content` — see
 These are the parsers Arcton ships. A route only ever receives a media type it
 accepts: `application/json` by default, or the ones it lists in `content`.
 
-| Content-Type | Parsed value |
-|---|---|
+| Content-Type                                    | Parsed value           |
+| ----------------------------------------------- | ---------------------- |
 | `application/json` and any `application/*+json` | `await request.json()` |
-| `text/plain` | `string` |
-| `application/x-www-form-urlencoded` | `FormData` |
-| `multipart/form-data` | `FormData` |
-| `application/octet-stream` | `ArrayBuffer` |
+| `text/plain`                                    | `string`               |
+| `application/x-www-form-urlencoded`             | `FormData`             |
+| `multipart/form-data`                           | `FormData`             |
+| `application/octet-stream`                      | `ArrayBuffer`          |
 
 A request whose `Content-Type` the route doesn't accept — or that has no
 parser, built-in or custom — gets `415` with an empty body. A built-in parser that
@@ -40,27 +40,27 @@ ordered pipeline, so it doesn't matter when relative to your routes you call
 it.
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.parser('text/csv', async request => {
-  const [header = '', ...rows] = (await request.text()).trim().split('\n')
-  const keys = header.split(',')
-  return rows.map(row =>
-    Object.fromEntries(keys.map((key, i) => [key, row.split(',')[i]]))
-  )
-})
+app.parser("text/csv", async (request) => {
+  const [header = "", ...rows] = (await request.text()).trim().split("\n");
+  const keys = header.split(",");
+  return rows.map((row) =>
+    Object.fromEntries(keys.map((key, i) => [key, row.split(",")[i]])),
+  );
+});
 
-app.post('/import', {
+app.post("/import", {
   body: {
-    content: { 'text/csv': v.array(v.record(v.string(), v.string())) }
+    content: { "text/csv": v.array(v.record(v.string(), v.string())) },
   },
-  handler: ctx => ({ imported: ctx.body.length, rows: ctx.body })
-})
+  handler: (ctx) => ({ imported: ctx.body.length, rows: ctx.body }),
+});
 
-app.listen()
+app.listen();
 ```
 
 A `BodyParser` receives the raw `Request`, not `ctx` — parsing has nothing to

@@ -9,7 +9,10 @@ body `application/json` que trae los issues que reportó el esquema:
 ```json
 {
   "issues": [
-    { "message": "Invalid length: Expected >=1 but received 0", "path": ["..."] }
+    {
+      "message": "Invalid length: Expected >=1 but received 0",
+      "path": ["..."]
+    }
   ]
 }
 ```
@@ -44,19 +47,19 @@ estable entre librerías, y trata el resto como específico de la que elegiste �
 cliente depende de los campos exactos, fija la librería de esquemas que los produce.
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/users', {
+app.post("/users", {
   body: v.object({
-    email: v.pipe(v.string(), v.email())
+    email: v.pipe(v.string(), v.email()),
   }),
-  handler: ctx => ({ created: ctx.body })
-})
+  handler: (ctx) => ({ created: ctx.body }),
+});
 
-app.listen()
+app.listen();
 ```
 
 Un `POST /users` con un body cuyo campo `email` falla `v.email()` recibe el `400` de

@@ -6,13 +6,13 @@ description: Capturar segmentos dinámicos y wildcard, los tipos que Arcton infi
 Un segmento `:name` captura un segmento de path:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
 
-app.listen()
+app.listen();
 ```
 
 `GET /users/42` retorna `{"id":"42"}`.
@@ -23,16 +23,16 @@ Arcton lee el literal de la ruta y tipa `ctx.params` a partir de él. No
 hay ningún argumento genérico involucrado:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/orgs/:orgId/repos/:repoId', ctx => {
+app.get("/orgs/:orgId/repos/:repoId", (ctx) => {
   // ctx.params is { orgId: string; repoId: string }
-  return { org: ctx.params.orgId, repo: ctx.params.repoId }
-})
+  return { org: ctx.params.orgId, repo: ctx.params.repoId };
+});
 
-app.listen()
+app.listen();
 ```
 
 Leer un nombre que el path no declara es un error de compilación. Una
@@ -51,19 +51,19 @@ Para trabajar con un número, conviértelo — o declara un schema y deja que
 la validation produzca el valor convertido:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', {
+app.get("/users/:id", {
   params: v.object({
-    id: v.pipe(v.string(), v.transform(Number), v.number())
+    id: v.pipe(v.string(), v.transform(Number), v.number()),
   }),
-  handler: ctx => ({ id: ctx.params.id, type: typeof ctx.params.id })
-})
+  handler: (ctx) => ({ id: ctx.params.id, type: typeof ctx.params.id }),
+});
 
-app.listen()
+app.listen();
 ```
 
 `GET /users/42` ahora retorna `{"id":42,"type":"number"}`. Ver
@@ -74,18 +74,18 @@ app.listen()
 Un segmento `*name` captura todo lo que queda del path, unido con `/`:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/files/*path', ctx => ({ path: ctx.params.path }))
+app.get("/files/*path", (ctx) => ({ path: ctx.params.path }));
 
-app.listen()
+app.listen();
 ```
 
-| Request | `ctx.params.path` |
-|---|---|
-| `/files/readme.md` | `readme.md` |
+| Request                      | `ctx.params.path`     |
+| ---------------------------- | --------------------- |
+| `/files/readme.md`           | `readme.md`           |
 | `/files/docs/api/index.html` | `docs/api/index.html` |
 
 Un wildcard debe ser el último segmento del path, y necesita al menos un
@@ -97,31 +97,31 @@ Como un wildcard acepta cualquier resto del path, valida el valor
 capturado antes de usarlo para acceder a algo en disco:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
 const files: Record<string, string> = {
-  'readme.md': '# Arcton',
-  'docs/intro.md': 'Welcome'
-}
+  "readme.md": "# Arcton",
+  "docs/intro.md": "Welcome",
+};
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/files/*path', ctx => {
-  const segments = ctx.params.path.split('/')
+app.get("/files/*path", (ctx) => {
+  const segments = ctx.params.path.split("/");
 
-  if (segments.some(segment => segment === '..' || segment === '')) {
-    return new Response('Invalid path', { status: 400 })
+  if (segments.some((segment) => segment === ".." || segment === "")) {
+    return new Response("Invalid path", { status: 400 });
   }
 
-  const content = files[ctx.params.path]
+  const content = files[ctx.params.path];
   if (content === undefined) {
-    return new Response('Not found', { status: 404 })
+    return new Response("Not found", { status: 404 });
   }
 
-  return new Response(content, { headers: { 'content-type': 'text/plain' } })
-})
+  return new Response(content, { headers: { "content-type": "text/plain" } });
+});
 
-app.listen()
+app.listen();
 ```
 
 ## Valores percent-encoded
@@ -138,33 +138,33 @@ Cualquier cantidad de segmentos dinámicos puede aparecer en un path,
 mientras sus nombres difieran:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/:year/:month/:slug', ctx => ({
+app.get("/:year/:month/:slug", (ctx) => ({
   year: ctx.params.year,
   month: ctx.params.month,
-  slug: ctx.params.slug
-}))
+  slug: ctx.params.slug,
+}));
 
-app.listen()
+app.listen();
 ```
 
 Un segmento dinámico y uno wildcard también pueden compartir un path,
 con el wildcard al final:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id/files/*path', ctx => ({
+app.get("/users/:id/files/*path", (ctx) => ({
   user: ctx.params.id,
-  path: ctx.params.path
-}))
+  path: ctx.params.path,
+}));
 
-app.listen()
+app.listen();
 ```
 
 ## Misma posición, mismo nombre
@@ -173,14 +173,14 @@ Las rutas que comparten un prefix deben coincidir en el nombre del
 parámetro en cada posición:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
-app.get('/users/:id/posts', ctx => ({ user: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
+app.get("/users/:id/posts", (ctx) => ({ user: ctx.params.id }));
 
-app.listen()
+app.listen();
 ```
 
 Escribir `'/users/:userId/posts'` junto con `'/users/:id'` tira un error

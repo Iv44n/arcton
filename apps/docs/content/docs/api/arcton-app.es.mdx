@@ -6,24 +6,22 @@ description: La interfaz que devuelve Arcton() — la superficie sobre la que re
 Todo método de registro en `ArctonApp` devuelve la app misma, por lo que las llamadas se encadenan:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app
-  .get('/', () => 'Hello, Arcton!')
-  .get('/health', () => ({ status: 'ok' }))
+app.get("/", () => "Hello, Arcton!").get("/health", () => ({ status: "ok" }));
 
-app.listen()
+app.listen();
 ```
 
 `config` contiene exactamente el objeto `ArctonConfig` pasado a [`Arcton()`](./arcton.mdx#arctonconfig):
 
 ```ts
-import type { ArctonConfig } from '@arcton/core'
+import type { ArctonConfig } from "@arcton/core";
 
 interface ArctonApp<TProvided = {}> {
-  config: ArctonConfig
+  config: ArctonConfig;
   // ...
 }
 ```
@@ -33,24 +31,29 @@ interface ArctonApp<TProvided = {}> {
 **Propósito:** registra una ruta para un método HTTP. Las siete abreviaturas comparten las mismas dos formas de llamada — solo cambia el método.
 
 **Firma**
+
 ```ts
-import type { Middleware, RouteHandler, StandardSchemaV1 } from '@arcton/contracts'
-import type { ArctonApp, RouteOptions } from '@arcton/core'
+import type {
+  Middleware,
+  RouteHandler,
+  StandardSchemaV1,
+} from "@arcton/contracts";
+import type { ArctonApp, RouteOptions } from "@arcton/core";
 
 interface RouteMethod<TProvided> {
   <Route extends string>(
     path: Route,
     ...args: [...Middleware[], RouteHandler]
-  ): ArctonApp<TProvided>
+  ): ArctonApp<TProvided>;
   <
     Route extends string,
     PSchema extends StandardSchemaV1 | undefined = undefined,
     QSchema extends StandardSchemaV1 | undefined = undefined,
-    BSchema extends StandardSchemaV1 | undefined = undefined
+    BSchema extends StandardSchemaV1 | undefined = undefined,
   >(
     path: Route,
-    options: RouteOptions<Route, TProvided, PSchema, QSchema, BSchema>
-  ): ArctonApp<TProvided>
+    options: RouteOptions<Route, TProvided, PSchema, QSchema, BSchema>,
+  ): ArctonApp<TProvided>;
 }
 ```
 
@@ -59,17 +62,19 @@ interface RouteMethod<TProvided> {
 <TypeTable
   type={{
     path: {
-      description: 'El patrón de la ruta — segmentos estáticos, ":dynamic", o "*wildcard".',
-      type: 'string'
+      description:
+        'El patrón de la ruta — segmentos estáticos, ":dynamic", o "*wildcard".',
+      type: "string",
     },
     args: {
-      description: 'Cero o más route middleware, seguidos del handler.',
-      type: 'Middleware[]'
+      description: "Cero o más route middleware, seguidos del handler.",
+      type: "Middleware[]",
     },
     options: {
-      description: 'Un objeto RouteOptions: esquemas de params/query/body más middleware y handler.',
-      type: 'RouteOptions'
-    }
+      description:
+        "Un objeto RouteOptions: esquemas de params/query/body más middleware y handler.",
+      type: "RouteOptions",
+    },
   }}
 />
 
@@ -80,18 +85,19 @@ interface RouteMethod<TProvided> {
 **Errores:** registrar el mismo `(method, path)` dos veces lanza `Duplicate route: <METHOD> <path> is already registered`. Ver [Errores de registro](../errors/registration-errors.mdx).
 
 **Ejemplo**
+
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
 
-app.post('/users/:id/orders', {
-  handler: ctx => ({ userId: ctx.params.id })
-})
+app.post("/users/:id/orders", {
+  handler: (ctx) => ({ userId: ctx.params.id }),
+});
 
-app.listen()
+app.listen();
 ```
 
 ## all
@@ -107,16 +113,17 @@ app.listen()
 **Errores:** comparte un mismo handler entre todos los métodos de ese path — registrar un método específico en el mismo path después (o antes) tira el mismo error de "Duplicate route" que registrar ese método dos veces. Ver [Registration errors](../errors/registration-errors.mdx).
 
 **Ejemplo**
+
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-declare const auth: { handler: (request: Request) => Promise<Response> }
+declare const auth: { handler: (request: Request) => Promise<Response> };
 
-const app = Arcton()
+const app = Arcton();
 
-app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+app.all("/api/auth/*path", (ctx) => auth.handler(ctx.request));
 
-app.listen()
+app.listen();
 ```
 
 ## RouteOptions
@@ -124,18 +131,19 @@ app.listen()
 **Propósito:** el objeto de opciones aceptado por la segunda forma de llamada de `get`/`post`/etc., para rutas que necesitan validación de la request.
 
 **Firma**
+
 ```ts
-import type { Middleware, RouteDetail, RouteHandler } from '@arcton/contracts'
-import type { ResponseSchemas } from '@arcton/core'
+import type { Middleware, RouteDetail, RouteHandler } from "@arcton/contracts";
+import type { ResponseSchemas } from "@arcton/core";
 
 interface RouteOptions<Route, TProvided, PSchema, QSchema, BSchema> {
-  params?: PSchema
-  query?: QSchema
-  body?: BSchema
-  response?: ResponseSchemas
-  detail?: RouteDetail
-  middleware?: Middleware[]
-  handler: RouteHandler
+  params?: PSchema;
+  query?: QSchema;
+  body?: BSchema;
+  response?: ResponseSchemas;
+  detail?: RouteDetail;
+  middleware?: Middleware[];
+  handler: RouteHandler;
 }
 ```
 
@@ -144,39 +152,43 @@ interface RouteOptions<Route, TProvided, PSchema, QSchema, BSchema> {
 <TypeTable
   type={{
     params: {
-      description: 'Un Standard Schema que valida ctx.params.',
-      type: 'StandardSchemaV1',
-      default: 'undefined'
+      description: "Un Standard Schema que valida ctx.params.",
+      type: "StandardSchemaV1",
+      default: "undefined",
     },
     query: {
-      description: 'Un Standard Schema que valida ctx.query.',
-      type: 'StandardSchemaV1',
-      default: 'undefined'
+      description: "Un Standard Schema que valida ctx.query.",
+      type: "StandardSchemaV1",
+      default: "undefined",
     },
     body: {
-      description: 'Un Standard Schema que valida el body de la request ya parseado (solo application/json); { schema, optional } para aceptar también una request sin body; o { content, optional } para aceptar exactamente los media types listados, cada uno con su propio schema.',
-      type: 'StandardSchemaV1 | { schema: StandardSchemaV1; optional?: boolean } | { content: Record<string, StandardSchemaV1>; optional?: boolean }',
-      default: 'undefined'
+      description:
+        "Un Standard Schema que valida el body de la request ya parseado (solo application/json); { schema, optional } para aceptar también una request sin body; o { content, optional } para aceptar exactamente los media types listados, cada uno con su propio schema.",
+      type: "StandardSchemaV1 | { schema: StandardSchemaV1; optional?: boolean } | { content: Record<string, StandardSchemaV1>; optional?: boolean }",
+      default: "undefined",
     },
     response: {
-      description: 'Qué responde esta ruta, por código de status. Solo documentación.',
-      type: 'ResponseSchemas',
-      default: 'undefined'
+      description:
+        "Qué responde esta ruta, por código de status. Solo documentación.",
+      type: "ResponseSchemas",
+      default: "undefined",
     },
     detail: {
-      description: 'Metadata de documentación — operationId, summary, tags, etc.',
-      type: 'RouteDetail',
-      default: 'undefined'
+      description:
+        "Metadata de documentación — operationId, summary, tags, etc.",
+      type: "RouteDetail",
+      default: "undefined",
     },
     middleware: {
-      description: 'Route middleware, que se ejecuta después de la validación, lo más cerca posible del handler.',
-      type: 'Middleware[]',
-      default: '[]'
+      description:
+        "Route middleware, que se ejecuta después de la validación, lo más cerca posible del handler.",
+      type: "Middleware[]",
+      default: "[]",
     },
     handler: {
-      description: 'El handler de la ruta.',
-      type: 'RouteHandler'
-    }
+      description: "El handler de la ruta.",
+      type: "RouteHandler",
+    },
   }}
 />
 
@@ -185,19 +197,20 @@ interface RouteOptions<Route, TProvided, PSchema, QSchema, BSchema> {
 `response` y `detail` son solo documentación — ver [`ResponseSchemas`](#responseschemas) y [`RouteDetail`](#routedetail) más abajo. Ninguno de los dos lo lee el pipeline de requests: un handler que devuelve algo distinto de lo que declara `response` responde exactamente igual que si `response` no existiera (ver [Response](../fundamentals/response.mdx) para lo que sí determina la respuesta). Ambos se leen a través de [`routesOf()`](#routesof) desde cualquier cosa que documente o inspeccione una app — ver [OpenAPI & Scalar](../integrations/openapi.mdx).
 
 **Ejemplo**
+
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/users/:id/orders', {
+app.post("/users/:id/orders", {
   params: v.object({ id: v.string() }),
   body: v.object({ item: v.string() }),
-  handler: ctx => ({ userId: ctx.params.id, item: ctx.body.item })
-})
+  handler: (ctx) => ({ userId: ctx.params.id, item: ctx.body.item }),
+});
 
-app.listen()
+app.listen();
 ```
 
 ## `ResponseSchemas`
@@ -205,36 +218,38 @@ app.listen()
 **Propósito** — la forma que acepta `RouteOptions.response`.
 
 **Firma**
-```ts
-import type { StandardSchemaV1 } from '@arcton/contracts'
 
-type ResponseSchemas = StandardSchemaV1 | Record<number, StandardSchemaV1>
+```ts
+import type { StandardSchemaV1 } from "@arcton/contracts";
+
+type ResponseSchemas = StandardSchemaV1 | Record<number, StandardSchemaV1>;
 ```
 
 **Comportamiento:** un `StandardSchemaV1` suelto es un atajo para `{ 200: schema }` — ambas formas se distinguen en runtime comprobando la key `'~standard'`, ya que un mapa de status → schema nunca la tiene. En cualquier caso, se normaliza a `Record<number, StandardSchemaV1>` antes de llegar a [`RouteRecord.response`](./openapi.mdx#routerecord).
 
 **Ejemplo**
-```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
 
-const app = Arcton()
+```ts
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
+
+const app = Arcton();
 
 // atajo de { response: { 200: UserSchema } }
-app.get('/users/:id', {
+app.get("/users/:id", {
   response: v.object({ id: v.string() }),
-  handler: ctx => ({ id: ctx.params.id })
-})
+  handler: (ctx) => ({ id: ctx.params.id }),
+});
 
-app.get('/orders/:id', {
+app.get("/orders/:id", {
   response: {
     200: v.object({ id: v.string() }),
-    404: v.object({ message: v.string() })
+    404: v.object({ message: v.string() }),
   },
-  handler: ctx => ({ id: ctx.params.id })
-})
+  handler: (ctx) => ({ id: ctx.params.id }),
+});
 
-app.listen()
+app.listen();
 ```
 
 ## `RouteDetail`
@@ -242,13 +257,14 @@ app.listen()
 **Propósito** — la metadata de documentación que acepta `RouteOptions.detail`.
 
 **Firma**
+
 ```ts
 interface RouteDetail {
-  operationId?: string
-  summary?: string
-  description?: string
-  tags?: string[]
-  deprecated?: boolean
+  operationId?: string;
+  summary?: string;
+  description?: string;
+  tags?: string[];
+  deprecated?: boolean;
 }
 ```
 
@@ -257,51 +273,52 @@ interface RouteDetail {
 <TypeTable
   type={{
     operationId: {
-      description: 'Un identificador único para la operación.',
-      type: 'string',
-      default: 'undefined'
+      description: "Un identificador único para la operación.",
+      type: "string",
+      default: "undefined",
     },
     summary: {
-      description: 'Un resumen breve de qué hace la ruta.',
-      type: 'string',
-      default: 'undefined'
+      description: "Un resumen breve de qué hace la ruta.",
+      type: "string",
+      default: "undefined",
     },
     description: {
-      description: 'Una descripción más larga.',
-      type: 'string',
-      default: 'undefined'
+      description: "Una descripción más larga.",
+      type: "string",
+      default: "undefined",
     },
     tags: {
-      description: 'Agrupa esta ruta con otras que comparten un tag.',
-      type: 'string[]',
-      default: 'undefined'
+      description: "Agrupa esta ruta con otras que comparten un tag.",
+      type: "string[]",
+      default: "undefined",
     },
     deprecated: {
-      description: 'Marca la ruta como deprecada.',
-      type: 'boolean',
-      default: 'undefined'
-    }
+      description: "Marca la ruta como deprecada.",
+      type: "boolean",
+      default: "undefined",
+    },
   }}
 />
 
 **Comportamiento:** cada campo es solo documentación — ninguno cambia cómo se matchea, valida o maneja un request. Los cinco se mapean directamente a los campos del mismo nombre de una operación de OpenAPI — ver [OpenAPI & Scalar](../integrations/openapi.mdx).
 
 **Ejemplo**
+
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', {
+app.get("/users/:id", {
   detail: {
-    operationId: 'getUser',
-    summary: 'Get user',
-    tags: ['Users']
+    operationId: "getUser",
+    summary: "Get user",
+    tags: ["Users"],
   },
-  handler: ctx => ({ id: ctx.params.id })
-})
+  handler: (ctx) => ({ id: ctx.params.id }),
+});
 
-app.listen()
+app.listen();
 ```
 
 ## ws
@@ -309,14 +326,15 @@ app.listen()
 **Propósito:** registra una ruta de WebSocket.
 
 **Firma**
+
 ```ts
-import type { RuntimeWebSocketHandler } from '@arcton/contracts'
-import type { ArctonApp } from '@arcton/core'
+import type { RuntimeWebSocketHandler } from "@arcton/contracts";
+import type { ArctonApp } from "@arcton/core";
 
 declare function ws<TProvided>(
   path: string,
-  handler: RuntimeWebSocketHandler
-): ArctonApp<TProvided>
+  handler: RuntimeWebSocketHandler,
+): ArctonApp<TProvided>;
 ```
 
 **Parámetros:** `path` — se compara exactamente, sin segmentos `:param`/`*wildcard`. `handler` — un [`RuntimeWebSocketHandler`](./runtime-types.mdx).
@@ -326,18 +344,19 @@ declare function ws<TProvided>(
 **Comportamiento:** las rutas ws se comparan por path exacto y no pasan por context, middleware ni providers. Ver [WebSockets](../routing/websockets.mdx) para la guía completa.
 
 **Ejemplo**
+
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.ws('/chat', {
+app.ws("/chat", {
   message(ws, message) {
-    ws.send(`echo: ${message}`)
-  }
-})
+    ws.send(`echo: ${message}`);
+  },
+});
 
-app.listen()
+app.listen();
 ```
 
 ## use
@@ -345,13 +364,17 @@ app.listen()
 **Propósito:** registra middleware global, middleware con scope, o monta un [module](../routing/modules.mdx). Tres overloads, distinguidos por los argumentos que se pasan.
 
 **Firma**
-```ts
-import type { Middleware } from '@arcton/contracts'
-import type { ArctonApp } from '@arcton/core'
 
-declare function use<TProvided>(middleware: Middleware): ArctonApp<TProvided>
-declare function use<TProvided>(scope: string, middleware: Middleware): ArctonApp<TProvided>
-declare function use<TProvided, M>(app: ArctonApp<M>): ArctonApp<TProvided>
+```ts
+import type { Middleware } from "@arcton/contracts";
+import type { ArctonApp } from "@arcton/core";
+
+declare function use<TProvided>(middleware: Middleware): ArctonApp<TProvided>;
+declare function use<TProvided>(
+  scope: string,
+  middleware: Middleware,
+): ArctonApp<TProvided>;
+declare function use<TProvided, M>(app: ArctonApp<M>): ArctonApp<TProvided>;
 ```
 
 **Parámetros:** `middleware` — una función [`Middleware`](./middleware-types.mdx#middleware). `scope` — una ruta estática; el middleware solo se aplica a las rutas en esa ruta o debajo de ella. `app` — otra instancia de `ArctonApp` para montar como module.
@@ -359,6 +382,7 @@ declare function use<TProvided, M>(app: ArctonApp<M>): ArctonApp<TProvided>
 **Tipo de retorno:** `ArctonApp<TProvided>`.
 
 **Comportamiento:**
+
 - `use(middleware)` registra middleware global — ver [Middleware global](../middleware/global.mdx).
 - `use(scope, middleware)` se selecciona por ruta en el momento del registro, comparando el path propio de la ruta contra `scope` — ver [Middleware con scope](../middleware/scoped.mdx).
 - `use(module)` fusiona el árbol de rutas ya construido del module dentro del árbol de esta app, en el momento del registro — ver [Modules](../routing/modules.mdx).
@@ -366,25 +390,26 @@ declare function use<TProvided, M>(app: ArctonApp<M>): ArctonApp<TProvided>
 **Errores:** un argumento objeto que no sea un `ArctonApp` lanza `use() expects a middleware function, a (scope, middleware) pair, or an Arcton app to mount`. Un `scope` no estático lanza el mismo error de "must be a static path" que un `ArctonConfig.prefix` no estático. Ver [Errores de registro](../errors/registration-errors.mdx).
 
 **Ejemplo**
+
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const users = Arcton({ prefix: '/users' })
-users.get('/:id', ctx => ({ id: ctx.params.id }))
+const users = Arcton({ prefix: "/users" });
+users.get("/:id", (ctx) => ({ id: ctx.params.id }));
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  await next()
-})
+  await next();
+});
 
-app.use('/users', async (ctx, next) => {
-  await next()
-})
+app.use("/users", async (ctx, next) => {
+  await next();
+});
 
-app.use(users)
+app.use(users);
 
-app.listen()
+app.listen();
 ```
 
 ## provide
@@ -392,14 +417,16 @@ app.listen()
 **Propósito:** compone contexto tipado sobre `ctx`, de forma plana, para cada middleware y handler registrado después.
 
 **Firma**
+
 ```ts
-import type { ProvideFn, ReservedKeys } from '@arcton/contracts'
-import type { ArctonApp } from '@arcton/core'
+import type { ProvideFn, ReservedKeys } from "@arcton/contracts";
+import type { ArctonApp } from "@arcton/core";
 
 declare function provide<
   TProvided,
-  R extends Partial<Record<ReservedKeys<TProvided>, never>> & Record<string, unknown>
->(fn: ProvideFn<TProvided, R>): ArctonApp<TProvided & R>
+  R extends Partial<Record<ReservedKeys<TProvided>, never>> &
+    Record<string, unknown>,
+>(fn: ProvideFn<TProvided, R>): ArctonApp<TProvided & R>;
 ```
 
 **Parámetros:** `fn` — una [`ProvideFn`](./middleware-types.mdx#providefn) que devuelve el objeto a fusionar sobre `ctx`.
@@ -411,16 +438,17 @@ declare function provide<
 **Errores:** volver a proveer una key que ya está en `TProvided`, o una de `request`/`params`/`query`/`response`/`body`/`contentType`, es un error de compilación (vía [`ReservedKeys`](./middleware-types.mdx#reservedkeys)) — no lanza una excepción en runtime.
 
 **Ejemplo**
-```ts
-import { Arcton } from '@arcton/core'
 
-const app = Arcton()
+```ts
+import { Arcton } from "@arcton/core";
+
+const app = Arcton();
 
 app
   .provide(() => ({ db: { query: async () => [] as unknown[] } }))
-  .get('/users', async ctx => ctx.db.query())
+  .get("/users", async (ctx) => ctx.db.query());
 
-app.listen()
+app.listen();
 ```
 
 ## parser
@@ -428,14 +456,15 @@ app.listen()
 **Propósito:** registra un body parser personalizado para un media type exacto.
 
 **Firma**
+
 ```ts
-import type { BodyParser } from '@arcton/contracts'
-import type { ArctonApp } from '@arcton/core'
+import type { BodyParser } from "@arcton/contracts";
+import type { ArctonApp } from "@arcton/core";
 
 declare function parser<TProvided>(
   mediaType: string,
-  parser: BodyParser
-): ArctonApp<TProvided>
+  parser: BodyParser,
+): ArctonApp<TProvided>;
 ```
 
 **Parámetros:** `mediaType` — se compara sin distinguir mayúsculas de minúsculas, ignorando parámetros como `; charset=`. `parser` — un [`BodyParser`](./validation-types.mdx#bodyparser).
@@ -445,17 +474,18 @@ declare function parser<TProvided>(
 **Comportamiento:** reemplaza un parser incorporado para el mismo media type, si existe uno. Registrar el mismo media type de nuevo reemplaza al parser anterior — es una tabla plana sin orden ni semántica de snapshot, a diferencia de `use()`/`provide()`. Solo se consulta para una ruta que declara un schema `body`, y registrar un parser no hace que una ruta acepte su media type — hay que listarlo en `body.content`. Ver [Body parsers](../validation/body-parsers.mdx).
 
 **Ejemplo**
+
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.parser('text/csv', async request => {
-  const text = await request.text()
-  return text.trim().split('\n')
-})
+app.parser("text/csv", async (request) => {
+  const text = await request.text();
+  return text.trim().split("\n");
+});
 
-app.listen()
+app.listen();
 ```
 
 ## onError
@@ -463,13 +493,14 @@ app.listen()
 **Propósito:** registra un handler para un error que de otro modo quedaría sin capturar — de un provider, un middleware, la validación, o el propio handler de la ruta.
 
 **Firma**
+
 ```ts
-import type { ErrorHandler, QueryParams, RouteParams } from '@arcton/contracts'
-import type { ArctonApp } from '@arcton/core'
+import type { ErrorHandler, QueryParams, RouteParams } from "@arcton/contracts";
+import type { ArctonApp } from "@arcton/core";
 
 declare function onError<TProvided>(
-  handler: ErrorHandler<RouteParams, QueryParams, {}, TProvided>
-): ArctonApp<TProvided>
+  handler: ErrorHandler<RouteParams, QueryParams, {}, TProvided>,
+): ArctonApp<TProvided>;
 ```
 
 **Parámetros:** `handler` — un [`ErrorHandler`](./middleware-types.mdx#errorhandler).
@@ -479,28 +510,29 @@ declare function onError<TProvided>(
 **Comportamiento:** solo un handler a la vez — una llamada posterior reemplaza a la anterior — y solo se consulta el de la instancia cuyo propio `listen()` termina sirviendo el request; uno registrado en un módulo montado con `use()` no tiene ningún efecto. Devolver un valor o una `Response` maneja el error; no devolver nada lo declina, y se aplica el comportamiento por defecto de Arcton (`400`/`415` para un `ValidationError` o un `Content-Type` de body no soportado; en cualquier otro caso el error se propaga al adapter). `ctx.response.status` usa `500` por defecto (`400`/`415` para esos dos errores de request) si el handler no asigna uno, sin sobrescribir un status que algún paso ya haya asignado antes del throw. Si el propio handler lanza un error, ese error se propaga de la misma forma en que lo haría un error no capturado sin ningún handler registrado. Sin `onError()`, un error no capturado se sigue propagando al adapter del runtime tal como describe [Errores no capturados](../errors/uncaught-errors.mdx) — esto es opt-in. Ver [Global error handler](../errors/global-error-handler.mdx) para la guía completa.
 
 **Ejemplo**
+
 ```ts
-import { Arcton, Http, HttpError } from '@arcton/core'
+import { Arcton, Http, HttpError } from "@arcton/core";
 
-declare function findOrder(id: string): { id: string } | undefined
+declare function findOrder(id: string): { id: string } | undefined;
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/orders/:id', ctx => {
-  const order = findOrder(ctx.params.id)
-  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
-  return order
-})
+app.get("/orders/:id", (ctx) => {
+  const order = findOrder(ctx.params.id);
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`);
+  return order;
+});
 
 app.onError((err, ctx) => {
   if (err instanceof HttpError) {
-    ctx.response.status = err.status
-    return err.body ?? { code: err.code, message: err.message }
+    ctx.response.status = err.status;
+    return err.body ?? { code: err.code, message: err.message };
   }
-  return { code: 'INTERNAL_SERVER_ERROR', message: 'Internal Server Error' }
-})
+  return { code: "INTERNAL_SERVER_ERROR", message: "Internal Server Error" };
+});
 
-app.listen()
+app.listen();
 ```
 
 ## listen
@@ -508,11 +540,12 @@ app.listen()
 **Propósito:** comienza a atender requests.
 
 **Firma**
-```ts
-import type { ArctonListenOptions } from '@arcton/core'
-import type { RuntimeServer } from '@arcton/contracts'
 
-declare function listen(options?: ArctonListenOptions): RuntimeServer
+```ts
+import type { ArctonListenOptions } from "@arcton/core";
+import type { RuntimeServer } from "@arcton/contracts";
+
+declare function listen(options?: ArctonListenOptions): RuntimeServer;
 ```
 
 **Comportamiento:** ver [`listen()`](./listen.mdx) para la referencia completa, incluyendo el `RuntimeServer` devuelto.
@@ -522,11 +555,12 @@ declare function listen(options?: ArctonListenOptions): RuntimeServer
 **Propósito:** la vista de solo lectura de cada ruta registrada en una app — los schemas y la metadata que declaró cada una, y su path final (con prefijo). Lo que permite que un paquete fuera de `@arcton/core` — [`@arcton/openapi`](./openapi.mdx), o cualquier otra cosa que documente o inspeccione una app — vea los contratos de las rutas sin que la app exponga directamente su router o su pipeline.
 
 **Firma**
-```ts
-import type { RouteRecord } from '@arcton/contracts'
-import type { ArctonApp } from '@arcton/core'
 
-declare function routesOf<T>(app: ArctonApp<T>): readonly RouteRecord[]
+```ts
+import type { RouteRecord } from "@arcton/contracts";
+import type { ArctonApp } from "@arcton/core";
+
+declare function routesOf<T>(app: ArctonApp<T>): readonly RouteRecord[];
 ```
 
 **Parámetros:** `app` — cualquier instancia de `ArctonApp`, montada o no.
@@ -538,19 +572,20 @@ declare function routesOf<T>(app: ArctonApp<T>): readonly RouteRecord[]
 **Errores:** lanza `routesOf() expects an Arcton app` para cualquier cosa que no sea una.
 
 **Ejemplo**
+
 ```ts
-import { Arcton, routesOf } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton, routesOf } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', {
+app.get("/users/:id", {
   params: v.object({ id: v.string() }),
-  handler: ctx => ({ id: ctx.params.id })
-})
+  handler: (ctx) => ({ id: ctx.params.id }),
+});
 
 for (const route of routesOf(app)) {
-  console.log(route.method, route.path)
+  console.log(route.method, route.path);
 }
 // GET /users/:id
 ```
@@ -560,8 +595,10 @@ for (const route of routesOf(app)) {
 **Propósito:** la unión de métodos HTTP a la que corresponden las abreviaturas de rutas de `ArctonApp`.
 
 **Firma**
+
 ```ts
-type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS'
+type HttpMethod =
+  "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS";
 ```
 
 **Comportamiento:** se usa en cualquier lugar donde un método necesite nombrarse fuera de llamar directamente a `app.get`/`app.post`/etc. — por ejemplo, el header `Allow` en una respuesta `405` lista los `HttpMethod` que sí soporta la ruta encontrada. Ver [Métodos HTTP](../routing/http-methods.mdx).

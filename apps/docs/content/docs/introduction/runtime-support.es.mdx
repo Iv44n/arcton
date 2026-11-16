@@ -11,27 +11,27 @@ decide el adapter que le pasas a `listen()`.
 Bun es el default. No pasar ningún adapter usa `bunAdapter`:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => ({ runtime: 'bun' }))
+app.get("/", () => ({ runtime: "bun" }));
 
-app.listen({ port: 3000 })
+app.listen({ port: 3000 });
 ```
 
 Córrelo con `bun src/index.ts`. Para ser explícito, importa el adapter tú
 mismo:
 
 ```ts
-import { bunAdapter } from '@arcton/adapter-bun'
-import { Arcton } from '@arcton/core'
+import { bunAdapter } from "@arcton/adapter-bun";
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => ({ runtime: 'bun' }))
+app.get("/", () => ({ runtime: "bun" }));
 
-app.listen({ adapter: bunAdapter })
+app.listen({ adapter: bunAdapter });
 ```
 
 ## Node.js
@@ -72,14 +72,14 @@ yarn add @arcton/adapter-node
 Luego pásaselo a `listen()`:
 
 ```ts
-import { nodeAdapter } from '@arcton/adapter-node'
-import { Arcton } from '@arcton/core'
+import { nodeAdapter } from "@arcton/adapter-node";
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => ({ runtime: 'node' }))
+app.get("/", () => ({ runtime: "node" }));
 
-app.listen({ adapter: nodeAdapter })
+app.listen({ adapter: nodeAdapter });
 ```
 
 Todo lo demás — rutas, middleware, providers, validation, mapeo de
@@ -97,27 +97,27 @@ respuestas — se comporta idéntico. Solo cambia el adapter.
 
 ## Diferencias que vale la pena conocer
 
-| | Bun | Node.js |
-|---|---|---|
-| Paquete | `@arcton/adapter-bun` | `@arcton/adapter-node` |
-| `adapter.version` | `Bun.version` | la versión de Node.js sin la `v` inicial |
-| `server.stop()` | retorna de inmediato | retorna una promesa para awaitear |
+|                   | Bun                   | Node.js                                  |
+| ----------------- | --------------------- | ---------------------------------------- |
+| Paquete           | `@arcton/adapter-bun` | `@arcton/adapter-node`                   |
+| `adapter.version` | `Bun.version`         | la versión de Node.js sin la `v` inicial |
+| `server.stop()`   | retorna de inmediato  | retorna una promesa para awaitear        |
 
 `stop()` es el que aparece en el código. En Node.js, úsalo con await:
 
 ```ts
-import { nodeAdapter } from '@arcton/adapter-node'
-import { Arcton } from '@arcton/core'
+import { nodeAdapter } from "@arcton/adapter-node";
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => 'ok')
+app.get("/", () => "ok");
 
-const server = app.listen({ adapter: nodeAdapter })
+const server = app.listen({ adapter: nodeAdapter });
 
-process.on('SIGTERM', async () => {
-  await server.stop()
-})
+process.on("SIGTERM", async () => {
+  await server.stop();
+});
 ```
 
 ## Eligiendo un puerto
@@ -127,15 +127,15 @@ como los tests evitan colisiones — lee el valor real de vuelta desde el
 server:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => 'ok')
+app.get("/", () => "ok");
 
-const server = app.listen({ port: 0 })
+const server = app.listen({ port: 0 });
 
-console.log(`listening on ${server.url}`)
+console.log(`listening on ${server.url}`);
 ```
 
 Ver [Testing](../testing/overview.mdx) para el patrón completo.

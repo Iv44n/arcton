@@ -14,8 +14,8 @@ depends on registration order — which means adding a route can silently change
 which handler an existing request reaches.
 
 Arcton stores routes in a tree instead, one node per path segment. Matching
-walks the request's segments and descends. Cost tracks the *depth* of the path,
-not the *number* of routes, and the shape of the tree is the same no matter
+walks the request's segments and descends. Cost tracks the _depth_ of the path,
+not the _number_ of routes, and the shape of the tree is the same no matter
 what order routes were registered in.
 
 ## Three slots per node

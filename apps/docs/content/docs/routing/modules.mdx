@@ -7,24 +7,24 @@ A module is an `Arcton()` instance with a prefix. Mounting it with `use()`
 merges its routes into the parent:
 
 ```ts title="users.ts"
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-export const users = Arcton({ prefix: '/users' })
+export const users = Arcton({ prefix: "/users" });
 
-users.get('/', () => [{ id: '1' }])
-users.get('/:id', ctx => ({ id: ctx.params.id }))
-users.post('/', () => ({ created: true }))
+users.get("/", () => [{ id: "1" }]);
+users.get("/:id", (ctx) => ({ id: ctx.params.id }));
+users.post("/", () => ({ created: true }));
 ```
 
 ```ts title="index.ts"
-import { Arcton } from '@arcton/core'
-import { users } from './users'
+import { Arcton } from "@arcton/core";
+import { users } from "./users";
 
-const app = Arcton({ prefix: '/api' })
+const app = Arcton({ prefix: "/api" });
 
-app.use(users)
+app.use(users);
 
-app.listen()
+app.listen();
 ```
 
 That serves `GET /api/users`, `GET /api/users/:id` and `POST /api/users`.
@@ -61,17 +61,17 @@ Two consequences follow from merging at registration time:
   duplicate route directly.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const users = Arcton({ prefix: '/users' })
-users.get('/:id', ctx => ({ id: ctx.params.id }))
+const users = Arcton({ prefix: "/users" });
+users.get("/:id", (ctx) => ({ id: ctx.params.id }));
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
-app.use(users) // throws: Duplicate route: GET /users/:id is already registered
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
+app.use(users); // throws: Duplicate route: GET /users/:id is already registered
 
-app.listen()
+app.listen();
 ```
 
 ## Middleware and mounting
@@ -82,22 +82,22 @@ it — the same registration-order rule that governs
 [middleware](../middleware/execution-order.mdx) everywhere else.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const users = Arcton({ prefix: '/users' })
+const users = Arcton({ prefix: "/users" });
 
-users.get('/:id', ctx => ({ id: ctx.params.id }))
+users.get("/:id", (ctx) => ({ id: ctx.params.id }));
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  await next()
-  ctx.response.headers.set('X-Request-Id', crypto.randomUUID())
-})
+  await next();
+  ctx.response.headers.set("X-Request-Id", crypto.randomUUID());
+});
 
-app.use(users) // every route the module brings in gets the header
+app.use(users); // every route the module brings in gets the header
 
-app.listen()
+app.listen();
 ```
 
 Each instance is typed on its own, so a module's handlers see the context that
@@ -105,21 +105,21 @@ module declares. When a module's handlers need a typed value, the module
 declares the provider itself:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const users = Arcton({ prefix: '/users' })
+const users = Arcton({ prefix: "/users" });
 
 users
-  .provide(ctx => ({
-    requestId: ctx.request.headers.get('x-request-id') ?? crypto.randomUUID()
+  .provide((ctx) => ({
+    requestId: ctx.request.headers.get("x-request-id") ?? crypto.randomUUID(),
   }))
-  .get('/:id', ctx => ({ id: ctx.params.id, requestId: ctx.requestId }))
+  .get("/:id", (ctx) => ({ id: ctx.params.id, requestId: ctx.requestId }));
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(users)
+app.use(users);
 
-app.listen()
+app.listen();
 ```
 
 A module keeps its own middleware too, including path-scoped middleware, which
@@ -127,25 +127,25 @@ keeps comparing against the module-local path — the path as written inside the
 module, not the mounted one:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const api = Arcton({ prefix: '/api' })
+const api = Arcton({ prefix: "/api" });
 
-api.use('/admin', async (ctx, next) => {
-  if (ctx.request.headers.get('x-admin-key') !== 'secret') {
-    return new Response('Unauthorized', { status: 401 })
+api.use("/admin", async (ctx, next) => {
+  if (ctx.request.headers.get("x-admin-key") !== "secret") {
+    return new Response("Unauthorized", { status: 401 });
   }
-  await next()
-})
+  await next();
+});
 
-api.get('/admin/stats', () => ({ users: 1 }))
-api.get('/public', () => ({ ok: true }))
+api.get("/admin/stats", () => ({ users: 1 }));
+api.get("/public", () => ({ ok: true }));
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(api)
+app.use(api);
 
-app.listen()
+app.listen();
 ```
 
 The scope is written `'/admin'`, matching the route as written inside the
@@ -153,8 +153,8 @@ module, while the route is served at `/api/admin/stats`.
 
 <Callout>
   A parent's path-scoped middleware does not reach a mounted module. Put the
-  scoped middleware inside the module it belongs to, or use global middleware
-  on the parent.
+  scoped middleware inside the module it belongs to, or use global middleware on
+  the parent.
 </Callout>
 
 ## Nesting
@@ -162,19 +162,19 @@ module, while the route is served at `/api/admin/stats`.
 Modules mount modules, to any depth:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const posts = Arcton({ prefix: '/posts' })
-posts.get('/:postId', ctx => ({ post: ctx.params.postId }))
+const posts = Arcton({ prefix: "/posts" });
+posts.get("/:postId", (ctx) => ({ post: ctx.params.postId }));
 
-const users = Arcton({ prefix: '/users' })
-users.get('/:id', ctx => ({ id: ctx.params.id }))
-users.use(posts)
+const users = Arcton({ prefix: "/users" });
+users.get("/:id", (ctx) => ({ id: ctx.params.id }));
+users.use(posts);
 
-const app = Arcton({ prefix: '/api' })
-app.use(users)
+const app = Arcton({ prefix: "/api" });
+app.use(users);
 
-app.listen()
+app.listen();
 ```
 
 This serves `GET /api/users/:id` and `GET /api/users/posts/:postId`.
@@ -185,21 +185,21 @@ A [WebSocket route](./websockets.mdx) registered inside a module picks up both
 prefixes when mounted:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const chat = Arcton({ prefix: '/chat' })
+const chat = Arcton({ prefix: "/chat" });
 
-chat.ws('/room', {
+chat.ws("/room", {
   message(ws, message) {
-    ws.send(`echo: ${message}`)
-  }
-})
+    ws.send(`echo: ${message}`);
+  },
+});
 
-const app = Arcton({ prefix: '/api' })
+const app = Arcton({ prefix: "/api" });
 
-app.use(chat)
+app.use(chat);
 
-app.listen()
+app.listen();
 ```
 
 The socket is served at `/api/chat/room`.
@@ -219,21 +219,21 @@ src/
 ```
 
 ```ts title="src/index.ts" no-check
-import { Arcton } from '@arcton/core'
-import { orders } from './orders'
-import { users } from './users'
+import { Arcton } from "@arcton/core";
+import { orders } from "./orders";
+import { users } from "./users";
 
-const app = Arcton({ prefix: '/api' })
+const app = Arcton({ prefix: "/api" });
 
 app.use(async (ctx, next) => {
-  console.log(`${ctx.request.method} ${new URL(ctx.request.url).pathname}`)
-  await next()
-})
+  console.log(`${ctx.request.method} ${new URL(ctx.request.url).pathname}`);
+  await next();
+});
 
-app.use(users)
-app.use(orders)
+app.use(users);
+app.use(orders);
 
-app.listen({ port: 3000 })
+app.listen({ port: 3000 });
 ```
 
 The logging middleware is registered before the mounts, so it covers every

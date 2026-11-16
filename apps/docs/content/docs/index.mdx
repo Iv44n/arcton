@@ -8,15 +8,15 @@ values, compose behavior with middleware, and organize an application into
 modules that merge into a single route tree.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => ({ message: 'Welcome to Arcton' }))
+app.get("/", () => ({ message: "Welcome to Arcton" }));
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
 
-app.listen({ port: 3000 })
+app.listen({ port: 3000 });
 ```
 
 `ctx.params.id` is typed as `string` because the route literal says so — no

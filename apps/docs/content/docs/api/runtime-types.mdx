@@ -8,14 +8,14 @@ description: The RuntimeAdapter contract and the supporting types an adapter imp
 These types define what a `RuntimeAdapter` is and what it hands back — they're the contract `bunAdapter` and `nodeAdapter` (see [Adapters](./adapters.mdx)) implement, and the shapes you'd need if you wrote your own. Most applications never touch these directly; they matter when you're passing `adapter` to `app.listen()` or authoring a new one.
 
 ```ts
-import { nodeAdapter } from '@arcton/adapter-node'
-import { Arcton } from '@arcton/core'
+import { nodeAdapter } from "@arcton/adapter-node";
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => 'Hello from Node')
+app.get("/", () => "Hello from Node");
 
-app.listen({ adapter: nodeAdapter })
+app.listen({ adapter: nodeAdapter });
 ```
 
 ## `RuntimeAdapter`
@@ -26,10 +26,10 @@ app.listen({ adapter: nodeAdapter })
 
 ```ts no-check
 interface RuntimeAdapter {
-  readonly name: string
-  readonly version: string
-  readonly capabilities: RuntimeCapabilities
-  serve(options: RuntimeServeOptions): RuntimeServer
+  readonly name: string;
+  readonly version: string;
+  readonly capabilities: RuntimeCapabilities;
+  serve(options: RuntimeServeOptions): RuntimeServer;
 }
 ```
 
@@ -45,7 +45,7 @@ interface RuntimeAdapter {
 
 ```ts
 interface RuntimeCapabilities {
-  readonly websocket: boolean
+  readonly websocket: boolean;
 }
 ```
 
@@ -60,16 +60,16 @@ interface RuntimeCapabilities {
 ```ts no-check
 type RuntimeHandler = (
   request: Request,
-  context: RuntimeRequestContext
-) => Response | undefined | Promise<Response | undefined>
+  context: RuntimeRequestContext,
+) => Response | undefined | Promise<Response | undefined>;
 ```
 
 **Parameters**
 
-| Parameter | Type | Description |
-|---|---|---|
-| `request` | `Request` | The incoming request. A request that carries no body must have `request.body === null`, not an empty stream — that is how a route with an [optional body](../validation/body.mdx#optional-bodies) tells the two apart. |
-| `context` | `RuntimeRequestContext` | Runtime-provided helpers, currently just the low-level WebSocket upgrade primitive. |
+| Parameter | Type                    | Description                                                                                                                                                                                                            |
+| --------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `request` | `Request`               | The incoming request. A request that carries no body must have `request.body === null`, not an empty stream — that is how a route with an [optional body](../validation/body.mdx#optional-bodies) tells the two apart. |
+| `context` | `RuntimeRequestContext` | Runtime-provided helpers, currently just the low-level WebSocket upgrade primitive.                                                                                                                                    |
 
 **Return type** — a `Response`, or `undefined` when the handler has already completed the request another way (for example, a successful WebSocket upgrade).
 
@@ -81,10 +81,10 @@ type RuntimeHandler = (
 
 ```ts no-check
 interface RuntimeServeOptions {
-  fetch: RuntimeHandler
-  port: number
-  hostname?: string
-  websocket?: RuntimeWebSocketRoute[]
+  fetch: RuntimeHandler;
+  port: number;
+  hostname?: string;
+  websocket?: RuntimeWebSocketRoute[];
 }
 ```
 
@@ -98,15 +98,15 @@ interface RuntimeServeOptions {
 
 ```ts no-check
 interface RuntimeRequestContext {
-  upgrade(request: Request, options?: RuntimeUpgradeOptions): boolean
+  upgrade(request: Request, options?: RuntimeUpgradeOptions): boolean;
 }
 ```
 
 **Parameters**
 
-| Parameter | Type | Description |
-|---|---|---|
-| `request` | `Request` | The request to upgrade. |
+| Parameter | Type                    | Description                       |
+| --------- | ----------------------- | --------------------------------- |
+| `request` | `Request`               | The request to upgrade.           |
 | `options` | `RuntimeUpgradeOptions` | Optional upgrade payload/headers. |
 
 **Return type** — `boolean`: `true` if the upgrade succeeded, `false` otherwise.
@@ -116,17 +116,17 @@ interface RuntimeRequestContext {
 **Example** — a fragment showing the primitive, not a full adapter:
 
 ```ts
-import type { RuntimeHandler } from '@arcton/contracts'
+import type { RuntimeHandler } from "@arcton/contracts";
 
 const fetchFallback: RuntimeHandler = (request, context) => {
-  if (new URL(request.url).pathname === '/socket') {
+  if (new URL(request.url).pathname === "/socket") {
     return context.upgrade(request)
       ? undefined
-      : new Response('Upgrade failed', { status: 400 })
+      : new Response("Upgrade failed", { status: 400 });
   }
 
-  return new Response('not found', { status: 404 })
-}
+  return new Response("not found", { status: 404 });
+};
 ```
 
 ## `RuntimeUpgradeOptions`
@@ -137,8 +137,8 @@ const fetchFallback: RuntimeHandler = (request, context) => {
 
 ```ts
 interface RuntimeUpgradeOptions {
-  data?: unknown
-  headers?: Record<string, string>
+  data?: unknown;
+  headers?: Record<string, string>;
 }
 ```
 
@@ -152,9 +152,9 @@ interface RuntimeUpgradeOptions {
 
 ```ts
 interface RuntimeWebSocket {
-  readonly data: unknown
-  send(message: string | ArrayBuffer | ArrayBufferView): void
-  close(code?: number, reason?: string): void
+  readonly data: unknown;
+  send(message: string | ArrayBuffer | ArrayBufferView): void;
+  close(code?: number, reason?: string): void;
 }
 ```
 
@@ -168,10 +168,17 @@ interface RuntimeWebSocket {
 
 ```ts no-check
 interface RuntimeWebSocketHandler {
-  message(ws: RuntimeWebSocket, message: string | ArrayBuffer): void | Promise<void>
-  open?(ws: RuntimeWebSocket): void | Promise<void>
-  close?(ws: RuntimeWebSocket, code: number, reason: string): void | Promise<void>
-  drain?(ws: RuntimeWebSocket): void | Promise<void>
+  message(
+    ws: RuntimeWebSocket,
+    message: string | ArrayBuffer,
+  ): void | Promise<void>;
+  open?(ws: RuntimeWebSocket): void | Promise<void>;
+  close?(
+    ws: RuntimeWebSocket,
+    code: number,
+    reason: string,
+  ): void | Promise<void>;
+  drain?(ws: RuntimeWebSocket): void | Promise<void>;
 }
 ```
 
@@ -180,17 +187,17 @@ interface RuntimeWebSocketHandler {
 **Example** — a fragment showing the shape:
 
 ```ts
-import type { RuntimeWebSocketHandler } from '@arcton/contracts'
+import type { RuntimeWebSocketHandler } from "@arcton/contracts";
 
 const echoHandler: RuntimeWebSocketHandler = {
   message(ws, message) {
-    if (message === 'bye') {
-      ws.close(1000, 'client said bye')
-      return
+    if (message === "bye") {
+      ws.close(1000, "client said bye");
+      return;
     }
-    ws.send(message)
-  }
-}
+    ws.send(message);
+  },
+};
 ```
 
 ## `RuntimeWebSocketRoute`
@@ -201,8 +208,8 @@ const echoHandler: RuntimeWebSocketHandler = {
 
 ```ts no-check
 interface RuntimeWebSocketRoute {
-  path: string
-  handler: RuntimeWebSocketHandler
+  path: string;
+  handler: RuntimeWebSocketHandler;
 }
 ```
 
@@ -214,9 +221,9 @@ interface RuntimeWebSocketRoute {
 
 ```ts
 interface RuntimeServer {
-  readonly port: number
-  readonly url: URL
-  stop(closeActiveConnections?: boolean): void | Promise<void>
+  readonly port: number;
+  readonly url: URL;
+  stop(closeActiveConnections?: boolean): void | Promise<void>;
 }
 ```
 

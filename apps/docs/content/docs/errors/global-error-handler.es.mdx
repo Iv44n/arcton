@@ -10,20 +10,20 @@ errores — de un provider, un middleware, un parser de body o el propio
 handler de la ruta — antes de que lleguen tan lejos:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/risky', () => {
-  throw new Error('boom')
-})
+app.get("/risky", () => {
+  throw new Error("boom");
+});
 
 app.onError((err, ctx) => {
-  console.error(err)
-  return { error: 'Something went wrong' }
-})
+  console.error(err);
+  return { error: "Something went wrong" };
+});
 
-app.listen()
+app.listen();
 ```
 
 Un request a `/risky` ahora responde con lo que devuelve el handler en lugar
@@ -39,27 +39,27 @@ cosa — por ejemplo, distinguiendo `HttpError` para reutilizar el status que
 ya trae:
 
 ```ts
-import { Arcton, Http, HttpError } from '@arcton/core'
+import { Arcton, Http, HttpError } from "@arcton/core";
 
-declare function findOrder(id: string): { id: string } | undefined
+declare function findOrder(id: string): { id: string } | undefined;
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/orders/:id', ctx => {
-  const order = findOrder(ctx.params.id)
-  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`)
-  return order
-})
+app.get("/orders/:id", (ctx) => {
+  const order = findOrder(ctx.params.id);
+  if (!order) throw Http.NotFound(`Order ${ctx.params.id} not found`);
+  return order;
+});
 
 app.onError((err, ctx) => {
   if (err instanceof HttpError) {
-    ctx.response.status = err.status
-    return err.body ?? { code: err.code, message: err.message }
+    ctx.response.status = err.status;
+    return err.body ?? { code: err.code, message: err.message };
   }
-  return { code: 'INTERNAL_SERVER_ERROR', message: 'Internal Server Error' }
-})
+  return { code: "INTERNAL_SERVER_ERROR", message: "Internal Server Error" };
+});
 
-app.listen()
+app.listen();
 ```
 
 Un status ya asignado antes del throw — por ejemplo, por un middleware que
@@ -80,24 +80,24 @@ librería de esquemas. Un `Content-Type` de body no soportado llega como un
 `HttpError` con status `415`.
 
 ```ts
-import { Arcton, ValidationError } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton, ValidationError } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/users', {
+app.post("/users", {
   body: v.object({ email: v.pipe(v.string(), v.email()) }),
-  handler: ctx => ({ created: ctx.body })
-})
+  handler: (ctx) => ({ created: ctx.body }),
+});
 
 app.onError((err, ctx) => {
   if (err instanceof ValidationError) {
-    return { error: 'Invalid request', issues: err.issues }
+    return { error: "Invalid request", issues: err.issues };
   }
-  return { error: 'Something went wrong' }
-})
+  return { error: "Something went wrong" };
+});
 
-app.listen()
+app.listen();
 ```
 
 La respuesta de arriba es un `400` aunque el handler nunca asignó un status:
@@ -125,20 +125,20 @@ El [middleware](../middleware/global.mdx) global corre incluso cuando nada
 matchea el request, así que `onError()` también cubre un throw ahí:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-declare function logRequest(request: Request): void
+declare function logRequest(request: Request): void;
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  logRequest(ctx.request) // lanza un error si el logger está caído
-  await next()
-})
+  logRequest(ctx.request); // lanza un error si el logger está caído
+  await next();
+});
 
-app.onError((err, ctx) => ({ error: 'Something went wrong' }))
+app.onError((err, ctx) => ({ error: "Something went wrong" }));
 
-app.listen()
+app.listen();
 ```
 
 ## Es un único handler, a nivel de la app completa
@@ -159,6 +159,6 @@ relanza el resto, que entonces llega a `onError()` como el catch-all final.
 
 <Callout type="warn">
   Si el propio handler de `onError()` lanza un error, ese error no vuelve a
-  pasarle por su cuenta — se propaga de la misma forma en que lo haría un
-  error no capturado sin ningún handler registrado.
+  pasarle por su cuenta — se propaga de la misma forma en que lo haría un error
+  no capturado sin ningún handler registrado.
 </Callout>

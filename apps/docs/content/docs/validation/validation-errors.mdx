@@ -9,7 +9,10 @@ When a `params`, `query` or `body` schema fails, Arcton responds `400` with an
 ```json
 {
   "issues": [
-    { "message": "Invalid length: Expected >=1 but received 0", "path": ["..."] }
+    {
+      "message": "Invalid length: Expected >=1 but received 0",
+      "path": ["..."]
+    }
   ]
 }
 ```
@@ -45,19 +48,19 @@ if a client depends on the exact fields, pin the schema library that produces
 them.
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/users', {
+app.post("/users", {
   body: v.object({
-    email: v.pipe(v.string(), v.email())
+    email: v.pipe(v.string(), v.email()),
   }),
-  handler: ctx => ({ created: ctx.body })
-})
+  handler: (ctx) => ({ created: ctx.body }),
+});
 
-app.listen()
+app.listen();
 ```
 
 A `POST /users` with a body whose `email` field fails `v.email()` gets the

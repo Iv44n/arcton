@@ -8,119 +8,119 @@
  * exists, that every heading anchor exists, and that no page uses an absolute
  * /docs URL (which would bypass the locale prefix).
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 
-const CONTENT = resolve(SCRIPT_DIR, '../content/docs')
+const CONTENT = resolve(SCRIPT_DIR, "../content/docs");
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry)
-    if (statSync(full).isDirectory()) walk(full, out)
-    else if (entry.endsWith('.mdx')) out.push(full)
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) walk(full, out);
+    else if (entry.endsWith(".mdx")) out.push(full);
   }
-  return out
+  return out;
 }
 
 // GitHub-style heading slug, matching how the docs renderer generates anchors
 function slugify(heading: string): string {
   return heading
     .toLowerCase()
-    .replace(/`/g, '')
-    .replace(/[^\w\s-]/g, '')
+    .replace(/`/g, "")
+    .replace(/[^\w\s-]/g, "")
     .trim()
-    .replace(/\s+/g, '-')
+    .replace(/\s+/g, "-");
 }
 
-const files = walk(CONTENT).sort()
+const files = walk(CONTENT).sort();
 
-const anchors = new Map<string, Set<string>>()
+const anchors = new Map<string, Set<string>>();
 for (const file of files) {
-  const set = new Set<string>()
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
-    const heading = /^#{2,6}\s+(.+?)\s*$/.exec(line)
-    if (heading?.[1]) set.add(slugify(heading[1]))
+  const set = new Set<string>();
+  for (const line of readFileSync(file, "utf8").split("\n")) {
+    const heading = /^#{2,6}\s+(.+?)\s*$/.exec(line);
+    if (heading?.[1]) set.add(slugify(heading[1]));
   }
-  anchors.set(file, set)
+  anchors.set(file, set);
 }
 
 interface Problem {
-  file: string
-  line: number
-  href: string
-  reason: string
+  file: string;
+  line: number;
+  href: string;
+  reason: string;
 }
 
-const problems: Problem[] = []
-let checked = 0
+const problems: Problem[] = [];
+let checked = 0;
 
 for (const file of files) {
-  const rel = relative(CONTENT, file)
-  const lines = readFileSync(file, 'utf8').split('\n')
-  let inCard = false
+  const rel = relative(CONTENT, file);
+  const lines = readFileSync(file, "utf8").split("\n");
+  let inCard = false;
 
   for (const [index, line] of lines.entries()) {
-    if (/<Card(?:\s|$)/.test(line)) inCard = true
+    if (/<Card(?:\s|$)/.test(line)) inCard = true;
 
     const hrefs = [
-      ...[...line.matchAll(/\]\(([^)\s]+)\)/g)].map(match => match[1]),
-      ...[...line.matchAll(/href="([^"]+)"/g)].map(match => match[1])
-    ].filter((href): href is string => href !== undefined)
+      ...[...line.matchAll(/\]\(([^)\s]+)\)/g)].map((match) => match[1]),
+      ...[...line.matchAll(/href="([^"]+)"/g)].map((match) => match[1]),
+    ].filter((href): href is string => href !== undefined);
 
     for (const href of hrefs) {
-      if (/^(https?:|mailto:)/.test(href)) continue
+      if (/^(https?:|mailto:)/.test(href)) continue;
 
-      checked++
+      checked++;
 
-      if (href.startsWith('#')) {
-        const anchor = href.slice(1)
+      if (href.startsWith("#")) {
+        const anchor = href.slice(1);
         if (!anchors.get(file)?.has(anchor)) {
           problems.push({
             file: rel,
             line: index + 1,
             href,
-            reason: 'anchor not found on this page'
-          })
+            reason: "anchor not found on this page",
+          });
         }
-        continue
+        continue;
       }
 
-      if (href.startsWith('/')) {
+      if (href.startsWith("/")) {
         problems.push({
           file: rel,
           line: index + 1,
           href,
-          reason: 'absolute link — use a relative path ending in .mdx'
-        })
-        continue
+          reason: "absolute link — use a relative path ending in .mdx",
+        });
+        continue;
       }
 
-      const [path = '', anchor] = href.split('#')
+      const [path = "", anchor] = href.split("#");
       const cardPath = inCard
-        ? path.startsWith('../docs/')
-          ? `${path.slice('../docs/'.length)}.mdx`
+        ? path.startsWith("../docs/")
+          ? `${path.slice("../docs/".length)}.mdx`
           : `${path}.mdx`
-        : path
-      const target = resolve(dirname(file), cardPath)
+        : path;
+      const target = resolve(dirname(file), cardPath);
 
-      if (!inCard && !path.endsWith('.mdx')) {
+      if (!inCard && !path.endsWith(".mdx")) {
         problems.push({
           file: rel,
           line: index + 1,
           href,
-          reason: 'relative link must point at a .mdx file'
-        })
-        continue
+          reason: "relative link must point at a .mdx file",
+        });
+        continue;
       }
 
-      let exists = true
+      let exists = true;
       try {
-        statSync(target)
+        statSync(target);
       } catch {
-        exists = false
+        exists = false;
       }
 
       if (!exists) {
@@ -128,9 +128,9 @@ for (const file of files) {
           file: rel,
           line: index + 1,
           href,
-          reason: `target does not exist (${relative(CONTENT, target)})`
-        })
-        continue
+          reason: `target does not exist (${relative(CONTENT, target)})`,
+        });
+        continue;
       }
 
       if (anchor && !anchors.get(target)?.has(anchor)) {
@@ -138,27 +138,27 @@ for (const file of files) {
           file: rel,
           line: index + 1,
           href,
-          reason: `anchor "#${anchor}" not found in ${relative(CONTENT, target)}`
-        })
+          reason: `anchor "#${anchor}" not found in ${relative(CONTENT, target)}`,
+        });
       }
     }
 
-    if (line.includes('/>')) inCard = false
+    if (line.includes("/>")) inCard = false;
   }
 }
 
 if (problems.length === 0) {
   console.log(
-    `check-links: ${checked} internal links across ${files.length} pages, 0 broken links`
-  )
-  process.exit(0)
+    `check-links: ${checked} internal links across ${files.length} pages, 0 broken links`,
+  );
+  process.exit(0);
 }
 
 console.error(
-  `check-links: ${problems.length} broken link(s) of ${checked} checked\n`
-)
+  `check-links: ${problems.length} broken link(s) of ${checked} checked\n`,
+);
 for (const problem of problems) {
-  console.error(`  ${problem.file}:${problem.line}  ${problem.href}`)
-  console.error(`    ${problem.reason}\n`)
+  console.error(`  ${problem.file}:${problem.line}  ${problem.href}`);
+  console.error(`    ${problem.reason}\n`);
 }
-process.exit(1)
+process.exit(1);

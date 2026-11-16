@@ -8,16 +8,16 @@ description: Las factories logger() y createLogger(), la interfaz Logger, y sus 
 Loguea una línea por request, sin ninguna dependencia en runtime:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { logger } from '@arcton/logger'
+import { Arcton } from "@arcton/core";
+import { logger } from "@arcton/logger";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(logger())
+app.use(logger());
 
-app.get('/', () => ({ hello: 'world' }))
+app.get("/", () => ({ hello: "world" }));
 
-app.listen()
+app.listen();
 ```
 
 `@arcton/logger` es solo `app.use()`. Ver
@@ -30,13 +30,13 @@ app.listen()
 **Firma**
 
 ```ts no-check
-function logger(options?: LoggerOptions): ArctonLogger
+function logger(options?: LoggerOptions): ArctonLogger;
 ```
 
 **Parámetros**
 
-| Parámetro | Tipo | Descripción |
-|---|---|---|
+| Parámetro | Tipo            | Descripción                                  |
+| --------- | --------------- | -------------------------------------------- |
 | `options` | `LoggerOptions` | Opcional. Ver abajo cada campo y su default. |
 
 **Tipo de retorno** — un [`ArctonLogger`](#arctonlogger): un
@@ -68,19 +68,19 @@ function logger(options?: LoggerOptions): ArctonLogger
 **Ejemplo**
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { logger } from '@arcton/logger'
+import { Arcton } from "@arcton/core";
+import { logger } from "@arcton/logger";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(logger({ level: 'debug', pretty: true }))
+app.use(logger({ level: "debug", pretty: true }));
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
-app.get('/boom', () => {
-  throw new Error('kaboom')
-})
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
+app.get("/boom", () => {
+  throw new Error("kaboom");
+});
 
-app.listen()
+app.listen();
 ```
 
 ## `createLogger()`
@@ -93,13 +93,13 @@ usable en un background job o al arrancar.
 **Firma**
 
 ```ts no-check
-function createLogger(options?: LoggerOptions): Logger
+function createLogger(options?: LoggerOptions): Logger;
 ```
 
 **Parámetros**
 
-| Parámetro | Tipo | Descripción |
-|---|---|---|
+| Parámetro | Tipo            | Descripción                                  |
+| --------- | --------------- | -------------------------------------------- |
 | `options` | `LoggerOptions` | Opcional. Ver abajo cada campo y su default. |
 
 **Tipo de retorno** — un [`Logger`](#logger).
@@ -109,14 +109,14 @@ function createLogger(options?: LoggerOptions): Logger
 **Ejemplo**
 
 ```ts
-import { createLogger } from '@arcton/logger'
+import { createLogger } from "@arcton/logger";
 
-const log = createLogger({ level: 'debug' })
+const log = createLogger({ level: "debug" });
 
-log.info('server starting', { pid: process.pid })
+log.info("server starting", { pid: process.pid });
 
-const dbLog = log.child({ component: 'database' })
-dbLog.info('query executed', { table: 'users' })
+const dbLog = log.child({ component: "database" });
+dbLog.info("query executed", { table: "users" });
 ```
 
 ## `Logger`
@@ -129,13 +129,13 @@ hasta `fatal`) y `child()`, devuelta tanto por `createLogger()` como en
 
 ```ts
 interface Logger {
-  trace(msg: string, data?: Record<string, unknown>): void
-  debug(msg: string, data?: Record<string, unknown>): void
-  info(msg: string, data?: Record<string, unknown>): void
-  warn(msg: string, data?: Record<string, unknown>): void
-  error(msg: string, data?: Record<string, unknown>): void
-  fatal(msg: string, data?: Record<string, unknown>): void
-  child(bindings: Record<string, unknown>): Logger
+  trace(msg: string, data?: Record<string, unknown>): void;
+  debug(msg: string, data?: Record<string, unknown>): void;
+  info(msg: string, data?: Record<string, unknown>): void;
+  warn(msg: string, data?: Record<string, unknown>): void;
+  error(msg: string, data?: Record<string, unknown>): void;
+  fatal(msg: string, data?: Record<string, unknown>): void;
+  child(bindings: Record<string, unknown>): Logger;
 }
 ```
 
@@ -144,18 +144,20 @@ interface Logger {
 <TypeTable
   type={{
     msg: {
-      description: 'El mensaje del log.',
-      type: 'string'
+      description: "El mensaje del log.",
+      type: "string",
     },
     data: {
-      description: 'Campos estructurados para esta llamada, mezclados en el record junto con cualquier binding.',
-      type: 'Record<string, unknown>',
-      default: 'undefined'
+      description:
+        "Campos estructurados para esta llamada, mezclados en el record junto con cualquier binding.",
+      type: "Record<string, unknown>",
+      default: "undefined",
     },
     bindings: {
-      description: 'Campos mezclados en cada record que escriba el Logger devuelto — y sus propios hijos — de ahí en adelante.',
-      type: 'Record<string, unknown>'
-    }
+      description:
+        "Campos mezclados en cada record que escriba el Logger devuelto — y sus propios hijos — de ahí en adelante.",
+      type: "Record<string, unknown>",
+    },
   }}
 />
 
@@ -172,14 +174,14 @@ agregaron — sin mutar el logger sobre el que se llamó.
 **Ejemplo**
 
 ```ts
-import { createLogger } from '@arcton/logger'
+import { createLogger } from "@arcton/logger";
 
-const log = createLogger()
+const log = createLogger();
 
-log.warn('cache miss', { key: 'user:42' })
+log.warn("cache miss", { key: "user:42" });
 
-const requestLog = log.child({ requestId: 'req_1' })
-requestLog.info('handled') // incluye requestId: 'req_1'
+const requestLog = log.child({ requestId: "req_1" });
+requestLog.info("handled"); // incluye requestId: 'req_1'
 ```
 
 ## `LoggerOptions`
@@ -190,24 +192,24 @@ por `createLogger()`.
 **Firma**
 
 ```ts
-import type { LevelWithSilent } from '@arcton/logger'
+import type { LevelWithSilent } from "@arcton/logger";
 
 interface LoggerOptions {
-  level?: LevelWithSilent
-  pretty?: boolean
-  sink?: (line: string) => void
-  bindings?: Record<string, unknown>
+  level?: LevelWithSilent;
+  pretty?: boolean;
+  sink?: (line: string) => void;
+  bindings?: Record<string, unknown>;
 }
 ```
 
 **Campos**
 
-| Campo | Tipo | Default | Descripción |
-|---|---|---|---|
-| `level` | `LevelWithSilent` | `'info'` | Nivel mínimo a loguear. Cualquier cosa por debajo se descarta antes de siquiera construir un record. |
-| `pretty` | `boolean` | `false` | Formatea para que lo lea una persona en vez de JSON separado por líneas. |
-| `sink` | `(line: string) => void` | escribe a `process.stdout` si existe, `console.log` si no | Dónde se escribe cada línea formateada. |
-| `bindings` | `Record<string, unknown>` | `{}` | Campos mezclados en cada record — lo que `child()` agrega, no un reemplazo. |
+| Campo      | Tipo                      | Default                                                   | Descripción                                                                                          |
+| ---------- | ------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `level`    | `LevelWithSilent`         | `'info'`                                                  | Nivel mínimo a loguear. Cualquier cosa por debajo se descarta antes de siquiera construir un record. |
+| `pretty`   | `boolean`                 | `false`                                                   | Formatea para que lo lea una persona en vez de JSON separado por líneas.                             |
+| `sink`     | `(line: string) => void`  | escribe a `process.stdout` si existe, `console.log` si no | Dónde se escribe cada línea formateada.                                                              |
+| `bindings` | `Record<string, unknown>` | `{}`                                                      | Campos mezclados en cada record — lo que `child()` agrega, no un reemplazo.                          |
 
 **Comportamiento:** el `sink` por defecto se resuelve una sola vez, cuando
 se carga `@arcton/logger` — `process.stdout.write` en Node/Bun,
@@ -223,8 +225,8 @@ más amplio que acepta `LoggerOptions.level`.
 **Firma**
 
 ```ts
-type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal'
-type LevelWithSilent = LogLevel | 'silent'
+type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
+type LevelWithSilent = LogLevel | "silent";
 ```
 
 **Comportamiento:** ordenados como se listan, `trace` el más bajo — una
@@ -240,8 +242,8 @@ que nada pasa el filtro.
 
 ```ts no-check
 type ArctonLogger = Middleware & {
-  readonly logger: Logger
-}
+  readonly logger: Logger;
+};
 ```
 
 **Comportamiento** — una función [`Middleware`](./middleware-types.mdx#middleware)
@@ -251,15 +253,15 @@ común, así que `app.use(logger())` funciona exactamente igual que
 cualquier cosa fuera del ciclo request/response:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { logger } from '@arcton/logger'
+import { Arcton } from "@arcton/core";
+import { logger } from "@arcton/logger";
 
-const app = Arcton()
-const log = logger()
+const app = Arcton();
+const log = logger();
 
-app.use(log)
-app.get('/', () => 'ok')
+app.use(log);
+app.get("/", () => "ok");
 
-const server = app.listen({ port: 0 })
-log.logger.info(`listening on ${server.url}`)
+const server = app.listen({ port: 0 });
+log.logger.info(`listening on ${server.url}`);
 ```

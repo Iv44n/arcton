@@ -8,13 +8,13 @@ An adapter is the only part of Arcton that talks to a runtime. It receives a
 and returns a handle.
 
 ```ts
-import type { RuntimeServeOptions, RuntimeServer } from '@arcton/contracts'
+import type { RuntimeServeOptions, RuntimeServer } from "@arcton/contracts";
 
 interface RuntimeAdapter {
-  readonly name: string
-  readonly version: string
-  readonly capabilities: { readonly websocket: boolean }
-  serve(options: RuntimeServeOptions): RuntimeServer
+  readonly name: string;
+  readonly version: string;
+  readonly capabilities: { readonly websocket: boolean };
+  serve(options: RuntimeServeOptions): RuntimeServer;
 }
 ```
 
@@ -89,11 +89,11 @@ because pretending they are identical would be a worse trade than naming them.
 Implement `RuntimeAdapter` and pass the instance to `listen()`:
 
 ```ts
-import type { RuntimeAdapter } from '@arcton/contracts'
+import type { RuntimeAdapter } from "@arcton/contracts";
 
 export const myAdapter: RuntimeAdapter = {
-  name: 'my-runtime',
-  version: '1.0.0',
+  name: "my-runtime",
+  version: "1.0.0",
   capabilities: { websocket: false },
   serve(options) {
     // start a server that calls options.fetch(request, context)
@@ -101,10 +101,10 @@ export const myAdapter: RuntimeAdapter = {
     return {
       port: options.port,
       url: new URL(`http://localhost:${options.port}/`),
-      stop() {}
-    }
-  }
-}
+      stop() {},
+    };
+  },
+};
 ```
 
 The `serve()` implementation must call `options.fetch` for every request and

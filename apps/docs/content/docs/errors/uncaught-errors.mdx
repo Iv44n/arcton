@@ -13,15 +13,15 @@ runtime adapter serving the request — unless the app has registered a
 [global error handler](./global-error-handler.mdx), which catches it first.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/risky', () => {
-  throw new Error('boom')
-})
+app.get("/risky", () => {
+  throw new Error("boom");
+});
 
-app.listen()
+app.listen();
 ```
 
 A request to `/risky` here logs the error with `console.error` and responds
@@ -34,16 +34,16 @@ A couple of Arcton's own checks throw synchronously while a response is being
 built, and are uncaught the same way:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/broken', ctx => {
-  ctx.response.status = 999
-  return { ok: true }
-})
+app.get("/broken", (ctx) => {
+  ctx.response.status = 999;
+  return { ok: true };
+});
 
-app.listen()
+app.listen();
 ```
 
 Setting a status outside `[200, 599]` throws

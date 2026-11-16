@@ -16,13 +16,13 @@ que listarlo con `content` — ver
 Estos son los parsers que trae Arcton. Una ruta solo recibe un media type que
 acepta: `application/json` por defecto, o los que lista en `content`.
 
-| Content-Type | Valor parseado |
-|---|---|
+| Content-Type                                        | Valor parseado         |
+| --------------------------------------------------- | ---------------------- |
 | `application/json` y cualquier `application/*+json` | `await request.json()` |
-| `text/plain` | `string` |
-| `application/x-www-form-urlencoded` | `FormData` |
-| `multipart/form-data` | `FormData` |
-| `application/octet-stream` | `ArrayBuffer` |
+| `text/plain`                                        | `string`               |
+| `application/x-www-form-urlencoded`                 | `FormData`             |
+| `multipart/form-data`                               | `FormData`             |
+| `application/octet-stream`                          | `ArrayBuffer`          |
 
 Una request cuyo `Content-Type` la ruta no acepta — o que no tiene parser, integrado
 o personalizado — recibe `415` con un body vacío. Un parser integrado que
@@ -39,27 +39,27 @@ type de nuevo reemplaza el parser anterior — es una tabla plana, no un pipelin
 ordenado, así que no importa en qué momento lo llames respecto a tus rutas.
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.parser('text/csv', async request => {
-  const [header = '', ...rows] = (await request.text()).trim().split('\n')
-  const keys = header.split(',')
-  return rows.map(row =>
-    Object.fromEntries(keys.map((key, i) => [key, row.split(',')[i]]))
-  )
-})
+app.parser("text/csv", async (request) => {
+  const [header = "", ...rows] = (await request.text()).trim().split("\n");
+  const keys = header.split(",");
+  return rows.map((row) =>
+    Object.fromEntries(keys.map((key, i) => [key, row.split(",")[i]])),
+  );
+});
 
-app.post('/import', {
+app.post("/import", {
   body: {
-    content: { 'text/csv': v.array(v.record(v.string(), v.string())) }
+    content: { "text/csv": v.array(v.record(v.string(), v.string())) },
   },
-  handler: ctx => ({ imported: ctx.body.length, rows: ctx.body })
-})
+  handler: (ctx) => ({ imported: ctx.body.length, rows: ctx.body }),
+});
 
-app.listen()
+app.listen();
 ```
 
 Un `BodyParser` recibe el `Request` crudo, no `ctx` — el parseo no tiene nada que ver

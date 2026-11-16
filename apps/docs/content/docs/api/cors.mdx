@@ -8,21 +8,21 @@ description: The cors() middleware factory and its options, from @arcton/cors.
 Add CORS headers and handle preflight requests with one global middleware:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(
   cors({
-    origin: ['https://app.example.com'],
-    credentials: true
-  })
-)
+    origin: ["https://app.example.com"],
+    credentials: true,
+  }),
+);
 
-app.get('/', () => ({ hello: 'world' }))
+app.get("/", () => ({ hello: "world" }));
 
-app.listen()
+app.listen();
 ```
 
 Because `cors()` returns unscoped global middleware, it also covers `404`/`405` responses (see [Global middleware](../middleware/global.mdx)).
@@ -34,13 +34,13 @@ Because `cors()` returns unscoped global middleware, it also covers `404`/`405` 
 **Signature**
 
 ```ts no-check
-function cors(options?: CorsOptions): Middleware
+function cors(options?: CorsOptions): Middleware;
 ```
 
 **Parameters**
 
-| Parameter | Type | Description |
-|---|---|---|
+| Parameter | Type          | Description                                  |
+| --------- | ------------- | -------------------------------------------- |
 | `options` | `CorsOptions` | Optional. See below for fields and defaults. |
 
 **Return type** — a [`Middleware`](./middleware-types.mdx), meant to be passed to `app.use()`.
@@ -71,27 +71,27 @@ A credentialed response can't use the wildcard origin; the browser rejects it.
 
 ```ts no-check
 interface CorsOptions {
-  origin?: CorsOrigin
-  methods?: string[]
-  allowedHeaders?: string[]
-  exposedHeaders?: string[]
-  credentials?: boolean
-  maxAge?: number
-  preflight?: boolean
+  origin?: CorsOrigin;
+  methods?: string[];
+  allowedHeaders?: string[];
+  exposedHeaders?: string[];
+  credentials?: boolean;
+  maxAge?: number;
+  preflight?: boolean;
 }
 ```
 
 **Fields**
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `origin` | `CorsOrigin` | `'*'` | Which origins are allowed. See `CorsOrigin` below. |
-| `methods` | `string[]` | — | Sent as `Access-Control-Allow-Methods` on a preflight. When omitted, the preflight echoes the request's own `Access-Control-Request-Method`. |
-| `allowedHeaders` | `string[]` | — | Sent as `Access-Control-Allow-Headers` on a preflight. When omitted, the preflight echoes the request's own `Access-Control-Request-Headers`. |
-| `exposedHeaders` | `string[]` | — | Sent as `Access-Control-Expose-Headers` on the actual response. |
-| `credentials` | `boolean` | `false` | Adds `Access-Control-Allow-Credentials: true`. Cannot be combined with `origin: '*'`. |
-| `maxAge` | `number` | — | Sent as `Access-Control-Max-Age` on a preflight. |
-| `preflight` | `boolean` | `true` | Whether a real preflight is automatically answered with `204`. |
+| Field            | Type         | Default | Description                                                                                                                                   |
+| ---------------- | ------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `origin`         | `CorsOrigin` | `'*'`   | Which origins are allowed. See `CorsOrigin` below.                                                                                            |
+| `methods`        | `string[]`   | —       | Sent as `Access-Control-Allow-Methods` on a preflight. When omitted, the preflight echoes the request's own `Access-Control-Request-Method`.  |
+| `allowedHeaders` | `string[]`   | —       | Sent as `Access-Control-Allow-Headers` on a preflight. When omitted, the preflight echoes the request's own `Access-Control-Request-Headers`. |
+| `exposedHeaders` | `string[]`   | —       | Sent as `Access-Control-Expose-Headers` on the actual response.                                                                               |
+| `credentials`    | `boolean`    | `false` | Adds `Access-Control-Allow-Credentials: true`. Cannot be combined with `origin: '*'`.                                                         |
+| `maxAge`         | `number`     | —       | Sent as `Access-Control-Max-Age` on a preflight.                                                                                              |
+| `preflight`      | `boolean`    | `true`  | Whether a real preflight is automatically answered with `204`.                                                                                |
 
 ## `CorsOrigin`
 
@@ -101,10 +101,7 @@ interface CorsOptions {
 
 ```ts
 type CorsOrigin =
-  | '*'
-  | string
-  | string[]
-  | ((origin: string, request: Request) => boolean)
+  "*" | string | string[] | ((origin: string, request: Request) => boolean);
 ```
 
 **Behavior** — `'*'` allows any origin (and cannot be combined with `credentials: true`). A `string` allows exactly that origin. A `string[]` allows any origin in the list. A function receives the request's `Origin` header value and the `Request` itself, and returns whether it's allowed — evaluated per request.
@@ -112,19 +109,19 @@ type CorsOrigin =
 **Example**
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(
   cors({
     origin: (origin, request) =>
-      origin.endsWith('.example.com') || request.headers.has('x-internal')
-  })
-)
+      origin.endsWith(".example.com") || request.headers.has("x-internal"),
+  }),
+);
 
-app.get('/status', () => ({ ok: true }))
+app.get("/status", () => ({ ok: true }));
 
-app.listen()
+app.listen();
 ```

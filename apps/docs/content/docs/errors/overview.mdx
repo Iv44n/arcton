@@ -11,19 +11,19 @@ returning a `Response`, by returning a plain value that gets mapped to one, or
 by setting `ctx.response` before the body finalizes.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => {
-  if (ctx.params.id === '0') {
-    return new Response('Not found', { status: 404 })
+app.get("/users/:id", (ctx) => {
+  if (ctx.params.id === "0") {
+    return new Response("Not found", { status: 404 });
   }
 
-  return { id: ctx.params.id }
-})
+  return { id: ctx.params.id };
+});
 
-app.listen()
+app.listen();
 ```
 
 That single idea covers three situations you'll run into:

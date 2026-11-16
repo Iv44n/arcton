@@ -16,18 +16,16 @@ reemplazo de la tuya:
 
 ```ts title="auth.ts"
 declare const auth: {
-  handler: (request: Request) => Promise<Response>
+  handler: (request: Request) => Promise<Response>;
   api: {
-    getSession: (options: {
-      headers: Headers
-    }) => Promise<{
-      user: { id: string; email: string }
-      session: { id: string }
-    } | null>
-  }
-}
+    getSession: (options: { headers: Headers }) => Promise<{
+      user: { id: string; email: string };
+      session: { id: string };
+    } | null>;
+  };
+};
 
-export { auth }
+export { auth };
 ```
 
 ## Instalación
@@ -70,14 +68,14 @@ El `auth.handler` de Better Auth recibe un `Request` y devuelve un
 [`app.all()`](../routing/http-methods.mdx#every-method-on-one-path):
 
 ```ts title="index.ts"
-import { Arcton } from '@arcton/core'
-import { auth } from './auth'
+import { Arcton } from "@arcton/core";
+import { auth } from "./auth";
 
-const app = Arcton()
+const app = Arcton();
 
-app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+app.all("/api/auth/*path", (ctx) => auth.handler(ctx.request));
 
-app.listen()
+app.listen();
 ```
 
 `app.all()` registra el mismo handler para todos los métodos HTTP que
@@ -104,23 +102,23 @@ con `credentials: true` para que la cookie de sesión se envíe entre
 orígenes. Agrega ese mismo origen a `trustedOrigins` de Better Auth:
 
 ```ts title="index.ts"
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
-import { auth } from './auth'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
+import { auth } from "./auth";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(
   cors({
-    origin: 'http://localhost:3001',
+    origin: "http://localhost:3001",
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization']
-  })
-)
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 
-app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+app.all("/api/auth/*path", (ctx) => auth.handler(ctx.request));
 
-app.listen()
+app.listen();
 ```
 
 Consulta [CORS](../middleware/cors.mdx) para ver todas las opciones
@@ -134,27 +132,26 @@ encabezados de la solicitud, y expón esa información con
 en cualquier ruta registrada después:
 
 ```ts title="index.ts"
-import { Arcton } from '@arcton/core'
-import { auth } from './auth'
+import { Arcton } from "@arcton/core";
+import { auth } from "./auth";
 
-const app = Arcton()
-  .provide(async ctx => {
-    const session = await auth.api.getSession({ headers: ctx.request.headers })
-    return { user: session?.user ?? null, session: session?.session ?? null }
-  })
+const app = Arcton().provide(async (ctx) => {
+  const session = await auth.api.getSession({ headers: ctx.request.headers });
+  return { user: session?.user ?? null, session: session?.session ?? null };
+});
 
-app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+app.all("/api/auth/*path", (ctx) => auth.handler(ctx.request));
 
 app.get(
-  '/me',
+  "/me",
   async (ctx, next) => {
-    if (!ctx.user) return new Response('Unauthorized', { status: 401 })
-    await next()
+    if (!ctx.user) return new Response("Unauthorized", { status: 401 });
+    await next();
   },
-  ctx => ({ user: ctx.user })
-)
+  (ctx) => ({ user: ctx.user }),
+);
 
-app.listen()
+app.listen();
 ```
 
 `ctx.user` y `ctx.session` son `null` cuando no hay una sesión activa.
@@ -165,37 +162,37 @@ sección de rutas.
 ## Ejemplo completo
 
 ```ts title="index.ts"
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
-import { auth } from './auth'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
+import { auth } from "./auth";
 
 const app = Arcton()
   .use(
     cors({
-      origin: 'http://localhost:3001',
+      origin: "http://localhost:3001",
       credentials: true,
-      allowedHeaders: ['Content-Type', 'Authorization']
-    })
+      allowedHeaders: ["Content-Type", "Authorization"],
+    }),
   )
-  .provide(async ctx => {
-    const session = await auth.api.getSession({ headers: ctx.request.headers })
-    return { user: session?.user ?? null, session: session?.session ?? null }
-  })
+  .provide(async (ctx) => {
+    const session = await auth.api.getSession({ headers: ctx.request.headers });
+    return { user: session?.user ?? null, session: session?.session ?? null };
+  });
 
-app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+app.all("/api/auth/*path", (ctx) => auth.handler(ctx.request));
 
 app.get(
-  '/me',
+  "/me",
   async (ctx, next) => {
-    if (!ctx.user) return new Response('Unauthorized', { status: 401 })
-    await next()
+    if (!ctx.user) return new Response("Unauthorized", { status: 401 });
+    await next();
   },
-  ctx => ({ user: ctx.user })
-)
+  (ctx) => ({ user: ctx.user }),
+);
 
-app.get('/posts', ctx => ({ posts: [], viewer: ctx.user }))
+app.get("/posts", (ctx) => ({ posts: [], viewer: ctx.user }));
 
-app.listen()
+app.listen();
 ```
 
 Esto funciona igual en Bun y en Node — Arcton entrega a `auth.handler` un

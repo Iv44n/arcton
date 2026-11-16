@@ -16,21 +16,21 @@ at that moment and stores the finished chain with the route. Calls made
 afterwards do not reach it.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/before', () => ({ timed: false }))
+app.get("/before", () => ({ timed: false }));
 
 app.use(async (ctx, next) => {
-  const start = performance.now()
-  await next()
-  ctx.response.headers.set('X-Time', `${performance.now() - start}ms`)
-})
+  const start = performance.now();
+  await next();
+  ctx.response.headers.set("X-Time", `${performance.now() - start}ms`);
+});
 
-app.get('/after', () => ({ timed: true }))
+app.get("/after", () => ({ timed: true }));
 
-app.listen()
+app.listen();
 ```
 
 `/after` gets the `X-Time` header. `/before` does not — it was registered when
@@ -40,8 +40,8 @@ This is why the file reads the way it behaves: move a `use()` call up or down
 and you change exactly the routes below it.
 
 <Callout>
-  The practical rule: register global middleware and providers at the top of
-  the file, before any route. Then every route sees all of them.
+  The practical rule: register global middleware and providers at the top of the
+  file, before any route. Then every route sees all of them.
 </Callout>
 
 ## The order inside a request
@@ -75,35 +75,35 @@ handler                                  │
 Seen in code:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  console.log('1 global in')
-  await next()
-  console.log('6 global out')
-})
+  console.log("1 global in");
+  await next();
+  console.log("6 global out");
+});
 
-app.get('/users/:id', {
+app.get("/users/:id", {
   params: v.object({
-    id: v.pipe(v.string(), v.transform(Number), v.number())
+    id: v.pipe(v.string(), v.transform(Number), v.number()),
   }),
   middleware: [
     async (ctx, next) => {
-      console.log('3 route in')
-      await next()
-      console.log('5 route out')
-    }
+      console.log("3 route in");
+      await next();
+      console.log("5 route out");
+    },
   ],
-  handler: ctx => {
-    console.log('4 handler')
-    return { id: ctx.params.id }
-  }
-})
+  handler: (ctx) => {
+    console.log("4 handler");
+    return { id: ctx.params.id };
+  },
+});
 
-app.listen()
+app.listen();
 ```
 
 `GET /users/42` logs `1 global in`, then validation runs (step 2, silently),
@@ -118,15 +118,15 @@ Because validation sits between them, global middleware sees the raw string
 the same snapshot applies:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app
   .provide(() => ({ startedAt: Date.now() }))
-  .get('/uptime', ctx => ({ uptime: Date.now() - ctx.startedAt }))
+  .get("/uptime", (ctx) => ({ uptime: Date.now() - ctx.startedAt }));
 
-app.listen()
+app.listen();
 ```
 
 Registering the route before the provider would be a compile error, because
@@ -140,24 +140,24 @@ registered, Arcton keeps the scoped middleware whose path the route sits under,
 and drops the rest.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  console.log('global')
-  await next()
-})
+  console.log("global");
+  await next();
+});
 
-app.use('/admin', async (ctx, next) => {
-  console.log('admin only')
-  await next()
-})
+app.use("/admin", async (ctx, next) => {
+  console.log("admin only");
+  await next();
+});
 
-app.get('/admin/stats', () => ({ users: 42 }))  // both
-app.get('/health', () => ({ status: 'ok' }))    // global only
+app.get("/admin/stats", () => ({ users: 42 })); // both
+app.get("/health", () => ({ status: "ok" })); // global only
 
-app.listen()
+app.listen();
 ```
 
 The decision happens once, at registration. Nothing is re-checked per request.
@@ -168,18 +168,18 @@ Responses that Arcton generates because nothing matched behave differently:
 **global middleware runs on them regardless of registration order.**
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => ({ ok: true }))
+app.get("/", () => ({ ok: true }));
 
 app.use(async (ctx, next) => {
-  await next()
-  ctx.response.headers.set('Access-Control-Allow-Origin', '*')
-})
+  await next();
+  ctx.response.headers.set("Access-Control-Allow-Origin", "*");
+});
 
-app.listen()
+app.listen();
 ```
 
 `GET /missing` answers `404` **with** the CORS header, even though the
@@ -194,13 +194,13 @@ cover every response. Arcton collects the unscoped `use()` middleware once when
 
 What does **not** run on `404`/`405`:
 
-| | Matched route | `404` / `405` |
-|---|---|---|
-| `use(middleware)` | before-only | always |
-| `use(scope, middleware)` | before-only, under scope | no |
-| route middleware | yes | no |
-| `provide()` | before-only | no |
-| validation | yes | no |
+|                          | Matched route            | `404` / `405` |
+| ------------------------ | ------------------------ | ------------- |
+| `use(middleware)`        | before-only              | always        |
+| `use(scope, middleware)` | before-only, under scope | no            |
+| route middleware         | yes                      | no            |
+| `provide()`              | before-only              | no            |
+| validation               | yes                      | no            |
 
 ## Modules
 
@@ -210,26 +210,26 @@ parent's side: the parent's global middleware and providers registered before
 registered after does not.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const users = Arcton({ prefix: '/users' })
-users.get('/:id', ctx => ({ id: ctx.params.id }))
+const users = Arcton({ prefix: "/users" });
+users.get("/:id", (ctx) => ({ id: ctx.params.id }));
 
-const app = Arcton()
-
-app.use(async (ctx, next) => {
-  ctx.response.headers.set('X-Before', 'yes')
-  await next()
-})
-
-app.use(users)
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  ctx.response.headers.set('X-After', 'no')
-  await next()
-})
+  ctx.response.headers.set("X-Before", "yes");
+  await next();
+});
 
-app.listen()
+app.use(users);
+
+app.use(async (ctx, next) => {
+  ctx.response.headers.set("X-After", "no");
+  await next();
+});
+
+app.listen();
 ```
 
 `GET /users/1` carries `X-Before` and not `X-After`.

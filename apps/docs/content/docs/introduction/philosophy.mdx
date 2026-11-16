@@ -13,21 +13,21 @@ rule, applied consistently: a route runs the middleware and providers that were
 registered **before it**, and nothing else.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/first', () => 'no timing header')
+app.get("/first", () => "no timing header");
 
 app.use(async (ctx, next) => {
-  const start = performance.now()
-  await next()
-  ctx.response.headers.set('X-Time', `${performance.now() - start}ms`)
-})
+  const start = performance.now();
+  await next();
+  ctx.response.headers.set("X-Time", `${performance.now() - start}ms`);
+});
 
-app.get('/second', () => 'timed')
+app.get("/second", () => "timed");
 
-app.listen()
+app.listen();
 ```
 
 `/first` and `/second` have different pipelines, and the file reads top to
@@ -44,18 +44,18 @@ the validated shape of `ctx.body`. A provider widens the context for
 everything after it.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app
   .provide(() => ({ startedAt: Date.now() }))
-  .get('/uptime/:unit', ctx => ({
+  .get("/uptime/:unit", (ctx) => ({
     unit: ctx.params.unit,
-    uptime: Date.now() - ctx.startedAt
-  }))
+    uptime: Date.now() - ctx.startedAt,
+  }));
 
-app.listen()
+app.listen();
 ```
 
 Nothing above names a type, and everything in it is typed.

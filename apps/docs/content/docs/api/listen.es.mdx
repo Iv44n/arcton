@@ -6,15 +6,15 @@ description: Comienza a atender requests y devuelve un handle al servidor en eje
 `listen()` es la última llamada en una aplicación Arcton:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => 'Hello, Arcton!')
+app.get("/", () => "Hello, Arcton!");
 
-const server = app.listen({ port: 3000 })
+const server = app.listen({ port: 3000 });
 
-console.log(`Listening on ${server.url}`)
+console.log(`Listening on ${server.url}`);
 ```
 
 Ver [Opciones de listen](../configuration/listen-options.mdx) para la guía orientada al uso.
@@ -24,11 +24,12 @@ Ver [Opciones de listen](../configuration/listen-options.mdx) para la guía orie
 **Propósito:** inicia el servidor a través del [adapter](./adapters.mdx) elegido.
 
 **Firma**
-```ts
-import type { ArctonListenOptions } from '@arcton/core'
-import type { RuntimeServer } from '@arcton/contracts'
 
-declare function listen(options?: ArctonListenOptions): RuntimeServer
+```ts
+import type { ArctonListenOptions } from "@arcton/core";
+import type { RuntimeServer } from "@arcton/contracts";
+
+declare function listen(options?: ArctonListenOptions): RuntimeServer;
 ```
 
 **Parámetros:** un `ArctonListenOptions` opcional, documentado más abajo.
@@ -44,17 +45,18 @@ declare function listen(options?: ArctonListenOptions): RuntimeServer
 **Propósito:** el objeto de opciones aceptado por `listen()`.
 
 **Firma**
+
 ```ts
-import type { RuntimeAdapter } from '@arcton/contracts'
+import type { RuntimeAdapter } from "@arcton/contracts";
 
 interface ArctonListenOptions {
-  port?: number
-  hostname?: string
-  adapter?: RuntimeAdapter
-  env?: string
-  maxBodySize?: number
-  gracefulShutdown?: boolean
-  shutdownTimeout?: number
+  port?: number;
+  hostname?: string;
+  adapter?: RuntimeAdapter;
+  env?: string;
+  maxBodySize?: number;
+  gracefulShutdown?: boolean;
+  shutdownTimeout?: number;
 }
 ```
 
@@ -63,44 +65,47 @@ interface ArctonListenOptions {
 <TypeTable
   type={{
     port: {
-      description: 'Puerto en el que escuchar. 0 elige un puerto libre — lee el real desde server.port/server.url.',
-      type: 'number',
-      default: '3000'
+      description:
+        "Puerto en el que escuchar. 0 elige un puerto libre — lee el real desde server.port/server.url.",
+      type: "number",
+      default: "3000",
     },
     hostname: {
-      description: 'Hostname al que hacer bind.',
-      type: 'string'
+      description: "Hostname al que hacer bind.",
+      type: "string",
     },
     adapter: {
-      description: 'El RuntimeAdapter usado para atender requests.',
-      type: 'RuntimeAdapter',
-      default: 'bunAdapter'
+      description: "El RuntimeAdapter usado para atender requests.",
+      type: "RuntimeAdapter",
+      default: "bunAdapter",
     },
     env: {
-      description: "Etiqueta la línea Environment del banner de arranque. Nada más la lee.",
-      type: 'string',
-      default: "process.env.NODE_ENV ?? 'development'"
+      description:
+        "Etiqueta la línea Environment del banner de arranque. Nada más la lee.",
+      type: "string",
+      default: "process.env.NODE_ENV ?? 'development'",
     },
     maxBodySize: {
-      description: 'Tamaño máximo del body del request, en bytes.',
-      type: 'number',
-      default: '134217728 (128MB)'
+      description: "Tamaño máximo del body del request, en bytes.",
+      type: "number",
+      default: "134217728 (128MB)",
     },
     gracefulShutdown: {
-      description: 'Drena las requests en curso al recibir SIGTERM/SIGINT antes de llamar a process.exit().',
-      type: 'boolean',
-      default: 'true'
+      description:
+        "Drena las requests en curso al recibir SIGTERM/SIGINT antes de llamar a process.exit().",
+      type: "boolean",
+      default: "true",
     },
     shutdownTimeout: {
-      description: 'Tiempo máximo (ms) a esperar por requests en curso antes de forzar el cierre. Debe ser positivo y finito.',
-      type: 'number',
-      default: '10000'
-    }
+      description:
+        "Tiempo máximo (ms) a esperar por requests en curso antes de forzar el cierre. Debe ser positivo y finito.",
+      type: "number",
+      default: "10000",
+    },
   }}
 />
 
 **Comportamiento:** ver [Entorno](../configuration/environment.mdx) para lo que hace `env` (y solo eso), [Tipos de runtime](./runtime-types.mdx) para la interfaz `RuntimeAdapter`, y [Adapters](./adapters.mdx) para los valores `bunAdapter`/`nodeAdapter`.
-
 
 `gracefulShutdown` y `shutdownTimeout` controlan el manejo process-wide de `SIGTERM`/`SIGINT` descrito en [Apagado elegante](../configuration/listen-options.mdx#apagado-elegante). `gracefulShutdown: false` excluye por completo a una llamada de `listen()` dada — útil cuando la aplicación anfitriona maneja las señales del proceso por su cuenta, ya que un apagado elegante termina llamando a `process.exit()`, lo que termina todo el proceso, no solo este servidor.
 
@@ -109,11 +114,12 @@ interface ArctonListenOptions {
 **Propósito:** el handle que devuelve `listen()` para el servidor en ejecución.
 
 **Firma**
+
 ```ts
 interface RuntimeServer {
-  readonly port: number
-  readonly url: URL
-  stop(closeActiveConnections?: boolean): void | Promise<void>
+  readonly port: number;
+  readonly url: URL;
+  stop(closeActiveConnections?: boolean): void | Promise<void>;
 }
 ```
 
@@ -121,30 +127,32 @@ interface RuntimeServer {
 
 <TypeTable
   type={{
-    port: { description: 'El puerto vinculado.', type: 'number' },
-    url: { description: 'La URL completa de escucha.', type: 'URL' },
+    port: { description: "El puerto vinculado.", type: "number" },
+    url: { description: "La URL completa de escucha.", type: "URL" },
     closeActiveConnections: {
-      description: "Se pasa a stop() — fuerza el cierre de las conexiones en curso en vez de esperarlas.",
-      type: 'boolean',
-      default: 'false'
-    }
+      description:
+        "Se pasa a stop() — fuerza el cierre de las conexiones en curso en vez de esperarlas.",
+      type: "boolean",
+      default: "false",
+    },
   }}
 />
 
 **Comportamiento:** `port` y `url` reflejan la dirección realmente vinculada — útil cuando `port: 0` eligió una libre. `stop()` apaga el servidor; devuelve `void` en el [adapter de Bun](./adapters.mdx) y una `Promise<void>` en el [adapter de Node](./adapters.mdx). Este es el tipo que se usa en toda la sección de [Testing](../testing/overview.mdx) para levantar un servidor en `port: 0`, ejercitarlo con llamadas `fetch` reales, y luego apagarlo.
 
 **Ejemplo**
+
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => 'ok')
+app.get("/", () => "ok");
 
-const server = app.listen({ port: 0 })
+const server = app.listen({ port: 0 });
 
-const res = await fetch(server.url)
-console.log(res.status, server.port)
+const res = await fetch(server.url);
+console.log(res.status, server.port);
 
-await server.stop()
+await server.stop();
 ```

@@ -8,15 +8,15 @@ A [`Middleware`](../api/middleware-types.mdx) is nothing more than a `(ctx, next
 ## A `makeCtx` helper
 
 ```ts
-import type { Context } from '@arcton/contracts'
+import type { Context } from "@arcton/contracts";
 
 function makeCtx(request: Request): Context {
   return {
     request,
     params: {},
     query: {},
-    response: { headers: new Headers() }
-  }
+    response: { headers: new Headers() },
+  };
 }
 ```
 
@@ -25,33 +25,33 @@ This builds the minimum `Context` a middleware needs: the incoming `request`, em
 ## Testing a middleware that calls `next()`
 
 ```ts
-import { expect, test } from 'bun:test'
-import type { Context } from '@arcton/contracts'
-import { cors } from '@arcton/cors'
+import { expect, test } from "bun:test";
+import type { Context } from "@arcton/contracts";
+import { cors } from "@arcton/cors";
 
 function makeCtx(request: Request): Context {
   return {
     request,
     params: {},
     query: {},
-    response: { headers: new Headers() }
-  }
+    response: { headers: new Headers() },
+  };
 }
 
-test('cors adds Access-Control-Allow-Origin for an allowed origin', async () => {
-  const middleware = cors({ origin: 'https://app.example.com' })
+test("cors adds Access-Control-Allow-Origin for an allowed origin", async () => {
+  const middleware = cors({ origin: "https://app.example.com" });
   const ctx = makeCtx(
-    new Request('http://localhost/', {
-      headers: { origin: 'https://app.example.com' }
-    })
-  )
+    new Request("http://localhost/", {
+      headers: { origin: "https://app.example.com" },
+    }),
+  );
 
-  await middleware(ctx, async () => {})
+  await middleware(ctx, async () => {});
 
-  expect(ctx.response.headers.get('Access-Control-Allow-Origin')).toBe(
-    'https://app.example.com'
-  )
-})
+  expect(ctx.response.headers.get("Access-Control-Allow-Origin")).toBe(
+    "https://app.example.com",
+  );
+});
 ```
 
 ## Testing a middleware that short-circuits
@@ -59,40 +59,40 @@ test('cors adds Access-Control-Allow-Origin for an allowed origin', async () => 
 A middleware that returns a value without calling `next()` short-circuits the pipeline. Assert that `next` was never invoked and inspect the returned value directly:
 
 ```ts
-import { expect, test } from 'bun:test'
-import type { Context } from '@arcton/contracts'
-import { cors } from '@arcton/cors'
+import { expect, test } from "bun:test";
+import type { Context } from "@arcton/contracts";
+import { cors } from "@arcton/cors";
 
 function makeCtx(request: Request): Context {
   return {
     request,
     params: {},
     query: {},
-    response: { headers: new Headers() }
-  }
+    response: { headers: new Headers() },
+  };
 }
 
-test('a real preflight short-circuits with a 204 Response', async () => {
-  const middleware = cors({ origin: 'https://app.example.com' })
+test("a real preflight short-circuits with a 204 Response", async () => {
+  const middleware = cors({ origin: "https://app.example.com" });
   const ctx = makeCtx(
-    new Request('http://localhost/users', {
-      method: 'OPTIONS',
+    new Request("http://localhost/users", {
+      method: "OPTIONS",
       headers: {
-        origin: 'https://app.example.com',
-        'access-control-request-method': 'POST'
-      }
-    })
-  )
-  let nextCalled = false
+        origin: "https://app.example.com",
+        "access-control-request-method": "POST",
+      },
+    }),
+  );
+  let nextCalled = false;
 
   const result = await middleware(ctx, async () => {
-    nextCalled = true
-  })
+    nextCalled = true;
+  });
 
-  expect(nextCalled).toBe(false)
-  expect(result).toBeInstanceOf(Response)
-  expect((result as Response).status).toBe(204)
-})
+  expect(nextCalled).toBe(false);
+  expect(result).toBeInstanceOf(Response);
+  expect((result as Response).status).toBe(204);
+});
 ```
 
 ## Testing your own middleware
@@ -100,34 +100,34 @@ test('a real preflight short-circuits with a 204 Response', async () => {
 The same technique applies to any middleware you write, not just a built-in one:
 
 ```ts
-import { expect, test } from 'bun:test'
-import type { Context, Middleware } from '@arcton/contracts'
+import { expect, test } from "bun:test";
+import type { Context, Middleware } from "@arcton/contracts";
 
 function makeCtx(request: Request): Context {
   return {
     request,
     params: {},
     query: {},
-    response: { headers: new Headers() }
-  }
+    response: { headers: new Headers() },
+  };
 }
 
 const withRequestId: Middleware = async (ctx, next) => {
-  ctx.response.headers.set('X-Request-Id', 'test-id')
-  await next()
-}
+  ctx.response.headers.set("X-Request-Id", "test-id");
+  await next();
+};
 
-test('withRequestId sets a header before calling next', async () => {
-  const ctx = makeCtx(new Request('http://localhost/'))
-  let nextCalled = false
+test("withRequestId sets a header before calling next", async () => {
+  const ctx = makeCtx(new Request("http://localhost/"));
+  let nextCalled = false;
 
   await withRequestId(ctx, async () => {
-    nextCalled = true
-  })
+    nextCalled = true;
+  });
 
-  expect(nextCalled).toBe(true)
-  expect(ctx.response.headers.get('X-Request-Id')).toBe('test-id')
-})
+  expect(nextCalled).toBe(true);
+  expect(ctx.response.headers.get("X-Request-Id")).toBe("test-id");
+});
 ```
 
 `Context` is imported as a type from `@arcton/contracts`. This tests the middleware function in isolation, decoupled from routing and the rest of the pipeline — for an end-to-end test that runs a middleware as part of a real request, see [Testing routes](./testing-routes.mdx).

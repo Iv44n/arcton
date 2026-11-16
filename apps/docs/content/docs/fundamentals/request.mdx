@@ -6,17 +6,17 @@ description: Reading the incoming request inside a handler or middleware — hea
 `ctx.request` is a standard [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request) — everything the Fetch API gives you is available directly:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/whoami', ctx => ({
+app.get("/whoami", (ctx) => ({
   method: ctx.request.method,
-  userAgent: ctx.request.headers.get('user-agent'),
-  url: ctx.request.url
-}))
+  userAgent: ctx.request.headers.get("user-agent"),
+  url: ctx.request.url,
+}));
 
-app.listen()
+app.listen();
 ```
 
 ## Query string and path
@@ -33,16 +33,16 @@ Reading `ctx.request` yourself — `.json()`, `.text()`, `.arrayBuffer()`,
 `.formData()` — works the same as it would on any `Request`:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/echo', async ctx => {
-  const payload = await ctx.request.json()
-  return { received: payload }
-})
+app.post("/echo", async (ctx) => {
+  const payload = await ctx.request.json();
+  return { received: payload };
+});
 
-app.listen()
+app.listen();
 ```
 
 This is a separate path from `ctx.body`: `ctx.body` only exists on a route

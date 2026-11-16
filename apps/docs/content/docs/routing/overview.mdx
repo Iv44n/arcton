@@ -6,29 +6,29 @@ description: Registering routes, the three kinds of path segment, and the rules 
 Register a route by calling the method you want to answer:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users', () => [{ id: '1' }])
-app.post('/users', () => ({ created: true }))
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get("/users", () => [{ id: "1" }]);
+app.post("/users", () => ({ created: true }));
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
 
-app.listen()
+app.listen();
 ```
 
 Every registration method returns the app, so calls chain:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app
-  .get('/health', () => ({ status: 'ok' }))
-  .get('/version', () => ({ version: '1.0.0' }))
+  .get("/health", () => ({ status: "ok" }))
+  .get("/version", () => ({ version: "1.0.0" }));
 
-app.listen()
+app.listen();
 ```
 
 Seven methods are available: `get`, `post`, `put`, `delete`, `patch`, `head`
@@ -38,22 +38,22 @@ and `options`. See [HTTP methods](./http-methods.mdx).
 
 A path is split on `/`, and each segment is one of three kinds:
 
-| Segment | Written | Matches |
-|---|---|---|
-| Static | `users` | exactly that text |
-| Dynamic | `:id` | any single segment, captured as `ctx.params.id` |
+| Segment  | Written | Matches                                             |
+| -------- | ------- | --------------------------------------------------- |
+| Static   | `users` | exactly that text                                   |
+| Dynamic  | `:id`   | any single segment, captured as `ctx.params.id`     |
 | Wildcard | `*path` | the rest of the path, captured as `ctx.params.path` |
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/health', () => ({ status: 'ok' }))            // static
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))    // dynamic
-app.get('/files/*path', ctx => ({ path: ctx.params.path })) // wildcard
+app.get("/health", () => ({ status: "ok" })); // static
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id })); // dynamic
+app.get("/files/*path", (ctx) => ({ path: ctx.params.path })); // wildcard
 
-app.listen()
+app.listen();
 ```
 
 `GET /files/docs/readme.md` gives `ctx.params.path === 'docs/readme.md'`.
@@ -78,14 +78,14 @@ rather than serving a surprise later.
   position — `'/users/:id'` and `'/users/:userId'` conflict.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
-app.get('/users/:id/posts', ctx => ({ user: ctx.params.id }))  // same name, fine
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
+app.get("/users/:id/posts", (ctx) => ({ user: ctx.params.id })); // same name, fine
 
-app.listen()
+app.listen();
 ```
 
 The exact messages are listed in
@@ -97,13 +97,13 @@ Empty segments are discarded before matching, so a trailing slash and a
 repeated slash resolve to the same route:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/me', () => 'me')
+app.get("/users/me", () => "me");
 
-app.listen()
+app.listen();
 ```
 
 `GET /users/me`, `GET /users/me/` and `GET /users//me` all reach that handler.
@@ -114,30 +114,30 @@ A handler receives the [context](../fundamentals/context.mdx) and returns the
 response body. It can be sync or async:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/sync', () => ({ ok: true }))
+app.get("/sync", () => ({ ok: true }));
 
-app.get('/async', async () => {
-  const data = await Promise.resolve({ ok: true })
-  return data
-})
+app.get("/async", async () => {
+  const data = await Promise.resolve({ ok: true });
+  return data;
+});
 
-app.listen()
+app.listen();
 ```
 
 Destructuring works when you only need part of the context:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ({ params }) => ({ id: params.id }))
+app.get("/users/:id", ({ params }) => ({ id: params.id }));
 
-app.listen()
+app.listen();
 ```
 
 ## Beyond a single file

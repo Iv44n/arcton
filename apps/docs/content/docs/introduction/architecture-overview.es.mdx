@@ -33,14 +33,14 @@ Como ese es todo el contrato, la misma aplicación corre en Bun o en Node.js
 cambiando una sola opción:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from "@arcton/core";
+import { nodeAdapter } from "@arcton/adapter-node";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => ({ ok: true }))
+app.get("/", () => ({ ok: true }));
 
-app.listen({ adapter: nodeAdapter })
+app.listen({ adapter: nodeAdapter });
 ```
 
 ## El router matchea paths
@@ -93,11 +93,11 @@ Ver [Modules](../routing/modules.mdx) y
 
 ## Paquetes
 
-| Paquete | Rol |
-|---|---|
-| `@arcton/core` | `Arcton()`, routing, pipeline, mapeo de respuestas |
-| `@arcton/contracts` | los tipos que comparten ambos lados, incluyendo `RuntimeAdapter` |
-| `@arcton/adapter-bun` | sirve sobre Bun |
-| `@arcton/adapter-node` | sirve sobre Node.js |
-| `@arcton/cors` | middleware de CORS |
-| `arcton` | el CLI que scaffoldea un proyecto |
+| Paquete                | Rol                                                              |
+| ---------------------- | ---------------------------------------------------------------- |
+| `@arcton/core`         | `Arcton()`, routing, pipeline, mapeo de respuestas               |
+| `@arcton/contracts`    | los tipos que comparten ambos lados, incluyendo `RuntimeAdapter` |
+| `@arcton/adapter-bun`  | sirve sobre Bun                                                  |
+| `@arcton/adapter-node` | sirve sobre Node.js                                              |
+| `@arcton/cors`         | middleware de CORS                                               |
+| `arcton`               | el CLI que scaffoldea un proyecto                                |

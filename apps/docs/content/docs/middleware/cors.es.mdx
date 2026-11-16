@@ -39,16 +39,16 @@ yarn add @arcton/cors
 Luego regístralo como middleware global:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(cors())
+app.use(cors());
 
-app.get('/users', () => [{ id: '1' }])
+app.get("/users", () => [{ id: "1" }]);
 
-app.listen()
+app.listen();
 ```
 
 Sin opciones, el middleware permite cualquier origen. Regístralo antes
@@ -60,50 +60,50 @@ de tus rutas, para que cada ruta debajo quede cubierta — mira
 `origin` acepta un string, un array, o una función:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use(cors({ origin: 'https://app.example.com' }))
+app.use(cors({ origin: "https://app.example.com" }));
 
-app.get('/users', () => [{ id: '1' }])
+app.get("/users", () => [{ id: "1" }]);
 
-app.listen()
+app.listen();
 ```
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(
   cors({
-    origin: ['https://app.example.com', 'https://admin.example.com']
-  })
-)
+    origin: ["https://app.example.com", "https://admin.example.com"],
+  }),
+);
 
-app.get('/users', () => [{ id: '1' }])
+app.get("/users", () => [{ id: "1" }]);
 
-app.listen()
+app.listen();
 ```
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(
   cors({
-    origin: origin => origin.endsWith('.example.com')
-  })
-)
+    origin: (origin) => origin.endsWith(".example.com"),
+  }),
+);
 
-app.get('/users', () => [{ id: '1' }])
+app.get("/users", () => [{ id: "1" }]);
 
-app.listen()
+app.listen();
 ```
 
 La función recibe el origin del request y el propio `Request`, así que
@@ -117,15 +117,15 @@ agregado, y el navegador bloquea el resultado del lado del cliente.
 
 ## Opciones
 
-| Opción | Default | Efecto |
-|---|---|---|
-| `origin` | `'*'` | qué orígenes están permitidos |
-| `methods` | repite lo que pidió el request | `Access-Control-Allow-Methods` en el preflight |
-| `allowedHeaders` | repite lo que pidió el request | `Access-Control-Allow-Headers` en el preflight |
-| `exposedHeaders` | — | `Access-Control-Expose-Headers` en la respuesta |
-| `credentials` | `false` | agrega `Access-Control-Allow-Credentials` |
-| `maxAge` | — | `Access-Control-Max-Age` en el preflight, en segundos |
-| `preflight` | `true` | si responde o no los requests de preflight |
+| Opción           | Default                        | Efecto                                                |
+| ---------------- | ------------------------------ | ----------------------------------------------------- |
+| `origin`         | `'*'`                          | qué orígenes están permitidos                         |
+| `methods`        | repite lo que pidió el request | `Access-Control-Allow-Methods` en el preflight        |
+| `allowedHeaders` | repite lo que pidió el request | `Access-Control-Allow-Headers` en el preflight        |
+| `exposedHeaders` | —                              | `Access-Control-Expose-Headers` en la respuesta       |
+| `credentials`    | `false`                        | agrega `Access-Control-Allow-Credentials`             |
+| `maxAge`         | —                              | `Access-Control-Max-Age` en el preflight, en segundos |
+| `preflight`      | `true`                         | si responde o no los requests de preflight            |
 
 ## Requests con credenciales
 
@@ -133,25 +133,25 @@ Los navegadores rechazan una respuesta con credenciales que permite
 cualquier origen, así que nombra los orígenes en los que confías:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(
   cors({
-    origin: 'https://app.example.com',
+    origin: "https://app.example.com",
     credentials: true,
-    exposedHeaders: ['X-Total-Count']
-  })
-)
+    exposedHeaders: ["X-Total-Count"],
+  }),
+);
 
-app.get('/users', ctx => {
-  ctx.response.headers.set('X-Total-Count', '1')
-  return [{ id: '1' }]
-})
+app.get("/users", (ctx) => {
+  ctx.response.headers.set("X-Total-Count", "1");
+  return [{ id: "1" }];
+});
 
-app.listen()
+app.listen();
 ```
 
 Combinar `origin: '*'` con `credentials: true` tira un `TypeError`
@@ -165,23 +165,23 @@ de ciertos requests cross-origin. `cors()` responde esos por su cuenta
 con `204` y los headers ya calculados:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(
   cors({
-    origin: 'https://app.example.com',
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    maxAge: 600
-  })
-)
+    origin: "https://app.example.com",
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    maxAge: 600,
+  }),
+);
 
-app.post('/users', () => ({ created: true }))
+app.post("/users", () => ({ created: true }));
 
-app.listen()
+app.listen();
 ```
 
 Con `methods` o `allowedHeaders` omitidos, la respuesta de preflight
@@ -203,17 +203,17 @@ necesita para reportar el status real en vez de una falla de CORS. Mira
 Para aplicar CORS a una sola sección, asígnale un scope:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { cors } from '@arcton/cors'
+import { Arcton } from "@arcton/core";
+import { cors } from "@arcton/cors";
 
-const app = Arcton()
+const app = Arcton();
 
-app.use('/public', cors({ origin: '*' }))
+app.use("/public", cors({ origin: "*" }));
 
-app.get('/public/status', () => ({ ok: true }))
-app.get('/internal/status', () => ({ ok: true }))
+app.get("/public/status", () => ({ ok: true }));
+app.get("/internal/status", () => ({ ok: true }));
 
-app.listen()
+app.listen();
 ```
 
 Un registro [con scope](./scoped.mdx) cubre las rutas matcheadas bajo

@@ -6,11 +6,11 @@ description: Por qué middleware, providers y validation comparten una única se
 Todo lo que pasa entre matchear una ruta y llamar a su handler es una
 sola lista de steps. Hay tres tipos:
 
-| Step | Comportamiento |
-|---|---|
+| Step       | Comportamiento                                                                  |
+| ---------- | ------------------------------------------------------------------------------- |
 | middleware | onion completo: recibe `next`, puede cortar la cadena, corre código a la salida |
-| provider | fusiona su resultado en el context y continúa, sin `next` propio |
-| validation | valida params, query y body, reemplazándolos con la salida validada |
+| provider   | fusiona su resultado en el context y continúa, sin `next` propio                |
+| validation | valida params, query y body, reemplazándolos con la salida validada             |
 
 Viven en una única secuencia en orden de registro, y el pipeline la
 recorre en ese orden.

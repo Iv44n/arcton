@@ -6,19 +6,19 @@ description: The seven method shorthands, registering several methods on one pat
 Each HTTP method has its own registration method:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
-app.post('/users', () => ({ created: true }))
-app.put('/users/:id', ctx => ({ replaced: ctx.params.id }))
-app.patch('/users/:id', ctx => ({ updated: ctx.params.id }))
-app.delete('/users/:id', ctx => ({ deleted: ctx.params.id }))
-app.head('/users/:id', () => {})
-app.options('/users', () => {})
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
+app.post("/users", () => ({ created: true }));
+app.put("/users/:id", (ctx) => ({ replaced: ctx.params.id }));
+app.patch("/users/:id", (ctx) => ({ updated: ctx.params.id }));
+app.delete("/users/:id", (ctx) => ({ deleted: ctx.params.id }));
+app.head("/users/:id", () => {});
+app.options("/users", () => {});
 
-app.listen()
+app.listen();
 ```
 
 The seven available are `get`, `post`, `put`, `delete`, `patch`, `head` and
@@ -33,16 +33,16 @@ Register them one at a time. Because every call returns the app, a resource
 reads as a block:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app
-  .get('/users/:id', ctx => ({ id: ctx.params.id }))
-  .put('/users/:id', ctx => ({ replaced: ctx.params.id }))
-  .delete('/users/:id', ctx => ({ deleted: ctx.params.id }))
+  .get("/users/:id", (ctx) => ({ id: ctx.params.id }))
+  .put("/users/:id", (ctx) => ({ replaced: ctx.params.id }))
+  .delete("/users/:id", (ctx) => ({ deleted: ctx.params.id }));
 
-app.listen()
+app.listen();
 ```
 
 Registering the same method and path twice throws at registration — see
@@ -56,15 +56,15 @@ an external Request/Response handler, e.g. mounting a library like
 [better-auth](https://www.better-auth.com):
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-declare const auth: { handler: (request: Request) => Promise<Response> }
+declare const auth: { handler: (request: Request) => Promise<Response> };
 
-const app = Arcton()
+const app = Arcton();
 
-app.all('/api/auth/*path', ctx => auth.handler(ctx.request))
+app.all("/api/auth/*path", (ctx) => auth.handler(ctx.request));
 
-app.listen()
+app.listen();
 ```
 
 `all` isn't a wildcard for arbitrary or non-standard HTTP verbs — it expands
@@ -85,14 +85,14 @@ When a request's path matches but its method has no handler, Arcton answers
 `405` with an `Allow` header listing the methods that path does answer:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
-app.post('/users/:id', ctx => ({ updated: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
+app.post("/users/:id", (ctx) => ({ updated: ctx.params.id }));
 
-app.listen()
+app.listen();
 ```
 
 `DELETE /users/42` returns `405` with `Allow: GET, POST` and an empty body.
@@ -106,22 +106,22 @@ not continue past it looking for another pattern that supports the method —
 Both are ordinary methods here: they answer when you register them.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
 
-app.head('/users/:id', ctx => {
-  ctx.response.headers.set('Content-Type', 'application/json')
-})
+app.head("/users/:id", (ctx) => {
+  ctx.response.headers.set("Content-Type", "application/json");
+});
 
-app.options('/users/:id', ctx => {
-  ctx.response.status = 204
-  ctx.response.headers.set('Allow', 'GET, HEAD, OPTIONS')
-})
+app.options("/users/:id", (ctx) => {
+  ctx.response.status = 204;
+  ctx.response.headers.set("Allow", "GET, HEAD, OPTIONS");
+});
 
-app.listen()
+app.listen();
 ```
 
 For cross-origin preflight requests, [`@arcton/cors`](../middleware/cors.mdx)
@@ -135,22 +135,22 @@ A handler answers `200` unless you say otherwise. Set `ctx.response.status`
 before returning:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/users', ctx => {
-  ctx.response.status = 201
-  ctx.response.headers.set('Location', '/users/42')
+app.post("/users", (ctx) => {
+  ctx.response.status = 201;
+  ctx.response.headers.set("Location", "/users/42");
 
-  return { id: '42' }
-})
+  return { id: "42" };
+});
 
-app.delete('/users/:id', ctx => {
-  ctx.response.status = 204
-})
+app.delete("/users/:id", (ctx) => {
+  ctx.response.status = 204;
+});
 
-app.listen()
+app.listen();
 ```
 
 `204`, `205` and `304` always send an empty body, whatever the handler returns.

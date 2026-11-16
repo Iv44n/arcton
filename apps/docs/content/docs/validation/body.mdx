@@ -8,20 +8,20 @@ request body, parsed according to its `Content-Type` and validated against
 your schema:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/users', {
+app.post("/users", {
   body: v.object({
     name: v.pipe(v.string(), v.minLength(1)),
-    email: v.pipe(v.string(), v.email())
+    email: v.pipe(v.string(), v.email()),
   }),
-  handler: ctx => ({ created: ctx.body })
-})
+  handler: (ctx) => ({ created: ctx.body }),
+});
 
-app.listen()
+app.listen();
 ```
 
 `ctx.body` only appears — and only type-checks — on a route that declared a
@@ -37,33 +37,33 @@ route declares it explicitly with
 parses to is what your schema validates against, so a route can take plain text:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/notes', {
-  body: { content: { 'text/plain': v.pipe(v.string(), v.minLength(1)) } },
-  handler: ctx => ({ length: ctx.body.length })
-})
+app.post("/notes", {
+  body: { content: { "text/plain": v.pipe(v.string(), v.minLength(1)) } },
+  handler: (ctx) => ({ length: ctx.body.length }),
+});
 
-app.listen()
+app.listen();
 ```
 
 or describe a `FormData` body:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/upload', {
-  body: { content: { 'multipart/form-data': v.instance(FormData) } },
-  handler: ctx => ({ received: ctx.body.get('name') })
-})
+app.post("/upload", {
+  body: { content: { "multipart/form-data": v.instance(FormData) } },
+  handler: (ctx) => ({ received: ctx.body.get("name") }),
+});
 
-app.listen()
+app.listen();
 ```
 
 Which `Content-Type` values parse to which JavaScript value — and what happens
@@ -77,20 +77,20 @@ before your schema runs. To also accept one, pass `{ schema, optional: true }`
 instead of a bare schema:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/reviews/:id/dismiss', {
+app.post("/reviews/:id/dismiss", {
   body: {
     schema: v.object({ reason: v.optional(v.string()) }),
-    optional: true
+    optional: true,
   },
-  handler: ctx => ({ dismissedWith: ctx.body?.reason ?? null })
-})
+  handler: (ctx) => ({ dismissedWith: ctx.body?.reason ?? null }),
+});
 
-app.listen()
+app.listen();
 ```
 
 A request that carries no body skips parsing and validation, and `ctx.body` is
@@ -110,22 +110,22 @@ replaces that default, so list `application/json` too if the route should keep
 taking it:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/webhook', {
+app.post("/webhook", {
   body: {
     content: {
-      'application/json': v.object({ event: v.string() }),
-      'text/plain': v.pipe(v.string(), v.minLength(1))
-    }
+      "application/json": v.object({ event: v.string() }),
+      "text/plain": v.pipe(v.string(), v.minLength(1)),
+    },
   },
-  handler: ctx => ({ via: ctx.contentType, received: ctx.body })
-})
+  handler: (ctx) => ({ via: ctx.contentType, received: ctx.body }),
+});
 
-app.listen()
+app.listen();
 ```
 
 A request whose `Content-Type` isn't listed responds `415` before anything is

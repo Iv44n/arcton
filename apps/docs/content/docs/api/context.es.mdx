@@ -4,15 +4,15 @@ description: El objeto que reciben todo handler, provider y función de middlewa
 ---
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => {
-  return { id: ctx.params.id, page: ctx.query.page ?? '1' }
-})
+app.get("/users/:id", (ctx) => {
+  return { id: ctx.params.id, page: ctx.query.page ?? "1" };
+});
 
-app.listen()
+app.listen();
 ```
 
 Todo handler, [provider](../providers/overview.mdx) y función de [middleware](../middleware/overview.mdx) recibe un `Context` como primer argumento (el middleware también recibe un `next`). Esta página es la referencia de tipos; ver [Context](../fundamentals/context.mdx) para la guía orientada al concepto.
@@ -22,11 +22,16 @@ Todo handler, [provider](../providers/overview.mdx) y función de [middleware](.
 **Propósito:** la forma completa de `ctx` en un punto dado del pipeline.
 
 **Firma**
-```ts
-import type { BaseContext, QueryParams, RouteParams } from '@arcton/contracts'
 
-type Context<P = RouteParams, Q = QueryParams, TBody = {}, TProvided = {}> =
-  BaseContext<P, Q> & TBody & TProvided
+```ts
+import type { BaseContext, QueryParams, RouteParams } from "@arcton/contracts";
+
+type Context<
+  P = RouteParams,
+  Q = QueryParams,
+  TBody = {},
+  TProvided = {},
+> = BaseContext<P, Q> & TBody & TProvided;
 ```
 
 **Parámetros**
@@ -34,25 +39,27 @@ type Context<P = RouteParams, Q = QueryParams, TBody = {}, TProvided = {}> =
 <TypeTable
   type={{
     P: {
-      description: 'Forma de ctx.params, inferida de la ruta o de un schema de params.',
-      type: 'object',
-      default: 'RouteParams'
+      description:
+        "Forma de ctx.params, inferida de la ruta o de un schema de params.",
+      type: "object",
+      default: "RouteParams",
     },
     Q: {
-      description: 'Forma de ctx.query, inferida de un schema de query.',
-      type: 'object',
-      default: 'QueryParams'
+      description: "Forma de ctx.query, inferida de un schema de query.",
+      type: "object",
+      default: "QueryParams",
     },
     TBody: {
-      description: 'Agrega ctx.body cuando una ruta declara un schema de body (y ctx.contentType para un body con content).',
-      type: 'object',
-      default: '{}'
+      description:
+        "Agrega ctx.body cuando una ruta declara un schema de body (y ctx.contentType para un body con content).",
+      type: "object",
+      default: "{}",
     },
     TProvided: {
-      description: 'Todo lo agregado por provide() hasta el momento.',
-      type: 'object',
-      default: '{}'
-    }
+      description: "Todo lo agregado por provide() hasta el momento.",
+      type: "object",
+      default: "{}",
+    },
   }}
 />
 
@@ -63,14 +70,15 @@ type Context<P = RouteParams, Q = QueryParams, TBody = {}, TProvided = {}> =
 **Propósito:** los campos presentes en todo `Context`, sin importar qué se haya provisto o validado.
 
 **Firma**
+
 ```ts
-import type { ResponseContext } from '@arcton/contracts'
+import type { ResponseContext } from "@arcton/contracts";
 
 interface BaseContext<P, Q> {
-  request: Request
-  params: P
-  query: Q
-  response: ResponseContext
+  request: Request;
+  params: P;
+  query: Q;
+  response: ResponseContext;
 }
 ```
 
@@ -81,17 +89,20 @@ interface BaseContext<P, Q> {
 **Propósito:** el estado mutable de la response disponible antes de que el body finalice.
 
 **Firma**
+
 ```ts
 interface ResponseContext {
-  status?: number
-  headers: Headers
+  status?: number;
+  headers: Headers;
 }
 ```
 
 **Comportamiento:** `ctx.response` comienza como este objeto plano y se materializa en un `Response` real en el momento en que el body finaliza, en cualquier capa (el handler retorna, un step corta la cadena, o una capa reemplaza el body después de `next()`). Antes de la materialización, se puede asignar `ctx.response.status` directamente. Después de la materialización, mutar los headers sigue funcionando y llega al cliente, pero `status` ya no acepta asignación. Ver [Response](../fundamentals/response.mdx).
 
 <Callout>
-Configura `ctx.response.status` desde el handler, o desde middleware antes de llamar a `await next()`. Configurarlo después lanza una excepción, porque para ese momento el body ya se materializó en un `Response` real.
+  Configura `ctx.response.status` desde el handler, o desde middleware antes de
+  llamar a `await next()`. Configurarlo después lanza una excepción, porque para
+  ese momento el body ya se materializó en un `Response` real.
 </Callout>
 
 ## RouteParams
@@ -99,8 +110,9 @@ Configura `ctx.response.status` desde el handler, o desde middleware antes de ll
 **Propósito:** la forma por defecto de `ctx.params` para una ruta sin schema de params.
 
 **Firma**
+
 ```ts
-type RouteParams = Record<string, string>
+type RouteParams = Record<string, string>;
 ```
 
 ## QueryParams
@@ -108,8 +120,9 @@ type RouteParams = Record<string, string>
 **Propósito:** la forma por defecto de `ctx.query` para una ruta sin schema de query.
 
 **Firma**
+
 ```ts
-type QueryParams = Record<string, string>
+type QueryParams = Record<string, string>;
 ```
 
 ## Body
@@ -117,6 +130,7 @@ type QueryParams = Record<string, string>
 **Propósito:** la unión de valores que un handler o middleware puede retornar.
 
 **Firma**
+
 ```ts
 type Body =
   | object
@@ -127,7 +141,7 @@ type Body =
   | FormData
   | URLSearchParams
   | ReadableStream
-  | Response
+  | Response;
 ```
 
 **Comportamiento:** cada variante se mapea a una response HTTP distinta — ver [Response](../fundamentals/response.mdx) para la tabla completa de mapeo, incluyendo cómo se derivan el status y los headers en cada caso.

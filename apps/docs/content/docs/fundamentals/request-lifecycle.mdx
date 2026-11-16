@@ -27,20 +27,20 @@ providers compose: **when a route is registered, it captures the `use()` and
 `provide()` calls made so far.** Calls made after registration don't reach it.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/before', () => 'registered with no global steps yet')
+app.get("/before", () => "registered with no global steps yet");
 
 app.use(async (ctx, next) => {
-  ctx.response.headers.set('X-Global', 'yes')
-  await next()
-})
+  ctx.response.headers.set("X-Global", "yes");
+  await next();
+});
 
-app.get('/after', () => 'registered after the middleware above')
+app.get("/after", () => "registered after the middleware above");
 
-app.listen()
+app.listen();
 ```
 
 `/before` runs with none of the surrounding `use()`/`provide()` calls, because

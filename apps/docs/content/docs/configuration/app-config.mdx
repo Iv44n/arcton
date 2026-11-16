@@ -9,13 +9,13 @@ Every `Arcton()` instance takes an optional config object. It has exactly one
 field: `prefix`.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton({ prefix: '/api' })
+const app = Arcton({ prefix: "/api" });
 
-app.get('/users', () => ({ users: [] }))
+app.get("/users", () => ({ users: [] }));
 
-app.listen()
+app.listen();
 ```
 
 With `prefix: '/api'`, the route above is reachable at `GET /api/users`. The
@@ -27,13 +27,13 @@ instance — you write `'/users'`, Arcton serves `/api/users`.
 `app.config` exposes the exact object you passed to `Arcton()`:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton({ prefix: '/api' })
+const app = Arcton({ prefix: "/api" });
 
-console.log(app.config.prefix) // '/api'
+console.log(app.config.prefix); // '/api'
 
-app.listen()
+app.listen();
 ```
 
 ## Rules for `prefix`

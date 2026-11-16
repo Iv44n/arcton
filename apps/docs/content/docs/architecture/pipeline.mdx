@@ -6,11 +6,11 @@ description: Why middleware, providers and validation share one ordered sequence
 Everything that happens between matching a route and calling its handler is one
 list of steps. There are three kinds:
 
-| Step | Behavior |
-|---|---|
-| middleware | full onion: receives `next`, can short-circuit, runs code on the way out |
-| provider | merges its result into the context and continues, with no `next` of its own |
-| validation | validates params, query and body, replacing them with the validated output |
+| Step       | Behavior                                                                    |
+| ---------- | --------------------------------------------------------------------------- |
+| middleware | full onion: receives `next`, can short-circuit, runs code on the way out    |
+| provider   | merges its result into the context and continues, with no `next` of its own |
+| validation | validates params, query and body, replacing them with the validated output  |
 
 They live in a single sequence in registration order, and the pipeline walks it
 in that order.

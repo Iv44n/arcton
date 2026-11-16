@@ -5,12 +5,12 @@ description: The layers of Arcton, what each one owns, and the decisions that sh
 
 Arcton is built from four pieces with narrow responsibilities:
 
-| Layer | Owns | Knows nothing about |
-|---|---|---|
-| Adapter | starting a server, native request ↔ `Request` | routing, middleware |
-| Router | mapping a method and path to a handler | what a handler does |
-| Pipeline | running middleware, providers and validation | how a path matched |
-| Response mapping | turning a returned value into a `Response` | the rest of the request |
+| Layer            | Owns                                          | Knows nothing about     |
+| ---------------- | --------------------------------------------- | ----------------------- |
+| Adapter          | starting a server, native request ↔ `Request` | routing, middleware     |
+| Router           | mapping a method and path to a handler        | what a handler does     |
+| Pipeline         | running middleware, providers and validation  | how a path matched      |
+| Response mapping | turning a returned value into a `Response`    | the rest of the request |
 
 The pages in this section explain why each one is built the way it is. If you
 are looking for how to use them, start from

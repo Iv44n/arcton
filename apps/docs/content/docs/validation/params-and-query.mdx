@@ -16,19 +16,19 @@ Route params always arrive as strings — a `params` schema is how you turn
 `:id` into something more useful:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', {
+app.get("/users/:id", {
   params: v.object({
-    id: v.pipe(v.string(), v.transform(Number), v.number())
+    id: v.pipe(v.string(), v.transform(Number), v.number()),
   }),
-  handler: ctx => ({ id: ctx.params.id, doubled: ctx.params.id * 2 })
-})
+  handler: (ctx) => ({ id: ctx.params.id, doubled: ctx.params.id * 2 }),
+});
 
-app.listen()
+app.listen();
 ```
 
 `ctx.params.id` is typed and valued as a `number`, so arithmetic on it just
@@ -40,22 +40,20 @@ Query values are strings too, and often optional — a query schema is where
 you turn `?limit=10` into a real number with a real default:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/search', {
+app.get("/search", {
   query: v.object({
     q: v.pipe(v.string(), v.minLength(1)),
-    limit: v.optional(
-      v.pipe(v.string(), v.transform(Number), v.number())
-    )
+    limit: v.optional(v.pipe(v.string(), v.transform(Number), v.number())),
   }),
-  handler: ctx => ({ query: ctx.query.q, limit: ctx.query.limit ?? 10 })
-})
+  handler: (ctx) => ({ query: ctx.query.q, limit: ctx.query.limit ?? 10 }),
+});
 
-app.listen()
+app.listen();
 ```
 
 `limit` stays `number | undefined` since it's optional — the fallback with

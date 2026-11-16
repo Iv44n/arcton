@@ -11,19 +11,19 @@ devolviendo un `Response`, devolviendo un valor plano que se mapea a uno, o
 configurando `ctx.response` antes de que el body finalice.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => {
-  if (ctx.params.id === '0') {
-    return new Response('Not found', { status: 404 })
+app.get("/users/:id", (ctx) => {
+  if (ctx.params.id === "0") {
+    return new Response("Not found", { status: 404 });
   }
 
-  return { id: ctx.params.id }
-})
+  return { id: ctx.params.id };
+});
 
-app.listen()
+app.listen();
 ```
 
 Esa misma idea cubre tres situaciones que pueden surgir:

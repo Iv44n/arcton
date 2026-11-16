@@ -33,9 +33,9 @@ arcton create [name]
 
 **Parameters**
 
-| Parameter | Type | Description |
-|---|---|---|
-| `name` | `string` (optional) | Project directory name. Must contain only letters, digits, dots, dashes and underscores. Prompted for interactively when omitted. |
+| Parameter | Type                | Description                                                                                                                       |
+| --------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `name`    | `string` (optional) | Project directory name. Must contain only letters, digits, dots, dashes and underscores. Prompted for interactively when omitted. |
 
 **Behavior** — the flow, in order:
 
@@ -82,15 +82,15 @@ Two runtime templates are available; both scaffold a project depending on `@arct
 `src/index.ts`:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => {
-  return 'Hello, Arcton!'
-})
+app.get("/", () => {
+  return "Hello, Arcton!";
+});
 
-app.listen()
+app.listen();
 ```
 
 ### Node template
@@ -110,16 +110,16 @@ app.listen()
 `src/index.ts`:
 
 ```ts
-import { nodeAdapter } from '@arcton/adapter-node'
-import { Arcton } from '@arcton/core'
+import { nodeAdapter } from "@arcton/adapter-node";
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => {
-  return 'Hello, Arcton!'
-})
+app.get("/", () => {
+  return "Hello, Arcton!";
+});
 
-app.listen({ adapter: nodeAdapter })
+app.listen({ adapter: nodeAdapter });
 ```
 
 See [Installation](../getting-started/installation.mdx) for prerequisites and [Development](../getting-started/development.mdx) for running these scripts day to day.

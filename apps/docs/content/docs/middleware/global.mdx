@@ -7,19 +7,19 @@ description: Registering middleware for every route with app.use(), including th
 call:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  console.log(`→ ${ctx.request.method} ${new URL(ctx.request.url).pathname}`)
-  await next()
-})
+  console.log(`→ ${ctx.request.method} ${new URL(ctx.request.url).pathname}`);
+  await next();
+});
 
-app.get('/', () => ({ ok: true }))
-app.get('/health', () => ({ status: 'ok' }))
+app.get("/", () => ({ ok: true }));
+app.get("/health", () => ({ status: "ok" }));
 
-app.listen()
+app.listen();
 ```
 
 Both routes log. Register global middleware near the top of the file, before
@@ -31,24 +31,24 @@ Call `use()` once per middleware. They nest in registration order, so the first
 one registered is the outermost:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
-
-app.use(async (ctx, next) => {
-  const start = performance.now()
-  await next()
-  ctx.response.headers.set('X-Time', `${performance.now() - start}ms`)
-})
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  ctx.response.headers.set('X-Request-Id', crypto.randomUUID())
-  await next()
-})
+  const start = performance.now();
+  await next();
+  ctx.response.headers.set("X-Time", `${performance.now() - start}ms`);
+});
 
-app.get('/', () => ({ ok: true }))
+app.use(async (ctx, next) => {
+  ctx.response.headers.set("X-Request-Id", crypto.randomUUID());
+  await next();
+});
 
-app.listen()
+app.get("/", () => ({ ok: true }));
+
+app.listen();
 ```
 
 ## It also covers 404 and 405
@@ -57,18 +57,18 @@ Global middleware runs on the responses Arcton generates when no route matches
 the path, or when the path matches but the method does not:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  await next()
-  ctx.response.headers.set('Access-Control-Allow-Origin', '*')
-})
+  await next();
+  ctx.response.headers.set("Access-Control-Allow-Origin", "*");
+});
 
-app.get('/', () => ({ ok: true }))
+app.get("/", () => ({ ok: true }));
 
-app.listen()
+app.listen();
 ```
 
 `GET /missing` answers `404` **with** the `Access-Control-Allow-Origin` header.
@@ -77,8 +77,8 @@ cover every HTTP response — CORS headers, request logging, response timing.
 
 <Callout>
   On `404` and `405`, global middleware runs regardless of where it sits
-  relative to your routes: a `use()` written after every route still applies.
-  A matched route, by contrast, only runs the middleware registered before it.
+  relative to your routes: a `use()` written after every route still applies. A
+  matched route, by contrast, only runs the middleware registered before it.
   [Execution order](./execution-order.mdx) explains why the two rules differ.
 </Callout>
 
@@ -92,23 +92,23 @@ The context carries the standard `Request`, so anything you can do with the
 Fetch API is available:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app.use(async (ctx, next) => {
-  const auth = ctx.request.headers.get('authorization')
+  const auth = ctx.request.headers.get("authorization");
 
   if (auth === null) {
-    return new Response('Unauthorized', { status: 401 })
+    return new Response("Unauthorized", { status: 401 });
   }
 
-  await next()
-})
+  await next();
+});
 
-app.get('/private', () => ({ secret: true }))
+app.get("/private", () => ({ secret: true }));
 
-app.listen()
+app.listen();
 ```
 
 <Callout>

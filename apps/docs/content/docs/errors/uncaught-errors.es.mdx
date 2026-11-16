@@ -14,15 +14,15 @@ haya registrado un [manejador global de errores](./global-error-handler.mdx),
 que lo captura antes.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/risky', () => {
-  throw new Error('boom')
-})
+app.get("/risky", () => {
+  throw new Error("boom");
+});
 
-app.listen()
+app.listen();
 ```
 
 Una request a `/risky` aquí registra el error con `console.error` y
@@ -37,16 +37,16 @@ mientras se construye una respuesta, y quedan sin capturar de la misma
 manera:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/broken', ctx => {
-  ctx.response.status = 999
-  return { ok: true }
-})
+app.get("/broken", (ctx) => {
+  ctx.response.status = 999;
+  return { ok: true };
+});
 
-app.listen()
+app.listen();
 ```
 
 Configurar un status fuera de `[200, 599]` lanza

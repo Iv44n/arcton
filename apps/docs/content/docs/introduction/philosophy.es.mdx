@@ -14,21 +14,21 @@ corre el middleware y los providers que se registraron **antes que ella**, y
 nada más.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/first', () => 'no timing header')
+app.get("/first", () => "no timing header");
 
 app.use(async (ctx, next) => {
-  const start = performance.now()
-  await next()
-  ctx.response.headers.set('X-Time', `${performance.now() - start}ms`)
-})
+  const start = performance.now();
+  await next();
+  ctx.response.headers.set("X-Time", `${performance.now() - start}ms`);
+});
 
-app.get('/second', () => 'timed')
+app.get("/second", () => "timed");
 
-app.listen()
+app.listen();
 ```
 
 `/first` y `/second` tienen pipelines distintos, y el archivo se lee de
@@ -47,18 +47,18 @@ schema produce la forma validada de `ctx.body`. Un provider amplía el
 contexto para todo lo que viene después.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app
   .provide(() => ({ startedAt: Date.now() }))
-  .get('/uptime/:unit', ctx => ({
+  .get("/uptime/:unit", (ctx) => ({
     unit: ctx.params.unit,
-    uptime: Date.now() - ctx.startedAt
-  }))
+    uptime: Date.now() - ctx.startedAt,
+  }));
 
-app.listen()
+app.listen();
 ```
 
 Nada de lo anterior nombra un tipo, y todo en él está tipado.

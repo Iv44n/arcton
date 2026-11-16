@@ -8,14 +8,14 @@ description: The bunAdapter and nodeAdapter values that connect Arcton to a runt
 Pick a runtime by passing an adapter to `app.listen()`. `bunAdapter` is the default; pass `nodeAdapter` to run under Node.js instead. Both implement the [`RuntimeAdapter`](./runtime-types.mdx) interface.
 
 ```ts
-import { nodeAdapter } from '@arcton/adapter-node'
-import { Arcton } from '@arcton/core'
+import { nodeAdapter } from "@arcton/adapter-node";
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => 'Hello from Node')
+app.get("/", () => "Hello from Node");
 
-app.listen({ adapter: nodeAdapter })
+app.listen({ adapter: nodeAdapter });
 ```
 
 ## `bunAdapter`
@@ -25,7 +25,7 @@ app.listen({ adapter: nodeAdapter })
 **Signature**
 
 ```ts no-check
-const bunAdapter: RuntimeAdapter
+const bunAdapter: RuntimeAdapter;
 ```
 
 **Behavior** — `name` is `'bun'`. `version` is a live getter returning `Bun.version`. `capabilities.websocket` is `true`. It wraps `Bun.serve()`: it serves the app's `fetch` handler, exposes `port`/`url` on the returned server, auto-upgrades any registered `ws()` route, and turns an uncaught error thrown from the handler into a `500` response, logged with `console.error`. `stop()` returns `void` synchronously.
@@ -33,14 +33,14 @@ const bunAdapter: RuntimeAdapter
 **Example**
 
 ```ts
-import { bunAdapter } from '@arcton/adapter-bun'
-import { Arcton } from '@arcton/core'
+import { bunAdapter } from "@arcton/adapter-bun";
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => 'Hello from Bun')
+app.get("/", () => "Hello from Bun");
 
-app.listen({ adapter: bunAdapter })
+app.listen({ adapter: bunAdapter });
 ```
 
 ## `nodeAdapter`
@@ -50,7 +50,7 @@ app.listen({ adapter: bunAdapter })
 **Signature**
 
 ```ts no-check
-const nodeAdapter: RuntimeAdapter
+const nodeAdapter: RuntimeAdapter;
 ```
 
 **Behavior** — `name` is `'node'`. `version` is a live getter returning `process.version` with its leading `v` stripped, so it matches Bun's bare-number format (e.g. `'20.11.0'`, not `'v20.11.0'`). `capabilities.websocket` is `true`. It wraps `node:http`'s `createServer` for HTTP and the `ws` package for WebSocket upgrades: it serves the app's `fetch` handler, exposes `port`/`url` on the returned server, auto-upgrades any registered `ws()` route, and turns an uncaught error thrown from the handler into a `500` response, logged with `console.error`. `stop()` returns a `Promise<void>`.
@@ -58,15 +58,15 @@ const nodeAdapter: RuntimeAdapter
 **Example**
 
 ```ts
-import { nodeAdapter } from '@arcton/adapter-node'
-import { Arcton } from '@arcton/core'
+import { nodeAdapter } from "@arcton/adapter-node";
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => 'Hello from Node')
+app.get("/", () => "Hello from Node");
 
-const server = app.listen({ adapter: nodeAdapter, port: 0 })
-await server.stop()
+const server = app.listen({ adapter: nodeAdapter, port: 0 });
+await server.stop();
 ```
 
 ## Real differences between the two

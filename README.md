@@ -17,15 +17,15 @@ calling response methods, middleware composes in the order you register it, and
 an application is assembled from modules that merge into a single route tree.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => ({ message: 'Welcome to Arcton' }))
+app.get("/", () => ({ message: "Welcome to Arcton" }));
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
 
-app.listen({ port: 3000 })
+app.listen({ port: 3000 });
 ```
 
 `ctx.params.id` is typed as `string` because the route literal says so — no
@@ -69,27 +69,27 @@ bun add @arcton/core
 ## Your first server
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/health', () => ({ status: 'ok' }))
+app.get("/health", () => ({ status: "ok" }));
 
-app.post('/echo', {
+app.post("/echo", {
   body: v.object({ message: v.string() }),
-  handler: ctx => ({ echoed: ctx.body.message })
-})
+  handler: (ctx) => ({ echoed: ctx.body.message }),
+});
 
-app.listen({ port: 3000 })
+app.listen({ port: 3000 });
 ```
 
 Running on Node.js is one option away:
 
 ```ts
-import { nodeAdapter } from '@arcton/adapter-node'
+import { nodeAdapter } from "@arcton/adapter-node";
 
-app.listen({ adapter: nodeAdapter })
+app.listen({ adapter: nodeAdapter });
 ```
 
 ## Documentation
@@ -105,17 +105,17 @@ bun run dev
 
 ## Packages
 
-| Package | Description |
-|---|---|
-| `@arcton/core` | the framework: `Arcton()`, routing, middleware, validation |
-| `@arcton/contracts` | shared types, including the `RuntimeAdapter` interface |
-| `@arcton/adapter-bun` | serves an Arcton app on Bun |
-| `@arcton/adapter-node` | serves an Arcton app on Node.js |
-| `@arcton/cors` | CORS middleware |
-| `@arcton/logger` | request-logging middleware, zero runtime dependencies |
-| `@arcton/openapi` | generates an OpenAPI 3.1 document from a route's schemas, served through Scalar |
-| `arcton` | CLI — `arcton create` |
-| `create-arcton` | scaffolds a new project — `bun create arcton` |
+| Package                | Description                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| `@arcton/core`         | the framework: `Arcton()`, routing, middleware, validation                      |
+| `@arcton/contracts`    | shared types, including the `RuntimeAdapter` interface                          |
+| `@arcton/adapter-bun`  | serves an Arcton app on Bun                                                     |
+| `@arcton/adapter-node` | serves an Arcton app on Node.js                                                 |
+| `@arcton/cors`         | CORS middleware                                                                 |
+| `@arcton/logger`       | request-logging middleware, zero runtime dependencies                           |
+| `@arcton/openapi`      | generates an OpenAPI 3.1 document from a route's schemas, served through Scalar |
+| `arcton`               | CLI — `arcton create`                                                           |
+| `create-arcton`        | scaffolds a new project — `bun create arcton`                                   |
 
 ## Status
 

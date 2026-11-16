@@ -10,13 +10,13 @@ description: Qué hace la opción env y cómo leer variables de entorno en cada 
 etiqueta que se imprime en el banner de inicio.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => 'Hello, Arcton!')
+app.get("/", () => "Hello, Arcton!");
 
-app.listen({ env: 'staging' })
+app.listen({ env: "staging" });
 ```
 
 El banner imprime entonces `Environment  staging` en vez del valor por
@@ -33,15 +33,15 @@ En Bun, los archivos `.env` se cargan automáticamente, así que `process.env`
 ya tiene lo que sea que defina un archivo `.env` para cuando corre tu código:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-const databaseUrl = process.env.DATABASE_URL
+const databaseUrl = process.env.DATABASE_URL;
 
-app.get('/health', () => ({ ok: databaseUrl !== undefined }))
+app.get("/health", () => ({ ok: databaseUrl !== undefined }));
 
-app.listen()
+app.listen();
 ```
 
 En Node.js, lee `process.env` de la misma manera. Carga un archivo `.env`
@@ -53,21 +53,21 @@ node --env-file=.env dist/index.js
 ```
 
 ```ts
-import { nodeAdapter } from '@arcton/adapter-node'
-import { Arcton } from '@arcton/core'
+import { nodeAdapter } from "@arcton/adapter-node";
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-const databaseUrl = process.env.DATABASE_URL
+const databaseUrl = process.env.DATABASE_URL;
 
-app.get('/health', () => ({ ok: databaseUrl !== undefined }))
+app.get("/health", () => ({ ok: databaseUrl !== undefined }));
 
-app.listen({ adapter: nodeAdapter })
+app.listen({ adapter: nodeAdapter });
 ```
 
 <Callout>
-  `NODE_ENV` no se lee para nada más que ese valor por defecto de `env` — si
-  tu propio código toma decisiones según esa variable (feature flags, nivel
-  de logging, etc.), lee `process.env.NODE_ENV` directamente, igual que hace
+  `NODE_ENV` no se lee para nada más que ese valor por defecto de `env` — si tu
+  propio código toma decisiones según esa variable (feature flags, nivel de
+  logging, etc.), lee `process.env.NODE_ENV` directamente, igual que hace
   `app.listen()`.
 </Callout>

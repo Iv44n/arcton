@@ -1,11 +1,11 @@
-import { Rubik_Spray_Paint } from 'next/font/google'
-import { Arcton } from '@/components/icons/arcton'
-import { appName } from '@/lib/shared'
+import { Rubik_Spray_Paint } from "next/font/google";
+import { Arcton } from "@/components/icons/arcton";
+import { appName } from "@/lib/shared";
 
 const rubikSprayPaint = Rubik_Spray_Paint({
-  subsets: ['latin'],
-  weight: ['400']
-})
+  subsets: ["latin"],
+  weight: ["400"],
+});
 
 export function Logo() {
   return (
@@ -17,5 +17,5 @@ export function Logo() {
         {appName}
       </span>
     </span>
-  )
+  );
 }

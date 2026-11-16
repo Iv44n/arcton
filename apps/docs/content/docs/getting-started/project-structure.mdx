@@ -17,15 +17,15 @@ my-arcton-app/
 ```
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => {
-  return 'Hello, Arcton!'
-})
+app.get("/", () => {
+  return "Hello, Arcton!";
+});
 
-app.listen()
+app.listen();
 ```
 
 `package.json` depends on `@arcton/core` and declares three scripts —
@@ -43,16 +43,16 @@ my-arcton-app/
 ```
 
 ```ts
-import { nodeAdapter } from '@arcton/adapter-node'
-import { Arcton } from '@arcton/core'
+import { nodeAdapter } from "@arcton/adapter-node";
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => {
-  return 'Hello, Arcton!'
-})
+app.get("/", () => {
+  return "Hello, Arcton!";
+});
 
-app.listen({ adapter: nodeAdapter })
+app.listen({ adapter: nodeAdapter });
 ```
 
 The only difference from the Bun template is the extra `@arcton/adapter-node`

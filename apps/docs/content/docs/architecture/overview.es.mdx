@@ -6,12 +6,12 @@ description: Las capas de Arcton, qué es dueño de cada una, y las decisiones q
 Arcton está construido a partir de cuatro piezas con responsabilidades
 acotadas:
 
-| Capa | Es dueña de | No sabe nada de |
-|---|---|---|
-| Adapter | arrancar un servidor, request nativo ↔ `Request` | routing, middleware |
-| Router | mapear un método y un path a un handler | qué hace un handler |
-| Pipeline | correr middleware, providers y validation | cómo matcheó un path |
-| Response mapping | convertir un valor retornado en un `Response` | el resto del request |
+| Capa             | Es dueña de                                      | No sabe nada de      |
+| ---------------- | ------------------------------------------------ | -------------------- |
+| Adapter          | arrancar un servidor, request nativo ↔ `Request` | routing, middleware  |
+| Router           | mapear un método y un path a un handler          | qué hace un handler  |
+| Pipeline         | correr middleware, providers y validation        | cómo matcheó un path |
+| Response mapping | convertir un valor retornado en un `Response`    | el resto del request |
 
 Las páginas de esta sección explican por qué cada una está construida
 como está. Si buscas cómo usarlas, empieza por

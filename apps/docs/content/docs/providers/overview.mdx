@@ -8,17 +8,17 @@ whatever it returns flat onto `ctx`, typed, for everything registered after
 it:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app
-  .provide(ctx => ({
-    requestId: ctx.request.headers.get('x-request-id') ?? crypto.randomUUID()
+  .provide((ctx) => ({
+    requestId: ctx.request.headers.get("x-request-id") ?? crypto.randomUUID(),
   }))
-  .get('/whoami', ctx => ({ requestId: ctx.requestId }))
+  .get("/whoami", (ctx) => ({ requestId: ctx.requestId }));
 
-app.listen()
+app.listen();
 ```
 
 `ctx.requestId` type-checks on the handler above because `.get()` is chained
@@ -32,19 +32,19 @@ Providers run in registration order, and a later one can read what an earlier
 one added:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app
   .provide(() => ({ db: { query: async (_sql: string) => [] } }))
-  .provide(async ctx => {
-    const users = await ctx.db.query('select * from users')
-    return { users }
+  .provide(async (ctx) => {
+    const users = await ctx.db.query("select * from users");
+    return { users };
   })
-  .get('/users', ctx => ctx.users)
+  .get("/users", (ctx) => ctx.users);
 
-app.listen()
+app.listen();
 ```
 
 ## What you can't provide

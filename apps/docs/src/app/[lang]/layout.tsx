@@ -1,25 +1,25 @@
-import type { TranslationsAPI } from 'fumadocs-core/i18n'
-import { i18nProvider } from 'fumadocs-ui/i18n'
-import { RootProvider } from 'fumadocs-ui/provider/next'
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import { translations } from '@/lib/layout.shared'
-import { siteUrl } from '@/lib/shared'
-import '../global.css'
+import type { TranslationsAPI } from "fumadocs-core/i18n";
+import { i18nProvider } from "fumadocs-ui/i18n";
+import { RootProvider } from "fumadocs-ui/provider/next";
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import { translations } from "@/lib/layout.shared";
+import { siteUrl } from "@/lib/shared";
+import "../global.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl)
-}
+  metadataBase: new URL(siteUrl),
+};
 
 const inter = Inter({
-  subsets: ['latin']
-})
+  subsets: ["latin"],
+});
 
 export default async function Layout({
   params,
-  children
-}: LayoutProps<'/[lang]'>) {
-  const { lang } = await params
+  children,
+}: LayoutProps<"/[lang]">) {
+  const { lang } = await params;
 
   return (
     <html lang={lang} className={inter.className} suppressHydrationWarning>
@@ -29,13 +29,13 @@ export default async function Layout({
             exactly the keys the UI ever looks up. */}
         <RootProvider
           i18n={i18nProvider(
-            translations as TranslationsAPI<'en' | 'es'>,
-            lang
+            translations as TranslationsAPI<"en" | "es">,
+            lang,
           )}
         >
           {children}
         </RootProvider>
       </body>
     </html>
-  )
+  );
 }

@@ -9,22 +9,22 @@ a la vez, con backtracking cuando una rama llega a un callejón sin
 salida.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/me', () => 'the current user')
-app.get('/users/:id', ctx => `user ${ctx.params.id}`)
-app.get('/users/*path', ctx => `anything else: ${ctx.params.path}`)
+app.get("/users/me", () => "the current user");
+app.get("/users/:id", (ctx) => `user ${ctx.params.id}`);
+app.get("/users/*path", (ctx) => `anything else: ${ctx.params.path}`);
 
-app.listen()
+app.listen();
 ```
 
-| Request | Gana | Por qué |
-|---|---|---|
-| `GET /users/me` | `/users/me` | primero se prueba un segmento static |
-| `GET /users/42` | `/users/:id` | no hay static `42`, así que se lo lleva el slot dynamic |
-| `GET /users/a/b/c` | `/users/*path` | más segmentos de los que `:id` puede contener |
+| Request            | Gana           | Por qué                                                 |
+| ------------------ | -------------- | ------------------------------------------------------- |
+| `GET /users/me`    | `/users/me`    | primero se prueba un segmento static                    |
+| `GET /users/42`    | `/users/:id`   | no hay static `42`, así que se lo lleva el slot dynamic |
+| `GET /users/a/b/c` | `/users/*path` | más segmentos de los que `:id` puede contener           |
 
 El orden de registro no importa. Mover `/users/me` al final del archivo
 no cambia nada — la precedencia es una propiedad del path, no de cuándo
@@ -54,19 +54,19 @@ todavía tenía opciones, descartando los parámetros que esa rama
 abandonada haya capturado.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/a/:b/c', ctx => `deep: ${ctx.params.b}`)
-app.get('/a/*rest', ctx => `rest: ${ctx.params.rest}`)
+app.get("/a/:b/c", (ctx) => `deep: ${ctx.params.b}`);
+app.get("/a/*rest", (ctx) => `rest: ${ctx.params.rest}`);
 
-app.listen()
+app.listen();
 ```
 
-| Request | Resultado |
-|---|---|
-| `GET /a/x/c` | `deep: x` — la rama dynamic llega hasta `c` y matchea |
+| Request      | Resultado                                                                    |
+| ------------ | ---------------------------------------------------------------------------- |
+| `GET /a/x/c` | `deep: x` — la rama dynamic llega hasta `c` y matchea                        |
 | `GET /a/x/y` | `rest: x/y` — `y` no es `c`, así que el matching retrocede hacia el wildcard |
 
 La `b` capturada al entrar en la rama abandonada se descarta, así que el
@@ -75,49 +75,49 @@ matcheó.
 
 ## Un método que no coincide termina la búsqueda
 
-El backtracking aplica a *paths*, no a métodos. Una vez que el matching
+El backtracking aplica a _paths_, no a métodos. Una vez que el matching
 llega a un nodo que tiene handlers, ese nodo responde — con el handler
 para este método si lo tiene, y con `405` si no lo tiene. Arcton no
 sigue buscando otro patrón de path que resulte soportar el método.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/me', () => 'the current user')
-app.post('/users/:id', ctx => `updated ${ctx.params.id}`)
+app.get("/users/me", () => "the current user");
+app.post("/users/:id", (ctx) => `updated ${ctx.params.id}`);
 
-app.listen()
+app.listen();
 ```
 
-| Request | Respuesta |
-|---|---|
-| `GET /users/me` | `200` |
-| `POST /users/42` | `200` |
+| Request          | Respuesta              |
+| ---------------- | ---------------------- |
+| `GET /users/me`  | `200`                  |
+| `POST /users/42` | `200`                  |
 | `POST /users/me` | `405` con `Allow: GET` |
 
 `POST /users/me` llega al nodo `/users/me`, que solo responde `GET`, así
 que retorna `405` — aunque `/users/:id` hubiera aceptado el `POST`.
 
 <Callout>
-  El path más específico que matchea es el que responde. Si un path
-  static debería aceptar los mismos métodos que la ruta dynamic de al
-  lado, registra esos métodos también en el path static.
+  El path más específico que matchea es el que responde. Si un path static
+  debería aceptar los mismos métodos que la ruta dynamic de al lado, registra
+  esos métodos también en el path static.
 </Callout>
 
 Haciendo que el ejemplo de arriba responda a ambos:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/me', () => 'the current user')
-app.post('/users/me', () => 'updated the current user')
-app.post('/users/:id', ctx => `updated ${ctx.params.id}`)
+app.get("/users/me", () => "the current user");
+app.post("/users/me", () => "updated the current user");
+app.post("/users/:id", (ctx) => `updated ${ctx.params.id}`);
 
-app.listen()
+app.listen();
 ```
 
 ## Ningún match
@@ -133,14 +133,14 @@ respuestas — ver [Global middleware](../middleware/global.mdx).
 Un wildcard matchea uno o más segmentos, nunca cero:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/files', () => 'the index')
-app.get('/files/*path', ctx => `file: ${ctx.params.path}`)
+app.get("/files", () => "the index");
+app.get("/files/*path", (ctx) => `file: ${ctx.params.path}`);
 
-app.listen()
+app.listen();
 ```
 
 Sin esa primera ruta, `GET /files` sería un `404`, porque `*path` no

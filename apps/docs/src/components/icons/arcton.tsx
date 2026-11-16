@@ -1,7 +1,7 @@
-import { type SVGProps, useId } from 'react'
+import { type SVGProps, useId } from "react";
 
 const Arcton = (props: SVGProps<SVGSVGElement>) => {
-  const gradientId = useId()
+  const gradientId = useId();
 
   return (
     <svg {...props} viewBox="0 0 100 100" fill="none">
@@ -26,7 +26,7 @@ const Arcton = (props: SVGProps<SVGSVGElement>) => {
         d="M50 14 A36 36 0 1 1 50 86 A36 36 0 1 1 50 14 Z M56 24 A20 20 0 1 1 56 64 A20 20 0 1 1 56 24 Z"
       />
     </svg>
-  )
-}
+  );
+};
 
-export { Arcton }
+export { Arcton };

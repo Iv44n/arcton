@@ -1,14 +1,14 @@
-import { DocsLayout } from 'fumadocs-ui/layouts/docs'
-import { FileText, List } from 'lucide-react'
-import Link from 'next/link'
-import { baseOptions } from '@/lib/layout.shared'
-import { source } from '@/lib/source'
+import { DocsLayout } from "fumadocs-ui/layouts/docs";
+import { FileText, List } from "lucide-react";
+import Link from "next/link";
+import { baseOptions } from "@/lib/layout.shared";
+import { source } from "@/lib/source";
 
 function LlmLinks({ locale }: { locale: string }) {
   return (
     <div className="order-first mb-3 border-fd-border border-b pb-3">
       <p className="mb-1.5 px-2 font-medium text-fd-muted-foreground text-xs uppercase tracking-wider">
-        {locale === 'es' ? 'Recursos' : 'Resources'}
+        {locale === "es" ? "Recursos" : "Resources"}
       </p>
       <div className="flex flex-col gap-0.5">
         <Link
@@ -27,14 +27,14 @@ function LlmLinks({ locale }: { locale: string }) {
         </Link>
       </div>
     </div>
-  )
+  );
 }
 
 export default async function Layout({
   params,
-  children
-}: LayoutProps<'/[lang]/docs'>) {
-  const { lang } = await params
+  children,
+}: LayoutProps<"/[lang]/docs">) {
+  const { lang } = await params;
 
   return (
     <DocsLayout
@@ -44,5 +44,5 @@ export default async function Layout({
     >
       {children}
     </DocsLayout>
-  )
+  );
 }

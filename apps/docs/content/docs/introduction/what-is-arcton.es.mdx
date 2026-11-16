@@ -8,13 +8,13 @@ aplicación es una instancia de `Arcton()`: registras rutas sobre ella,
 compones comportamiento alrededor de ellas, y la inicias con `listen()`.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/health', () => ({ status: 'ok' }))
+app.get("/health", () => ({ status: "ok" }));
 
-app.listen({ port: 3000 })
+app.listen({ port: 3000 });
 ```
 
 Eso es un archivo completo y ejecutable. `bun src/index.ts` lo sirve.
@@ -27,15 +27,15 @@ string se convierte en `text/plain`, un `Uint8Array` se convierte en un
 cuerpo binario.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/json', () => ({ ok: true }))
-app.get('/text', () => 'plain text')
-app.get('/empty', () => {})
+app.get("/json", () => ({ ok: true }));
+app.get("/text", () => "plain text");
+app.get("/empty", () => {});
 
-app.listen()
+app.listen();
 ```
 
 Cuando necesitas control total, retorna un `Response` y Arcton lo pasa sin
@@ -46,16 +46,16 @@ tocarlo. El mapeo completo está en [Response](../fundamentals/response.mdx).
 Arcton lee el path que escribiste y tipa `ctx.params` a partir de él:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:userId/posts/:postId', ctx => {
+app.get("/users/:userId/posts/:postId", (ctx) => {
   // ctx.params is { userId: string; postId: string }
-  return { user: ctx.params.userId, post: ctx.params.postId }
-})
+  return { user: ctx.params.userId, post: ctx.params.postId };
+});
 
-app.listen()
+app.listen();
 ```
 
 Escribir mal `ctx.params.userID` es un error de compilación, no un
@@ -67,17 +67,17 @@ Escribir mal `ctx.params.userID` es un error de compilación, no un
 registre después:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app
-  .provide(ctx => ({
-    requestId: ctx.request.headers.get('x-request-id') ?? crypto.randomUUID()
+  .provide((ctx) => ({
+    requestId: ctx.request.headers.get("x-request-id") ?? crypto.randomUUID(),
   }))
-  .get('/whoami', ctx => ({ requestId: ctx.requestId }))
+  .get("/whoami", (ctx) => ({ requestId: ctx.requestId }));
 
-app.listen()
+app.listen();
 ```
 
 `ctx.requestId` está tipado en el handler porque el provider se registró
@@ -89,18 +89,18 @@ Un módulo es una instancia de `Arcton()` con su propio prefix. Montar uno
 fusiona sus rutas en el árbol de rutas del padre:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const users = Arcton({ prefix: '/users' })
+const users = Arcton({ prefix: "/users" });
 
-users.get('/', () => [{ id: '1' }])
-users.get('/:id', ctx => ({ id: ctx.params.id }))
+users.get("/", () => [{ id: "1" }]);
+users.get("/:id", (ctx) => ({ id: ctx.params.id }));
 
-const app = Arcton({ prefix: '/api' })
+const app = Arcton({ prefix: "/api" });
 
-app.use(users)
+app.use(users);
 
-app.listen()
+app.listen();
 ```
 
 Esto sirve `GET /api/users` y `GET /api/users/:id`. Ver
@@ -112,14 +112,14 @@ El núcleo no depende de ningún runtime específico. Bun y Node.js están
 soportados a través de adapters, elegidos en `listen()`:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { nodeAdapter } from '@arcton/adapter-node'
+import { Arcton } from "@arcton/core";
+import { nodeAdapter } from "@arcton/adapter-node";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/', () => 'Hello from Node.js')
+app.get("/", () => "Hello from Node.js");
 
-app.listen({ adapter: nodeAdapter })
+app.listen({ adapter: nodeAdapter });
 ```
 
 Ver [Runtime support](./runtime-support.mdx).

@@ -7,36 +7,36 @@ Cualquier método HTTP también acepta un objeto de opciones en lugar de un hand
 simple, lo que te permite adjuntar un esquema a `params`, `query` y/o `body`:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
-app.post('/users/:id/orders', {
+app.post("/users/:id/orders", {
   params: v.object({
-    id: v.pipe(v.string(), v.transform(Number), v.number())
+    id: v.pipe(v.string(), v.transform(Number), v.number()),
   }),
   query: v.object({
     notify: v.optional(
       v.pipe(
         v.string(),
-        v.transform(s => s === 'true'),
-        v.boolean()
-      )
-    )
+        v.transform((s) => s === "true"),
+        v.boolean(),
+      ),
+    ),
   }),
   body: v.object({
     item: v.pipe(v.string(), v.minLength(1)),
-    quantity: v.pipe(v.number(), v.integer(), v.minValue(1))
+    quantity: v.pipe(v.number(), v.integer(), v.minValue(1)),
   }),
-  handler: ctx => ({
+  handler: (ctx) => ({
     userId: ctx.params.id,
     notify: ctx.query.notify ?? false,
-    order: ctx.body
-  })
-})
+    order: ctx.body,
+  }),
+});
 
-app.listen()
+app.listen();
 ```
 
 `ctx.params.id` aquí es un `number`, no un `string` — la validación reemplaza

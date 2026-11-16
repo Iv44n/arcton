@@ -7,19 +7,19 @@ Todo middleware, provider y handler recibe el mismo tipo de objeto, `ctx`. Su fo
 base siempre está:
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => {
+app.get("/users/:id", (ctx) => {
   // ctx.request  → the raw Request
   // ctx.params   → { id: string }, inferred from the route literal
   // ctx.query    → Record<string, string>, built from the URL's search params
   // ctx.response → { status?: number; headers: Headers } until it materializes
-  return { id: ctx.params.id, referer: ctx.request.headers.get('referer') }
-})
+  return { id: ctx.params.id, referer: ctx.request.headers.get("referer") };
+});
 
-app.listen()
+app.listen();
 ```
 
 - `request` es el [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request) estándar — ver [Request](./request.mdx).
@@ -39,22 +39,22 @@ que devuelva una llamada a `provide()` se mezcla plano sobre `ctx` — sin names
 para todo lo que se registre después:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import * as v from 'valibot'
+import { Arcton } from "@arcton/core";
+import * as v from "valibot";
 
-const app = Arcton()
+const app = Arcton();
 
 app
   .provide(() => ({ requestId: crypto.randomUUID() }))
-  .post('/users', {
+  .post("/users", {
     body: v.object({ name: v.pipe(v.string(), v.minLength(1)) }),
-    handler: ctx => ({
+    handler: (ctx) => ({
       requestId: ctx.requestId,
-      body: ctx.body
-    })
-  })
+      body: ctx.body,
+    }),
+  });
 
-app.listen()
+app.listen();
 ```
 
 `ctx.requestId` está disponible aquí porque la llamada a `provide()` de arriba corrió

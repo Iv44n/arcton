@@ -9,16 +9,16 @@ Serve an OpenAPI 3.1 document and a Scalar UI reading it, generated from a
 route's own `params`/`query`/`body`/`response`/`detail`:
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { openapi } from '@arcton/openapi'
+import { Arcton } from "@arcton/core";
+import { openapi } from "@arcton/openapi";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
 
-app.use(openapi({ info: { title: 'API', version: '1.0.0' } }))
+app.use(openapi({ info: { title: "API", version: "1.0.0" } }));
 
-app.listen()
+app.listen();
 ```
 
 See [OpenAPI & Scalar](../integrations/openapi.mdx) for the usage-first
@@ -32,15 +32,15 @@ page. Register it with `app.use()`.
 **Signature**
 
 ```ts no-check
-import type { RouteAwareMiddleware } from '@arcton/contracts'
+import type { RouteAwareMiddleware } from "@arcton/contracts";
 
-function openapi(options: OpenAPIOptions): RouteAwareMiddleware
+function openapi(options: OpenAPIOptions): RouteAwareMiddleware;
 ```
 
 **Parameters**
 
-| Parameter | Type | Description |
-|---|---|---|
+| Parameter | Type             | Description                                               |
+| --------- | ---------------- | --------------------------------------------------------- |
 | `options` | `OpenAPIOptions` | Required — at minimum, `info`. See below for every field. |
 
 **Return type** — a [`RouteAwareMiddleware`](#routeawaremiddleware).
@@ -62,27 +62,27 @@ first request for the document.
 **Example**
 
 ```ts
-import { Arcton } from '@arcton/core'
-import { openapi } from '@arcton/openapi'
-import * as z from 'zod'
+import { Arcton } from "@arcton/core";
+import { openapi } from "@arcton/openapi";
+import * as z from "zod";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', {
+app.get("/users/:id", {
   params: z.object({ id: z.uuid() }),
   response: z.object({ id: z.string() }),
-  detail: { operationId: 'getUser', tags: ['Users'] },
-  handler: ctx => ({ id: ctx.params.id })
-})
+  detail: { operationId: "getUser", tags: ["Users"] },
+  handler: (ctx) => ({ id: ctx.params.id }),
+});
 
 app.use(
   openapi({
-    info: { title: 'Users API', version: '1.0.0' },
-    docs: { path: '/reference' }
-  })
-)
+    info: { title: "Users API", version: "1.0.0" },
+    docs: { path: "/reference" },
+  }),
+);
 
-app.listen({ port: 3000 })
+app.listen({ port: 3000 });
 ```
 
 ## `OpenAPIOptions`
@@ -93,21 +93,21 @@ app.listen({ port: 3000 })
 
 ```ts no-check
 interface OpenAPIOptions extends DocumentOptions {
-  document?: { path?: string }
-  docs?: (ScalarOptions & { path?: string }) | false
+  document?: { path?: string };
+  docs?: (ScalarOptions & { path?: string }) | false;
 }
 ```
 
 **Fields**
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `info` | `OpenAPIInfo` | — | Required — see [`DocumentOptions`](#documentoptions). |
-| `servers` | `object[]` | — | See [`DocumentOptions`](#documentoptions). |
-| `tags` | `object[]` | — | See [`DocumentOptions`](#documentoptions). |
-| `security` | `object[]` | — | See [`DocumentOptions`](#documentoptions). |
-| `document.path` | `string` | `'/openapi.json'` | Where the document itself is served. |
-| `docs` | `ScalarOptions \| false` | `{}` | Scalar's own options — see [`ScalarOptions`](#scalaroptions) — plus `path` (default `'/docs'`). `false` serves the document alone, with no UI. |
+| Field           | Type                     | Default           | Description                                                                                                                                    |
+| --------------- | ------------------------ | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `info`          | `OpenAPIInfo`            | —                 | Required — see [`DocumentOptions`](#documentoptions).                                                                                          |
+| `servers`       | `object[]`               | —                 | See [`DocumentOptions`](#documentoptions).                                                                                                     |
+| `tags`          | `object[]`               | —                 | See [`DocumentOptions`](#documentoptions).                                                                                                     |
+| `security`      | `object[]`               | —                 | See [`DocumentOptions`](#documentoptions).                                                                                                     |
+| `document.path` | `string`                 | `'/openapi.json'` | Where the document itself is served.                                                                                                           |
+| `docs`          | `ScalarOptions \| false` | `{}`              | Scalar's own options — see [`ScalarOptions`](#scalaroptions) — plus `path` (default `'/docs'`). `false` serves the document alone, with no UI. |
 
 **Behavior** — `document` and `docs` are kept separate from `info`/
 `servers`/`tags`/`security` on purpose: one side describes the API, the
@@ -124,20 +124,20 @@ Scalar](../integrations/openapi.mdx#configuring-scalar).
 
 ```ts
 interface OpenAPIInfo {
-  title: string
-  version: string
-  description?: string
-  [key: string]: unknown
+  title: string;
+  version: string;
+  description?: string;
+  [key: string]: unknown;
 }
 ```
 
 **Fields**
 
-| Field | Type | Description |
-|---|---|---|
-| `title` | `string` | The API's name. |
-| `version` | `string` | The API's own version — unrelated to the OpenAPI spec version (`3.1.0`, always set for you). |
-| `description` | `string` | Optional. |
+| Field         | Type     | Description                                                                                  |
+| ------------- | -------- | -------------------------------------------------------------------------------------------- |
+| `title`       | `string` | The API's name.                                                                              |
+| `version`     | `string` | The API's own version — unrelated to the OpenAPI spec version (`3.1.0`, always set for you). |
+| `description` | `string` | Optional.                                                                                    |
 
 **Behavior** — any other OpenAPI `info` field (`termsOfService`, `contact`,
 `license`, ...) is accepted through the index signature and passed straight
@@ -152,21 +152,21 @@ through to the document, unvalidated.
 
 ```ts no-check
 interface DocumentOptions {
-  info: OpenAPIInfo
-  servers?: Record<string, unknown>[]
-  tags?: Record<string, unknown>[]
-  security?: Record<string, unknown>[]
+  info: OpenAPIInfo;
+  servers?: Record<string, unknown>[];
+  tags?: Record<string, unknown>[];
+  security?: Record<string, unknown>[];
 }
 ```
 
 **Fields**
 
-| Field | Type | Description |
-|---|---|---|
-| `info` | `OpenAPIInfo` | See [`OpenAPIInfo`](#openapiinfo). |
-| `servers` | `object[]` | OpenAPI Server Objects, passed through as given. |
-| `tags` | `object[]` | OpenAPI Tag Objects, passed through as given. |
-| `security` | `object[]` | OpenAPI Security Requirement Objects, passed through as given. |
+| Field      | Type          | Description                                                    |
+| ---------- | ------------- | -------------------------------------------------------------- |
+| `info`     | `OpenAPIInfo` | See [`OpenAPIInfo`](#openapiinfo).                             |
+| `servers`  | `object[]`    | OpenAPI Server Objects, passed through as given.               |
+| `tags`     | `object[]`    | OpenAPI Tag Objects, passed through as given.                  |
+| `security` | `object[]`    | OpenAPI Security Requirement Objects, passed through as given. |
 
 **Behavior** — `servers`/`tags`/`security` are copied onto the document
 verbatim when present, and omitted entirely otherwise — none of the three
@@ -180,19 +180,19 @@ has a default.
 
 ```ts
 interface ScalarOptions {
-  pageTitle?: string
-  cdn?: string
-  configuration?: Record<string, unknown>
+  pageTitle?: string;
+  cdn?: string;
+  configuration?: Record<string, unknown>;
 }
 ```
 
 **Fields**
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `pageTitle` | `string` | `'Scalar API Reference'` | The `<title>` of the `/docs` page. |
-| `cdn` | `string` | jsDelivr | Where Scalar's JS bundle is loaded from — set to point at a self-hosted build. |
-| `configuration` | `object` | `{}` | Scalar's own configuration object (theme, sidebar, auth, ...) — see [Scalar's configuration docs](https://guides.scalar.com/scalar/scalar-api-references/configuration). |
+| Field           | Type     | Default                  | Description                                                                                                                                                              |
+| --------------- | -------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pageTitle`     | `string` | `'Scalar API Reference'` | The `<title>` of the `/docs` page.                                                                                                                                       |
+| `cdn`           | `string` | jsDelivr                 | Where Scalar's JS bundle is loaded from — set to point at a self-hosted build.                                                                                           |
+| `configuration` | `object` | `{}`                     | Scalar's own configuration object (theme, sidebar, auth, ...) — see [Scalar's configuration docs](https://guides.scalar.com/scalar/scalar-api-references/configuration). |
 
 **Behavior** — `configuration.url` is always set for you, from
 `OpenAPIOptions.document.path` — the page reads the document by URL, so it
@@ -209,38 +209,38 @@ testing what a set of routes produces without starting a server.
 **Signature**
 
 ```ts no-check
-import type { RouteRecord } from '@arcton/contracts'
+import type { RouteRecord } from "@arcton/contracts";
 
 function buildDocument(
   records: readonly RouteRecord[],
-  options: DocumentOptions
-): Record<string, unknown>
+  options: DocumentOptions,
+): Record<string, unknown>;
 ```
 
 **Parameters**
 
-| Parameter | Type | Description |
-|---|---|---|
+| Parameter | Type                     | Description                                                           |
+| --------- | ------------------------ | --------------------------------------------------------------------- |
 | `records` | `readonly RouteRecord[]` | Typically the result of [`routesOf(app)`](./arcton-app.mdx#routesof). |
-| `options` | `DocumentOptions` | See [`DocumentOptions`](#documentoptions) above. |
+| `options` | `DocumentOptions`        | See [`DocumentOptions`](#documentoptions) above.                      |
 
 **Return type** — a plain, JSON-serializable OpenAPI 3.1 document.
 
 **Example**
 
 ```ts
-import { Arcton, routesOf } from '@arcton/core'
-import { buildDocument } from '@arcton/openapi'
+import { Arcton, routesOf } from "@arcton/core";
+import { buildDocument } from "@arcton/openapi";
 
-const app = Arcton()
+const app = Arcton();
 
-app.get('/users/:id', ctx => ({ id: ctx.params.id }))
+app.get("/users/:id", (ctx) => ({ id: ctx.params.id }));
 
 const document = buildDocument(routesOf(app), {
-  info: { title: 'Users API', version: '1.0.0' }
-})
+  info: { title: "Users API", version: "1.0.0" },
+});
 
-await Bun.write('openapi.json', JSON.stringify(document, null, 2))
+await Bun.write("openapi.json", JSON.stringify(document, null, 2));
 ```
 
 ## `RouteRecord`
@@ -253,32 +253,32 @@ also what a [`RouteAwareMiddleware`](#routeawaremiddleware) reads.
 **Signature**
 
 ```ts no-check
-import type { StandardSchemaV1 } from '@arcton/contracts'
+import type { StandardSchemaV1 } from "@arcton/contracts";
 
 interface RouteRecord {
-  method: HttpMethod
-  path: string
-  params?: StandardSchemaV1
-  query?: StandardSchemaV1
-  body?: StandardSchemaV1
-  bodyContent?: Record<string, StandardSchemaV1>
-  bodyOptional?: boolean
-  response?: Record<number, StandardSchemaV1>
-  detail?: RouteDetail
+  method: HttpMethod;
+  path: string;
+  params?: StandardSchemaV1;
+  query?: StandardSchemaV1;
+  body?: StandardSchemaV1;
+  bodyContent?: Record<string, StandardSchemaV1>;
+  bodyOptional?: boolean;
+  response?: Record<number, StandardSchemaV1>;
+  detail?: RouteDetail;
 }
 ```
 
 **Fields**
 
-| Field | Type | Description |
-|---|---|---|
-| `method` | `HttpMethod` | One concrete method — `app.all()` produces one record per method it registers, never an "any method" record. |
-| `path` | `string` | The route's final path, with every mounting prefix already applied. |
-| `params`/`query`/`body` | `StandardSchemaV1` | The original schema instances, not a converted form — see [`StandardSchemaV1`](./validation-types.mdx#standardschemav1). |
-| `bodyContent` | `Record<string, StandardSchemaV1>` | Set instead of `body` when the route lists the media types it accepts (keys lowercased, no parameters). Each one becomes an entry of `requestBody.content`. |
-| `bodyOptional` | `boolean` | `true` when the route accepts a request with no body — its `requestBody` is documented without `required`. |
-| `response` | `Record<number, StandardSchemaV1>` | Normalized from `RouteOptions.response` — always keyed by status, even when a bare schema was given. |
-| `detail` | `RouteDetail` | See [`RouteDetail`](./arcton-app.mdx#routedetail). |
+| Field                   | Type                               | Description                                                                                                                                                 |
+| ----------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `method`                | `HttpMethod`                       | One concrete method — `app.all()` produces one record per method it registers, never an "any method" record.                                                |
+| `path`                  | `string`                           | The route's final path, with every mounting prefix already applied.                                                                                         |
+| `params`/`query`/`body` | `StandardSchemaV1`                 | The original schema instances, not a converted form — see [`StandardSchemaV1`](./validation-types.mdx#standardschemav1).                                    |
+| `bodyContent`           | `Record<string, StandardSchemaV1>` | Set instead of `body` when the route lists the media types it accepts (keys lowercased, no parameters). Each one becomes an entry of `requestBody.content`. |
+| `bodyOptional`          | `boolean`                          | `true` when the route accepts a request with no body — its `requestBody` is documented without `required`.                                                  |
+| `response`              | `Record<number, StandardSchemaV1>` | Normalized from `RouteOptions.response` — always keyed by status, even when a bare schema was given.                                                        |
+| `detail`                | `RouteDetail`                      | See [`RouteDetail`](./arcton-app.mdx#routedetail).                                                                                                          |
 
 **Behavior** — a `ws()` route produces no record, having no contract to
 describe. See [`routesOf()`](./arcton-app.mdx#routesof) for how records
@@ -293,7 +293,7 @@ registered on. `openapi()` returns one.
 
 ```ts no-check
 interface RouteAwareMiddleware extends Middleware {
-  bindRoutes(routes: () => readonly RouteRecord[]): void
+  bindRoutes(routes: () => readonly RouteRecord[]): void;
 }
 ```
 

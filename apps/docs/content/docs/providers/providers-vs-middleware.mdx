@@ -13,31 +13,31 @@ without calling `next()` at all — stopping everything downstream, including
 any provider or handler that would otherwise run.
 
 ```ts
-import { Arcton } from '@arcton/core'
+import { Arcton } from "@arcton/core";
 
-const app = Arcton()
+const app = Arcton();
 
 app
   .use(async (ctx, next) => {
-    console.log(ctx.request.method, new URL(ctx.request.url).pathname)
-    await next()
+    console.log(ctx.request.method, new URL(ctx.request.url).pathname);
+    await next();
   })
-  .provide(ctx => {
-    const authHeader = ctx.request.headers.get('authorization')
+  .provide((ctx) => {
+    const authHeader = ctx.request.headers.get("authorization");
     return {
-      user: authHeader === 'secret' ? { id: 1, name: 'Alice' } : null
-    }
+      user: authHeader === "secret" ? { id: 1, name: "Alice" } : null,
+    };
   })
   .get(
-    '/profile',
+    "/profile",
     async (ctx, next) => {
-      if (!ctx.user) return new Response('Unauthorized', { status: 401 })
-      await next()
+      if (!ctx.user) return new Response("Unauthorized", { status: 401 });
+      await next();
     },
-    ctx => ({ user: ctx.user })
-  )
+    (ctx) => ({ user: ctx.user }),
+  );
 
-app.listen()
+app.listen();
 ```
 
 The logging `use()` at the top just observes the request; it doesn't add
