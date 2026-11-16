@@ -313,6 +313,12 @@ export interface RuntimeServeOptions {
   port: number
   hostname?: string
   /**
+   * Largest request body, in bytes, any route accepts. An adapter whose
+   * server enforces its own cap (Bun's `maxRequestBodySize`) sets it to this
+   * value; Arcton enforces each route's own limit on top.
+   */
+  maxBodySize?: number
+  /**
    * WebSocket routes.
    *
    * Requires the underlying runtime to expose a raw socket-upgrade API.

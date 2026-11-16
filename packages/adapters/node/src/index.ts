@@ -252,13 +252,15 @@ export const nodeAdapter: RuntimeAdapter = {
           typeof address === 'object' && address ? address.port : options.port
         return new URL(`http://${options.hostname ?? 'localhost'}:${port}/`)
       },
+      // Forcing is not memoized: a graceful stop() that is still draining
+      // must be escalable, or the shutdown timeout's forced stop(true) would
+      // return the pending promise without closing anything.
       stop(closeActiveConnections) {
-        if (stopped) return stopped
-        stopped = new Promise<void>((resolve, reject) => {
-          if (closeActiveConnections) {
-            for (const client of wss.clients) client.terminate()
-            server.closeAllConnections()
-          }
+        if (closeActiveConnections) {
+          for (const client of wss.clients) client.terminate()
+          server.closeAllConnections()
+        }
+        stopped ??= new Promise<void>((resolve, reject) => {
           server.close(error => (error ? reject(error) : resolve()))
         })
         return stopped

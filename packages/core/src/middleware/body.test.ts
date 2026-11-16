@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import type { BodyParser } from '@arcton/contracts'
-import { parseBody } from './body'
+import { PayloadTooLargeError } from '../errors'
+import { limitBodySize, parseBody } from './body'
 
 test('application/json is parsed', async () => {
   const request = new Request('http://localhost/', {
@@ -249,4 +250,30 @@ test('a throwing custom parser propagates uncaught, unlike a built-in', async ()
   await expect(parseBody(request, parsers)).rejects.toThrow(
     'custom parser boom'
   )
+})
+
+test('limitBodySize: a declared Content-Length within the limit skips the stream wrapper', () => {
+  const request = new Request('http://localhost/', {
+    method: 'POST',
+    headers: { 'content-length': '5' },
+    body: 'hello'
+  })
+  expect(limitBodySize(request, 100)).toBe(request)
+})
+
+test('limitBodySize: a body with no Content-Length is wrapped and errors past the limit', async () => {
+  const request = new Request('http://localhost/', {
+    method: 'POST',
+    body: new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('x'.repeat(20)))
+        controller.close()
+      }
+    }),
+    duplex: 'half'
+  } as RequestInit)
+
+  const limited = limitBodySize(request, 10)
+  expect(limited).not.toBe(request)
+  await expect(limited.text()).rejects.toBeInstanceOf(PayloadTooLargeError)
 })

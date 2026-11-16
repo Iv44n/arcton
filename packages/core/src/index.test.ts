@@ -1023,6 +1023,49 @@ test("use('/admin', mw) does not cover routes that merely share the text prefix"
   expect(calls).toBe(0)
 })
 
+test('onError: a middleware throwing after next() does not let the handler response out', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+
+  app.onError(() => ({ error: 'denied' }))
+  app.use(async (_ctx, next) => {
+    await next()
+    throw new Error('post-handler authorization failed')
+  })
+  app.get('/doc', () => ({ secret: 'owner-only' }))
+  app.listen({ port: 0, adapter })
+
+  const res = await call(handler, new Request('http://localhost/doc'))
+  const text = await res.text()
+  expect(res.status).toBe(500)
+  expect(text).toBe('{"error":"denied"}')
+  expect(text).not.toContain('owner-only')
+})
+
+test("mounting a module warns when a parent's scoped middleware covers its routes", () => {
+  const warnings: string[] = []
+  const original = console.warn
+  console.warn = (message: string) => void warnings.push(message)
+  try {
+    const guarded = Arcton({ prefix: '/admin' })
+    guarded.get('/stats', () => 'stats')
+    const other = Arcton({ prefix: '/public' })
+    other.get('/info', () => 'info')
+
+    Arcton()
+      .use('/admin', async (_ctx, next) => {
+        await next()
+      })
+      .use(guarded)
+      .use(other)
+  } finally {
+    console.warn = original
+  }
+
+  expect(warnings).toHaveLength(1)
+  expect(warnings[0]).toContain("use('/admin'")
+})
+
 test('route-level middleware does NOT run on 404/405', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
   const app = Arcton()
@@ -2963,7 +3006,20 @@ test('maxBodySize: a declared Content-Length over the limit is rejected with 413
   expect(handlerCalled).toBe(false)
 })
 
-test('maxBodySize: a streamed body with no Content-Length exceeding the limit fails once read', async () => {
+function streamed(text: string): Request {
+  return new Request('http://localhost/upload', {
+    method: 'POST',
+    body: new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(text))
+        controller.close()
+      }
+    }),
+    duplex: 'half'
+  } as RequestInit)
+}
+
+test('maxBodySize: a streamed body with no Content-Length exceeding the limit is a 413 once read', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
   const app = Arcton()
   app.post('/upload', async ctx => {
@@ -2972,24 +3028,147 @@ test('maxBodySize: a streamed body with no Content-Length exceeding the limit fa
   })
   app.listen({ port: 0, adapter, maxBodySize: 10 })
 
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(new TextEncoder().encode('x'.repeat(20)))
-      controller.close()
-    }
-  })
+  const res = await call(handler, streamed('x'.repeat(20)))
+  expect(res.status).toBe(413)
+})
 
-  await expect(
+test('maxBodySize: a streamed body over the limit is a 413 through body validation, not a 400', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/upload', {
+    body: {
+      schema: {
+        '~standard': {
+          version: 1,
+          vendor: 't',
+          validate: (v: unknown) => ({ value: v })
+        }
+      } as never
+    },
+    handler: () => ({ ok: true })
+  })
+  app.listen({ port: 0, adapter, maxBodySize: 10 })
+
+  const req = streamed(JSON.stringify({ a: 'x'.repeat(30) }))
+  req.headers.set('content-type', 'application/json')
+  const res = await call(handler, req)
+  expect(res.status).toBe(413)
+})
+
+test('route maxBodySize: raises the limit for one route only', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/upload', { maxBodySize: 100, handler: () => ({ ok: true }) })
+  app.post('/small', () => ({ ok: true }))
+  app.listen({ port: 0, adapter, maxBodySize: 10 })
+
+  const post = (path: string, size: number) =>
     call(
       handler,
-      new Request('http://localhost/upload', {
+      new Request(`http://localhost${path}`, {
         method: 'POST',
-        body: stream,
-        duplex: 'half'
-      } as RequestInit)
+        headers: { 'content-length': String(size) },
+        body: 'x'.repeat(size)
+      })
     )
-  ).rejects.toThrow(/exceeds the configured limit/)
+
+  expect((await post('/upload', 50)).status).toBe(200)
+  expect((await post('/upload', 150)).status).toBe(413)
+  expect((await post('/small', 50)).status).toBe(413)
 })
+
+test('route maxBodySize: lowers the limit below the global one, for chunked bodies too', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  app.post('/json', {
+    maxBodySize: 5,
+    handler: async ctx => {
+      await ctx.request.text()
+      return { ok: true }
+    }
+  })
+  app.listen({ port: 0, adapter })
+
+  const declared = await call(
+    handler,
+    new Request('http://localhost/json', {
+      method: 'POST',
+      body: 'x'.repeat(10)
+    })
+  )
+  expect(declared.status).toBe(413)
+
+  const chunked = await call(handler, streamed('x'.repeat(10)))
+  expect(chunked.status).toBe(404) // /upload isn't registered: global limit, unmatched
+
+  const chunkedToRoute = await call(
+    handler,
+    new Request('http://localhost/json', {
+      method: 'POST',
+      body: streamed('x'.repeat(10)).body,
+      duplex: 'half'
+    } as RequestInit)
+  )
+  expect(chunkedToRoute.status).toBe(413)
+})
+
+test('route maxBodySize: survives mounting the module into a parent', async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const mod = Arcton({ prefix: '/files' })
+  mod.post('/up', { maxBodySize: 100, handler: () => ({ ok: true }) })
+  const app = Arcton()
+  app.use(async (_ctx, next) => {
+    await next()
+  })
+  app.use(mod)
+  app.listen({ port: 0, adapter, maxBodySize: 10 })
+
+  const res = await call(
+    handler,
+    new Request('http://localhost/files/up', {
+      method: 'POST',
+      body: 'x'.repeat(50)
+    })
+  )
+  expect(res.status).toBe(200)
+})
+
+test('maxBodySize: the adapter gets the largest limit any route accepts', () => {
+  let received: number | undefined
+  const adapter: RuntimeAdapter = {
+    name: 'test',
+    version: '0.0.0',
+    capabilities: { websocket: true },
+    serve(options) {
+      received = options.maxBodySize
+      return { port: 0, url: new URL('http://localhost'), stop() {} }
+    }
+  }
+
+  const app = Arcton()
+  app.post('/big', { maxBodySize: 500 * 1024 * 1024, handler: () => 'ok' })
+  app.listen({ port: 0, adapter })
+  expect(received).toBe(500 * 1024 * 1024)
+
+  Arcton().listen({ port: 0, adapter, maxBodySize: 1024 })
+  expect(received).toBe(1024)
+})
+
+test.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+  'maxBodySize %p is rejected at registration',
+  value => {
+    expect(() =>
+      Arcton().post('/x', { maxBodySize: value, handler: () => 'ok' })
+    ).toThrow(/maxBodySize must be a positive, finite number/)
+    expect(() =>
+      Arcton().listen({
+        port: 0,
+        adapter: createTestAdapter().adapter,
+        maxBodySize: value
+      })
+    ).toThrow(/maxBodySize must be a positive, finite number/)
+  }
+)
 
 test('maxBodySize: a body under the default limit is unaffected', async () => {
   const { adapter, fetch: handler } = createTestAdapter()

@@ -26,11 +26,25 @@ export class UnsupportedMediaTypeError extends HttpError {
   }
 }
 
-export type RequestError = ValidationError | UnsupportedMediaTypeError
+export class PayloadTooLargeError extends HttpError {
+  constructor(readonly limit: number) {
+    super(
+      413,
+      'PAYLOAD_TOO_LARGE',
+      `Request body exceeds the configured limit of ${limit} bytes`
+    )
+    this.name = 'PayloadTooLargeError'
+  }
+}
+
+export type RequestError =
+  ValidationError | UnsupportedMediaTypeError | PayloadTooLargeError
 
 export function isRequestError(err: unknown): err is RequestError {
   return (
-    err instanceof ValidationError || err instanceof UnsupportedMediaTypeError
+    err instanceof ValidationError ||
+    err instanceof UnsupportedMediaTypeError ||
+    err instanceof PayloadTooLargeError
   )
 }
 
@@ -40,6 +54,9 @@ export function defaultErrorResponse(err: RequestError): Response {
       status: 400,
       headers: { 'content-type': 'application/json' }
     })
+  }
+  if (err instanceof PayloadTooLargeError) {
+    return new Response(null, { status: 413 })
   }
   return new Response(null, { status: 415 })
 }

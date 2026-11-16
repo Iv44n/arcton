@@ -166,6 +166,31 @@ for (const { name, adapter } of adapters) {
     await server.stop()
   })
 
+  test(`${name}: stop(true) after a stop() still draining closes the open connections`, async () => {
+    const server = adapter.serve({
+      port: 0,
+      fetch: () => new Response('ok'),
+      websocket: [{ path: '/chat', handler: { message: () => {} } }]
+    })
+
+    const wsUrl = new URL('/chat', server.url)
+    wsUrl.protocol = 'ws:'
+    const ws = new WebSocket(wsUrl)
+    await new Promise<void>(resolve =>
+      ws.addEventListener('open', () => resolve())
+    )
+
+    const graceful = server.stop(false)
+    await new Promise(resolve => setTimeout(resolve, 50))
+    const forced = server.stop(true)
+
+    const result = await Promise.race([
+      Promise.all([graceful, forced]).then(() => 'stopped'),
+      new Promise(resolve => setTimeout(() => resolve('hung'), 2000))
+    ])
+    expect(result).toBe('stopped')
+  })
+
   test(`${name}: upgrade() runs on the handshake and its return value is ws.data`, async () => {
     let seenAuth = null as string | null
     let observedData: unknown

@@ -45,7 +45,24 @@ import { toRuntimeWebSocketHandler, type WebSocketHandler } from './websocket'
 // Shared across every listen() call in this process, not per-app — see shutdown.ts.
 const shutdownCoordinator = createShutdownCoordinator()
 
-export { Http, HttpError, ValidationError } from './errors'
+// A route's own `maxBodySize`, keyed by the handler the tree stores so it is
+// read with the match that already happened — no second lookup per request.
+const routeBodyLimits = new WeakMap<RouteHandler, number>()
+
+function assertBodyLimit(value: number, label: string): void {
+  if (!(Number.isFinite(value) && value > 0)) {
+    throw new Error(
+      `${label}: maxBodySize must be a positive, finite number of bytes.`
+    )
+  }
+}
+
+export {
+  Http,
+  HttpError,
+  PayloadTooLargeError,
+  ValidationError
+} from './errors'
 export type {
   WebSocketConnection,
   WebSocketContext,
@@ -365,6 +382,13 @@ export interface RouteOptions<
   response?: ResponseSchemas
   /** Documentation metadata — see {@link RouteDetail}. */
   detail?: RouteDetail
+  /**
+   * Max request body size for this route, in bytes — replaces
+   * `listen({ maxBodySize })` for it, in either direction: a small cap on a
+   * JSON endpoint, a large one on an upload route. A larger body is answered
+   * with a `413` before the handler runs. Must be a positive, finite number.
+   */
+  maxBodySize?: number
   middleware?: Middleware<
     ParamsFor<Route, PSchema>,
     QueryFor<QSchema>,
@@ -426,6 +450,8 @@ interface InternalState {
   parsers: Map<string, BodyParser>
   prefix: string
   records: RouteRecord[]
+  /** Largest `maxBodySize` any route declares; a holder so mounts see updates. */
+  bodyCeiling: { value: number }
 }
 
 // Avoids TypeScript's excess-property check on a symbol-keyed field
@@ -464,6 +490,7 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
   const router = createRouter()
   const websocketRoutes: RuntimeWebSocketRoute[] = []
   const steps: Step[] = []
+  const bodyCeiling = { value: 0 }
   // What each route declared, kept because the tree stores only composed
   // handlers. Append-only, in registration order; read through routesOf().
   const records: RouteRecord[] = []
@@ -502,7 +529,8 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     path: Route,
     routeMiddleware: Middleware[],
     handler: RouteHandler,
-    contract?: Omit<RouteRecord, 'method' | 'path'>
+    contract?: Omit<RouteRecord, 'method' | 'path'>,
+    maxBodySize?: number
   ): ArctonApp<never> {
     // Only params/query/body become a pipeline step — `response`/`detail`
     // describe the route without affecting how a request runs.
@@ -543,7 +571,14 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     // Applied only here — scope matching above still works against `path`
     // as written to `.get()`, unprefixed (see ArctonConfig.prefix).
     const finalPath = joinPrefix(prefix, path)
+    if (maxBodySize !== undefined) {
+      assertBodyLimit(maxBodySize, `${finalPath}`)
+    }
     router.insert(method, finalPath, composed)
+    if (maxBodySize !== undefined) {
+      routeBodyLimits.set(composed, maxBodySize)
+      bodyCeiling.value = Math.max(bodyCeiling.value, maxBodySize)
+    }
 
     // After insert, so a rejected registration (duplicate route, conflicting
     // parameter name) leaves no record behind. app.all() registers seven
@@ -574,12 +609,37 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     const parentSteps = steps.filter(
       step => step.kind !== 'use' || step.scope === undefined
     )
-    const wrap = (handler: RouteHandler): RouteHandler =>
-      parentSteps.length === 0
-        ? handler
-        : ctx => runPipeline(parentSteps, handler, ctx, parsers)
+    const wrap = (handler: RouteHandler): RouteHandler => {
+      if (parentSteps.length === 0) return handler
+      const wrapped: RouteHandler = ctx =>
+        runPipeline(parentSteps, handler, ctx, parsers)
+      const limit = routeBodyLimits.get(handler)
+      if (limit !== undefined) routeBodyLimits.set(wrapped, limit)
+      return wrapped
+    }
+    bodyCeiling.value = Math.max(
+      bodyCeiling.value,
+      subInternal.bodyCeiling.value
+    )
 
     graftTree(router.root, subInternal.root, prefixSegments, wrap)
+
+    // A parent's scoped middleware never reaches a mounted module's routes
+    // (see above) — silent for the one caller most likely to rely on it, an
+    // auth scope over a module's prefix.
+    for (const step of steps) {
+      if (step.kind !== 'use' || step.scope === undefined) continue
+      const scope = step.scope
+      const covered = subInternal.records.some(record =>
+        matchesScope(joinPrefix(prefix, record.path), scope)
+      )
+      if (covered) {
+        console.warn(
+          `Arcton: use('${scope}', ...) does not apply to the routes of the ` +
+            `module mounted here — register it on the module instead.`
+        )
+      }
+    }
 
     // Mirrors the graft: a module's record already carries the module's own
     // prefix, so only this app's prefix is added. Copied, not referenced —
@@ -601,15 +661,27 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
   // anything else rethrows to the adapter.
   async function resolveError(ctx: Context, err: unknown): Promise<Response> {
     if (errorHandler) {
+      const before = ctx.response
       const body = await errorHandler(err, ctx)
       if (body !== undefined) {
-        if (ctx.response instanceof Response) return ctx.response
+        // A Response already materialized for this request belongs to a
+        // handler that finished before the error — a middleware throwing
+        // after next() must not let that response out. Only a Response
+        // onError() itself put there is kept; otherwise the error body is
+        // built from a fresh context.
+        if (ctx.response instanceof Response && ctx.response !== before) {
+          return ctx.response
+        }
+        const responseContext =
+          ctx.response instanceof Response
+            ? { headers: new Headers() }
+            : ctx.response
         // Only backfilled if nothing set a status already — before the throw
         // or in the handler itself.
-        if (ctx.response.status === undefined) {
-          ctx.response.status = isRequestError(err) ? err.status : 500
+        if (responseContext.status === undefined) {
+          responseContext.status = isRequestError(err) ? err.status : 500
         }
-        return mapResponse(body, ctx.response)
+        return mapResponse(body, responseContext)
       }
     }
     if (isRequestError(err)) return defaultErrorResponse(err)
@@ -658,6 +730,7 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     body?: BodyOption
     response?: ResponseSchemas
     detail?: RouteDetail
+    maxBodySize?: number
     middleware?: Middleware[]
     handler: RouteHandler
   } {
@@ -670,8 +743,16 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     args: unknown[]
   ): ArctonApp<never> {
     if (args.length === 1 && isRouteOptions(args[0])) {
-      const { params, query, body, response, detail, middleware, handler } =
-        args[0]
+      const {
+        params,
+        query,
+        body,
+        response,
+        detail,
+        maxBodySize,
+        middleware,
+        handler
+      } = args[0]
       if (typeof handler !== 'function') {
         const label = Array.isArray(method) ? 'ALL' : method
         throw new Error(
@@ -679,15 +760,22 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
         )
       }
       const bodyOption = normalizeBody(body)
-      return insertRoute(method, path, middleware ?? [], handler, {
-        params,
-        query,
-        body: bodyOption.schema,
-        bodyContent: bodyOption.content,
-        bodyOptional: bodyOption.optional,
-        response: normalizeResponse(response),
-        detail
-      })
+      return insertRoute(
+        method,
+        path,
+        middleware ?? [],
+        handler,
+        {
+          params,
+          query,
+          body: bodyOption.schema,
+          bodyContent: bodyOption.content,
+          bodyOptional: bodyOption.optional,
+          response: normalizeResponse(response),
+          detail
+        },
+        maxBodySize
+      )
     }
 
     const handler = args[args.length - 1] as RouteHandler
@@ -773,6 +861,9 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
       const adapter = options.adapter ?? bunAdapter
       const environment = options.env ?? process.env.NODE_ENV ?? 'development'
       const maxBodySize = options.maxBodySize ?? DEFAULT_MAX_BODY_SIZE
+      if (options.maxBodySize !== undefined) {
+        assertBodyLimit(options.maxBodySize, 'listen()')
+      }
 
       // Checked here, not at ws()/mount time — this is the earliest point
       // the final set of ws routes (including any merged in via mountApp)
@@ -811,18 +902,26 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
         port: options.port ?? 3000,
         hostname: options.hostname,
         websocket: websocketRoutes,
+        // The adapter's own server-level cap must admit the largest body any
+        // route accepts — and refuses anything above it before it reaches us.
+        maxBodySize: Math.max(maxBodySize, bodyCeiling.value),
         async fetch(request) {
-          if (contentLengthExceeds(request, maxBodySize)) {
-            return new Response(null, { status: 413 })
-          }
-          request = limitBodySize(request, maxBodySize)
-
           const method = request.method as HttpMethod
           // Parsed once and reused for both matching (pathname) and query
           // (searchParams) — router.matchPathname skips the URL parse
           // router.match does internally, since we already have one here.
           const url = new URL(request.url, 'http://localhost')
           const result = router.matchPathname(method, url.pathname)
+
+          // Matched first so the route's own limit applies; an unmatched
+          // request (404/405) gets the global one.
+          const limit =
+            ('handler' in result && routeBodyLimits.get(result.handler)) ||
+            maxBodySize
+          if (contentLengthExceeds(request, limit)) {
+            return new Response(null, { status: 413 })
+          }
+          request = limitBodySize(request, limit)
 
           if ('notFound' in result || 'methodNotAllowed' in result) {
             const fallback: RouteHandler =
@@ -922,7 +1021,8 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     steps,
     parsers,
     prefix,
-    records
+    records,
+    bodyCeiling
   })
 
   return app

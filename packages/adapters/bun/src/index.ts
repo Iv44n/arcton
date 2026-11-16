@@ -110,6 +110,7 @@ export const bunAdapter: RuntimeAdapter = {
         ? Bun.serve<WsConnectionData>({
             port: options.port,
             hostname: options.hostname,
+            maxRequestBodySize: options.maxBodySize,
             fetch: handleRequest,
             websocket: bunWebSocketHandler,
             error(error) {
@@ -120,6 +121,7 @@ export const bunAdapter: RuntimeAdapter = {
         : Bun.serve({
             port: options.port,
             hostname: options.hostname,
+            maxRequestBodySize: options.maxBodySize,
             fetch: handleRequest as (
               request: Request
             ) => Response | Promise<Response>,

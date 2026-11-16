@@ -1,4 +1,5 @@
 import type { BodyParser } from '@arcton/contracts'
+import { PayloadTooLargeError } from '../errors'
 
 // Matches Bun.serve's own default — the Node adapter otherwise buffers a
 // request body with no limit at all.
@@ -17,9 +18,20 @@ export function contentLengthExceeds(
 }
 
 // Counts bytes as a chunked/streamed body (no Content-Length) arrives,
-// aborting once the running total exceeds the limit. No-op for GET/HEAD.
+// aborting once the running total exceeds the limit. No-op for GET/HEAD, and
+// for a body whose declared Content-Length is already within the limit — the
+// HTTP parser frames the body by that length, so it can't deliver more, and
+// the common case skips the extra stream and Request copy.
 export function limitBodySize(request: Request, maxBytes: number): Request {
   if (!request.body) return request
+  const declared = request.headers.get('content-length')
+  if (
+    declared !== null &&
+    /^\d+$/.test(declared) &&
+    Number(declared) <= maxBytes
+  ) {
+    return request
+  }
 
   let total = 0
   const limited = request.body.pipeThrough(
@@ -27,11 +39,7 @@ export function limitBodySize(request: Request, maxBytes: number): Request {
       transform(chunk, controller) {
         total += chunk.byteLength
         if (total > maxBytes) {
-          controller.error(
-            new Error(
-              `Request body exceeds the configured limit of ${maxBytes} bytes`
-            )
-          )
+          controller.error(new PayloadTooLargeError(maxBytes))
           return
         }
         controller.enqueue(chunk)
@@ -114,7 +122,8 @@ export async function parseBody(
     return value === undefined
       ? { ok: false, reason: 'unsupported-media-type' }
       : { ok: true, value }
-  } catch {
+  } catch (err) {
+    if (err instanceof PayloadTooLargeError) throw err
     return { ok: false, reason: 'invalid-body' }
   }
 }
