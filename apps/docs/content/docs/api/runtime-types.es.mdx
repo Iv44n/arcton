@@ -84,11 +84,12 @@ interface RuntimeServeOptions {
   fetch: RuntimeHandler;
   port: number;
   hostname?: string;
+  maxBodySize?: number;
   websocket?: RuntimeWebSocketRoute[];
 }
 ```
 
-**Comportamiento** — `websocket` lista cada ruta `ws()` registrada en la app (incluyendo las injertadas al montar un módulo); se espera que el adapter haga auto-upgrade de los requests que coincidan con alguna de estas rutas, antes incluso de llamar a `fetch`.
+**Comportamiento** — `maxBodySize` es el body de request más grande que acepta cualquier ruta; un adapter cuyo servidor impone su propio tope (el `maxRequestBodySize` de Bun) lo fija a este valor, y Arcton aplica encima el límite de cada ruta. El adapter de Node no tiene tope propio y lo ignora. `websocket` lista cada ruta `ws()` registrada en la app (incluyendo las injertadas al montar un módulo); se espera que el adapter haga auto-upgrade de los requests que coincidan con alguna de estas rutas, antes incluso de llamar a `fetch`.
 
 ## `RuntimeRequestContext`
 

@@ -142,6 +142,7 @@ interface RouteOptions<Route, TProvided, PSchema, QSchema, BSchema> {
   body?: BSchema;
   response?: ResponseSchemas;
   detail?: RouteDetail;
+  maxBodySize?: number;
   middleware?: Middleware[];
   handler: RouteHandler;
 }
@@ -178,6 +179,12 @@ interface RouteOptions<Route, TProvided, PSchema, QSchema, BSchema> {
         "Metadata de documentación — operationId, summary, tags, etc.",
       type: "RouteDetail",
       default: "undefined",
+    },
+    maxBodySize: {
+      description:
+        "Tamaño máximo del body para esta ruta, en bytes. Reemplaza el maxBodySize de listen() para ella, en cualquier dirección. Un body más grande se responde con 413 antes de que corra el handler.",
+      type: "number",
+      default: "listen()'s maxBodySize",
     },
     middleware: {
       description:

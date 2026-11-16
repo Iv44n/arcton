@@ -115,6 +115,21 @@ import { Http } from "@arcton/core";
 throw Http.Conflict("Email already registered", { field: "email" });
 ```
 
+## `PayloadTooLargeError`
+
+**Propósito** — el error que Arcton lanza cuando el body de un request excede el límite que aplica a la ruta (`listen({ maxBodySize })`, o el `maxBodySize` propio de la ruta) mientras se lee.
+
+**Firma**
+
+```ts no-check
+class PayloadTooLargeError extends HttpError {
+  constructor(limit: number);
+  readonly limit: number;
+}
+```
+
+**Comportamiento** — `status` es `413` y `code` es `'PAYLOAD_TOO_LARGE'`. Un body que declara un `Content-Length` por encima del límite se responde con `413` antes de que corra el handler. Un body chunked se cuenta a medida que llega, así que el error aparece cuando algo lo lee — un schema `body`, o `ctx.request.json()` en un handler — y, sin `onError()` (o con uno que no devuelve nada), responde `413` sin body.
+
 ## `ValidationError`
 
 **Propósito** — el error que Arcton lanza cuando falla un esquema de `params`, `query` o `body` (o no se puede interpretar el body). Llega a [`app.onError()`](./arcton-app.mdx#onerror) como cualquier otro error.

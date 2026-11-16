@@ -86,7 +86,8 @@ interface ArctonListenOptions {
       default: "process.env.NODE_ENV ?? 'development'",
     },
     maxBodySize: {
-      description: "Max request body size, in bytes.",
+      description:
+        "Max request body size, in bytes, for every route that doesn't set its own maxBodySize. A larger body is answered with 413.",
       type: "number",
       default: "134217728 (128MB)",
     },

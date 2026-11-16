@@ -145,6 +145,36 @@ request with no body leaves both `ctx.body` and `ctx.contentType` `undefined`.
 Use either `schema` or `content`, never both. [OpenAPI](../integrations/openapi.mdx)
 documents each listed media type with its schema.
 
+## Limiting the body size
+
+Every route accepts bodies up to `listen({ maxBodySize })`, which defaults to
+128 MiB. That is generous for an upload and far too much for a JSON endpoint:
+a body is read into memory before it is validated. Lower the global limit, and
+raise it only where it is needed with the route's own `maxBodySize`:
+
+```ts
+import { Arcton } from "@arcton/core";
+
+const app = Arcton();
+
+app.post("/upload", {
+  maxBodySize: 100 * 1024 * 1024,
+  handler: async (ctx) => {
+    const file = await ctx.request.arrayBuffer();
+    return { bytes: file.byteLength };
+  },
+});
+
+app.post("/notes", async (ctx) => ctx.request.json());
+
+app.listen({ maxBodySize: 1024 * 1024 });
+```
+
+A route's limit replaces the global one in either direction. A body over the
+limit is answered with `413`: before the handler runs when it declares a
+`Content-Length`, and as soon as the limit is crossed when it is chunked. The
+limit applies on Bun and on Node.js alike.
+
 ## Order
 
 `body` validates last, after `params` and `query` — see

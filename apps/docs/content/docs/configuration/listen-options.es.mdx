@@ -42,7 +42,8 @@ Todos los campos son opcionales:
       default: "process.env.NODE_ENV ?? 'development'",
     },
     maxBodySize: {
-      description: "Tamaño máximo del body del request, en bytes.",
+      description:
+        "Tamaño máximo del body del request, en bytes, para toda ruta que no defina su propio maxBodySize. Un body más grande se responde con 413.",
       type: "number",
       default: "134217728 (128MB)",
     },

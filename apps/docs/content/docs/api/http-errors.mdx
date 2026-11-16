@@ -115,6 +115,21 @@ import { Http } from "@arcton/core";
 throw Http.Conflict("Email already registered", { field: "email" });
 ```
 
+## `PayloadTooLargeError`
+
+**Purpose** — the error Arcton raises when a request body exceeds the limit that applies to the route (`listen({ maxBodySize })`, or the route's own `maxBodySize`) while it is being read.
+
+**Signature**
+
+```ts no-check
+class PayloadTooLargeError extends HttpError {
+  constructor(limit: number);
+  readonly limit: number;
+}
+```
+
+**Behavior** — `status` is `413` and `code` is `'PAYLOAD_TOO_LARGE'`. A body that declares a `Content-Length` over the limit is answered with `413` before the handler runs. A chunked body is counted as it arrives, so the error surfaces when something reads it — a `body` schema, or `ctx.request.json()` in a handler — and, with no `onError()` (or one that returns nothing), answers `413` with no body.
+
 ## `ValidationError`
 
 **Purpose** — the error Arcton raises when a `params`, `query` or `body` schema fails (or a body can't be parsed). It reaches [`app.onError()`](./arcton-app.mdx#onerror) like any other error.

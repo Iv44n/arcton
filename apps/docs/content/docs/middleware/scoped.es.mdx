@@ -109,6 +109,10 @@ sobre las respuestas `404` y `405` que genera Arcton, ya que esas no
 tienen ninguna ruta a la que pertenecer. Cuando algo tiene que llegar a
 cada respuesta, regístralo [globalmente](./global.mdx) en su lugar.
 
+Esto incluye las páginas que sirve [`openapi()`](../integrations/openapi.mdx):
+las responde un middleware global, así que `app.use('/docs', auth)` no las
+protege. Pon la verificación en un middleware global que mire el path.
+
 ## Scopes adentro de módulos
 
 Un [módulo](../routing/modules.mdx) puede darle scope a su propio
@@ -142,5 +146,7 @@ coincidiendo con cómo se escribió la ruta adentro del módulo.
 <Callout>
   Un scope pertenece a la instancia en la que se registra. El middleware con
   scope de un padre no alcanza las rutas de un módulo montado — pon el
-  middleware con scope en el módulo dueño de esas rutas.
+  middleware con scope en el módulo dueño de esas rutas. Arcton registra una
+  advertencia cuando montas un módulo cuyas rutas habría cubierto un scope del
+  padre.
 </Callout>

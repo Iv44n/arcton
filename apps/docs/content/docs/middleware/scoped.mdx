@@ -107,6 +107,10 @@ Scoped middleware runs only for routes that matched. It does not run on the
 to. When a concern has to reach every response, register it
 [globally](./global.mdx) instead.
 
+This includes the pages [`openapi()`](../integrations/openapi.mdx) serves: they
+are answered by a global middleware, so `app.use('/docs', auth)` does not
+protect them. Put the check in a global middleware that looks at the path.
+
 ## Scopes inside modules
 
 A [module](../routing/modules.mdx) can scope its own middleware, and the scope
@@ -140,5 +144,6 @@ matching how the route was written inside the module.
 <Callout>
   A scope belongs to the instance it is registered on. A parent's scoped
   middleware does not reach the routes of a mounted module — put the scoped
-  middleware in the module that owns those routes.
+  middleware in the module that owns those routes. Arcton logs a warning when
+  you mount a module whose routes a parent scope would have covered.
 </Callout>
