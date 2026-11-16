@@ -182,6 +182,7 @@ has a default.
 interface ScalarOptions {
   pageTitle?: string;
   cdn?: string;
+  version?: string;
   configuration?: Record<string, unknown>;
 }
 ```
@@ -192,6 +193,7 @@ interface ScalarOptions {
 | --------------- | -------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `pageTitle`     | `string` | `'Scalar API Reference'` | The `<title>` of the `/docs` page.                                                                                                                                       |
 | `cdn`           | `string` | jsDelivr                 | Where Scalar's JS bundle is loaded from — set to point at a self-hosted build.                                                                                           |
+| `version`       | `string` | latest                   | Pins the jsDelivr bundle to an exact `@scalar/api-reference` version, e.g. `'1.79.0'`. Cannot be combined with `cdn`; anything but an exact version throws when `openapi()` is called. |
 | `configuration` | `object` | `{}`                     | Scalar's own configuration object (theme, sidebar, auth, ...) — see [Scalar's configuration docs](https://guides.scalar.com/scalar/scalar-api-references/configuration). |
 
 **Behavior** — `configuration.url` is always set for you, from

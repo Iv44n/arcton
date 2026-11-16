@@ -222,6 +222,27 @@ configuration docs](https://guides.scalar.com/scalar/scalar-api-references/confi
 for every option it accepts. Scalar's JS bundle loads from a CDN by default;
 pass `cdn` to point at a self-hosted build instead.
 
+### Pinning the Scalar version
+
+Without further options the page loads whatever jsDelivr serves as the latest
+`@scalar/api-reference`, so a broken or compromised release reaches your docs
+page the moment it is published. Pin it with `version`:
+
+```ts
+import { openapi } from "@arcton/openapi";
+
+openapi({
+  info: { title: "Users API", version: "1.0.0" },
+  docs: { version: "1.79.0" },
+});
+```
+
+`version` must be an exact version and cannot be combined with `cdn`. A pinned
+version stops surprise updates but does not verify the file; to also control
+its integrity, self-host the bundle and point `cdn` at it. The docs page and
+`/openapi.json` are public, like any route without
+[a check](../middleware/scoped.mdx#scoped-middleware-and-matched-routes).
+
 ## Modules and the final route tree
 
 The document reflects the app's final route tree, read the first time it's

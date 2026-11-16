@@ -228,6 +228,27 @@ Scalar](https://guides.scalar.com/scalar/scalar-api-references/configuration)
 para cada opción que acepta. El bundle de JS de Scalar se carga desde un
 CDN por defecto; pasa `cdn` para apuntar a un build self-hosted.
 
+### Fijar la versión de Scalar
+
+Sin más opciones, la página carga lo que jsDelivr sirva como última versión de
+`@scalar/api-reference`, así que un release roto o comprometido llega a tu
+página de docs en cuanto se publica. Fíjala con `version`:
+
+```ts
+import { openapi } from "@arcton/openapi";
+
+openapi({
+  info: { title: "Users API", version: "1.0.0" },
+  docs: { version: "1.79.0" },
+});
+```
+
+`version` debe ser una versión exacta y no se puede combinar con `cdn`. Fijar
+la versión evita actualizaciones sorpresa pero no verifica el archivo; para
+controlar también su integridad, aloja el bundle tú mismo y apunta `cdn` hacia
+él. La página de docs y `/openapi.json` son públicas, como cualquier ruta sin
+[una verificación](../middleware/scoped.mdx#scoped-middleware-and-matched-routes).
+
 ## Modules y el árbol de rutas final
 
 El documento refleja el árbol de rutas final de la app, leído la primera vez

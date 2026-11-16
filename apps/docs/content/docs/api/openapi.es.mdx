@@ -186,6 +186,7 @@ ninguno de los tres tiene un valor por defecto.
 interface ScalarOptions {
   pageTitle?: string;
   cdn?: string;
+  version?: string;
   configuration?: Record<string, unknown>;
 }
 ```
@@ -196,6 +197,7 @@ interface ScalarOptions {
 | --------------- | -------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pageTitle`     | `string` | `'Scalar API Reference'` | El `<title>` de la página `/docs`.                                                                                                                                                                 |
 | `cdn`           | `string` | jsDelivr                 | Desde dónde se carga el bundle de JS de Scalar — asígnalo para apuntar a un build self-hosted.                                                                                                     |
+| `version`       | `string` | latest                   | Fija el bundle de jsDelivr a una versión exacta de `@scalar/api-reference`, p. ej. `'1.79.0'`. No se puede combinar con `cdn`; cualquier cosa que no sea una versión exacta lanza un error al llamar a `openapi()`. |
 | `configuration` | `object` | `{}`                     | El objeto de configuración propio de Scalar (theme, sidebar, auth, ...) — ver la [documentación de configuración de Scalar](https://guides.scalar.com/scalar/scalar-api-references/configuration). |
 
 **Comportamiento** — `configuration.url` siempre se asigna automáticamente,
