@@ -1,6 +1,6 @@
 import type { RouteAwareMiddleware, RouteRecord } from '@arcton/contracts'
 import { buildDocument, type DocumentOptions } from './document'
-import { renderScalar, type ScalarOptions } from './scalar'
+import { assertScalarOptions, renderScalar, type ScalarOptions } from './scalar'
 
 export interface OpenAPIOptions extends DocumentOptions {
   /** Where the document is served. Defaults to `/openapi.json`. */
@@ -32,6 +32,7 @@ export function openapi(options: OpenAPIOptions): RouteAwareMiddleware {
   const documentPath = normalizePath(options.document?.path ?? '/openapi.json')
   const docs = options.docs === false ? undefined : (options.docs ?? {})
   const docsPath = docs ? normalizePath(docs.path ?? '/docs') : undefined
+  if (docs) assertScalarOptions(docs)
 
   let readRoutes: (() => readonly RouteRecord[]) | undefined
   let documentBody: string | undefined

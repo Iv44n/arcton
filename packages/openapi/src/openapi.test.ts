@@ -334,3 +334,43 @@ test('earlier middleware guards the documentation paths', async () => {
     (await fetch('/openapi.json', { headers: { authorization: 'x' } })).status
   ).toBe(200)
 })
+
+test('docs.version pins the Scalar bundle to that version', async () => {
+  const { adapter, fetch } = createTestAdapter()
+  const app = Arcton()
+  app.use(openapi({ info, docs: { version: '1.79.0' } }))
+  app.listen({ adapter })
+
+  const html = await (await fetch('/docs')).text()
+  expect(html).toContain(
+    'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.79.0'
+  )
+  expect(html).not.toContain('@scalar/api-reference/esm.js')
+})
+
+test('without docs.version the unpinned bundle is used, as before', async () => {
+  const { adapter, fetch } = createTestAdapter()
+  const app = Arcton()
+  app.use(openapi({ info }))
+  app.listen({ adapter })
+
+  const html = await (await fetch('/docs')).text()
+  expect(html).toContain(
+    'https://cdn.jsdelivr.net/npm/@scalar/api-reference/esm.js'
+  )
+})
+
+test('docs.version rejects anything but an exact version, and cannot be combined with cdn', () => {
+  expect(() => openapi({ info, docs: { version: 'latest' } })).toThrow(
+    /exact version/
+  )
+  expect(() => openapi({ info, docs: { version: '1.79.0/../evil' } })).toThrow(
+    /exact version/
+  )
+  expect(() =>
+    openapi({
+      info,
+      docs: { version: '1.79.0', cdn: 'https://x.example/s.js' }
+    })
+  ).toThrow(/cannot be combined/)
+})
