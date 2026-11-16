@@ -21,32 +21,23 @@ export function contentLengthExceeds(
 export function limitBodySize(request: Request, maxBytes: number): Request {
   if (!request.body) return request
 
-  const source = request.body
   let total = 0
-  const limited = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const reader = source.getReader()
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          total += value.byteLength
-          if (total > maxBytes) {
-            controller.error(
-              new Error(
-                `Request body exceeds the configured limit of ${maxBytes} bytes`
-              )
+  const limited = request.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        total += chunk.byteLength
+        if (total > maxBytes) {
+          controller.error(
+            new Error(
+              `Request body exceeds the configured limit of ${maxBytes} bytes`
             )
-            return
-          }
-          controller.enqueue(value)
+          )
+          return
         }
-        controller.close()
-      } catch (err) {
-        controller.error(err)
+        controller.enqueue(chunk)
       }
-    }
-  })
+    })
+  )
 
   return new Request(request, { body: limited, duplex: 'half' } as RequestInit)
 }

@@ -978,6 +978,51 @@ test("use(scope, mw): does NOT run on 404/405 — there's no matched route to be
   expect(scopedCalled).toBe(false)
 })
 
+test.each(['/', '/admin/'])(
+  "use(%p, auth) protects every route under the scope (no fail-open on '/' or a trailing slash)",
+  async scope => {
+    const { adapter, fetch: handler } = createTestAdapter()
+    const app = Arcton()
+
+    app.use(scope, async (ctx, next) => {
+      if (ctx.request.headers.get('x-key') !== 'secret') {
+        return new Response('no', { status: 401 })
+      }
+      await next()
+    })
+    app.get('/admin/users', () => 'secret-data')
+    app.listen({ port: 0, adapter })
+
+    const denied = await call(
+      handler,
+      new Request('http://localhost/admin/users')
+    )
+    expect(denied.status).toBe(401)
+    const allowed = await call(
+      handler,
+      new Request('http://localhost/admin/users', {
+        headers: { 'x-key': 'secret' }
+      })
+    )
+    expect(allowed.status).toBe(200)
+  }
+)
+
+test("use('/admin', mw) does not cover routes that merely share the text prefix", async () => {
+  const { adapter, fetch: handler } = createTestAdapter()
+  const app = Arcton()
+  let calls = 0
+
+  app.use('/admin', () => {
+    calls++
+  })
+  app.get('/administrator', () => 'ok')
+  app.listen({ port: 0, adapter })
+
+  await call(handler, new Request('http://localhost/administrator'))
+  expect(calls).toBe(0)
+})
+
 test('route-level middleware does NOT run on 404/405', async () => {
   const { adapter, fetch: handler } = createTestAdapter()
   const app = Arcton()
@@ -2146,7 +2191,10 @@ test('body content: each media type is validated by its own schema, and ctx.cont
           from: 'json',
           n: b.n
         })),
-        'text/plain': fakeSchema((b: string) => ({ from: 'text', n: b.length }))
+        'text/plain': fakeSchema((b: string) => ({
+          from: 'text',
+          n: b.length
+        }))
       }
     },
     handler: ctx => ({ body: ctx.body, contentType: ctx.contentType })
@@ -2164,7 +2212,10 @@ test('body content: each media type is validated by its own schema, and ctx.cont
 
   const asText = await call(
     handler,
-    postTo('/hook', { headers: { 'content-type': 'text/plain' }, body: 'four' })
+    postTo('/hook', {
+      headers: { 'content-type': 'text/plain' },
+      body: 'four'
+    })
   )
   expect(await asText.json()).toEqual({
     body: { from: 'text', n: 4 },

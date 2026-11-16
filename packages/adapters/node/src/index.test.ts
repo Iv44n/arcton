@@ -144,3 +144,74 @@ test('nodeAdapter destroys the socket for an upgrade request on an unregistered 
 
   await server.stop()
 })
+
+test('nodeAdapter: a "//" request-target is a path, never an authority', async () => {
+  const server = nodeAdapter.serve({
+    port: 0,
+    fetch: request => {
+      const url = new URL(request.url)
+      return new Response(`${url.host}|${url.pathname}`)
+    }
+  })
+  const { hostname, port } = new URL(server.url)
+
+  const raw = (target: string) =>
+    new Promise<string>(resolve => {
+      let out = ''
+      Bun.connect({
+        hostname,
+        port: Number(port),
+        socket: {
+          open(s) {
+            s.write(
+              `GET ${target} HTTP/1.1\r\nHost: ${hostname}:${port}\r\nConnection: close\r\n\r\n`
+            )
+          },
+          data(_s, d) {
+            out += d.toString()
+          },
+          close() {
+            resolve(out)
+          }
+        }
+      })
+    })
+
+  const res = await raw('//x/secret/stats')
+  expect(res).toContain(`${hostname}:${port}|//x/secret/stats`)
+
+  await server.stop()
+})
+
+test('nodeAdapter: a Host header cannot contribute path or query to the routed URL', async () => {
+  const server = nodeAdapter.serve({
+    port: 0,
+    fetch: request => new Response(new URL(request.url).pathname)
+  })
+  const { hostname, port } = new URL(server.url)
+
+  const status = await new Promise<string>(resolve => {
+    let out = ''
+    Bun.connect({
+      hostname,
+      port: Number(port),
+      socket: {
+        open(s) {
+          s.write(
+            'GET /public HTTP/1.1\r\nHost: x/admin?\r\nConnection: close\r\n\r\n'
+          )
+        },
+        data(_s, d) {
+          out += d.toString()
+        },
+        close() {
+          resolve(out)
+        }
+      }
+    })
+  })
+  expect(status).not.toContain('/admin')
+  expect(status).not.toContain('200 OK')
+
+  await server.stop()
+})

@@ -42,9 +42,20 @@ function announcesBody(req: IncomingMessage): boolean {
 // GET/HEAD can't carry a body — the Request constructor throws if one is
 // passed. Any other method only gets one if the request announces it, so an
 // absent body is `null` here just as it is on Bun.
-function toWebRequest(req: IncomingMessage, fallbackHost: string): Request {
+// Only path and query are taken from the request-target — resolving it
+// against a base with `new URL(target, base)` would read `//x/path` as
+// authority `x` and drop the first segment.
+const AUTHORITY = /^(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:.]+\])(?::\d+)?$/
+
+function toRequestUrl(req: IncomingMessage, fallbackHost: string): URL {
   const host = req.headers.host ?? fallbackHost
-  const url = new URL(req.url ?? '/', `http://${host}`)
+  if (!AUTHORITY.test(host)) throw new Error('Invalid Host header')
+  const target = req.url ?? '/'
+  return new URL(`http://${host}${target.startsWith('/') ? '' : '/'}${target}`)
+}
+
+function toWebRequest(req: IncomingMessage, fallbackHost: string): Request {
+  const url = toRequestUrl(req, fallbackHost)
   const method = req.method ?? 'GET'
   const hasBody = method !== 'GET' && method !== 'HEAD' && announcesBody(req)
 
@@ -143,8 +154,13 @@ export const nodeAdapter: RuntimeAdapter = {
     })
 
     server.on('upgrade', (req, socket, head) => {
-      const host = req.headers.host ?? `localhost:${options.port}`
-      const pathname = new URL(req.url ?? '/', `http://${host}`).pathname
+      let pathname: string
+      try {
+        pathname = toRequestUrl(req, `localhost:${options.port}`).pathname
+      } catch {
+        socket.destroy()
+        return
+      }
       const handler = wsRoutes.get(pathname)
       if (!handler) {
         socket.destroy()

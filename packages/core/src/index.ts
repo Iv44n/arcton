@@ -381,7 +381,8 @@ function assertStaticPath(value: string, label: string): void {
 }
 
 function matchesScope(path: string, scope: string): boolean {
-  return path === scope || path.startsWith(`${scope}/`)
+  const base = scope.replace(/\/+$/, '')
+  return base === '' || path === base || path.startsWith(`${base}/`)
 }
 
 // `undefined` and `'/'` both collapse to `''` — one case downstream instead
