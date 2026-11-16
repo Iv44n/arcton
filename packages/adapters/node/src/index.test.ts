@@ -215,3 +215,50 @@ test('nodeAdapter: a Host header cannot contribute path or query to the routed U
 
   await server.stop()
 })
+
+test('nodeAdapter: an upgrade with a malformed Host header is dropped and the server keeps serving', async () => {
+  let reached = false
+  const server = nodeAdapter.serve({
+    port: 0,
+    fetch: () => new Response('still up'),
+    websocket: [
+      {
+        path: '/chat',
+        handler: {
+          upgrade: () => {
+            reached = true
+          },
+          message: () => {}
+        }
+      }
+    ]
+  })
+  const { hostname, port } = new URL(server.url)
+
+  const reply = await new Promise<string>(resolve => {
+    let out = ''
+    Bun.connect({
+      hostname,
+      port: Number(port),
+      socket: {
+        open(s) {
+          s.write(
+            'GET /chat HTTP/1.1\r\nHost: x/admin?\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n'
+          )
+        },
+        data(_s, d) {
+          out += d.toString()
+        },
+        close() {
+          resolve(out)
+        }
+      }
+    })
+  })
+
+  expect(reply).not.toContain('101')
+  expect(reached).toBe(false)
+  expect(await (await fetch(server.url)).text()).toBe('still up')
+
+  await server.stop()
+})
