@@ -380,3 +380,43 @@ Arcton({ port: 3000 })
 
 // adapter/env now belong to listen(), alongside port/hostname.
 Arcton().listen({ adapter: bunAdapter, env: 'development' })
+
+// ── ws(): ws.data is inferred from what upgrade() returns ──────────────────
+
+Arcton().ws('/room', {
+  upgrade: () => ({ user: { id: 'u1' } as User }),
+  open: ws => {
+    ws.data.user.id satisfies string
+  },
+  message: (ws, message) => {
+    ws.data.user satisfies User
+    message satisfies string | ArrayBuffer
+  }
+})
+
+// A branch that rejects with a Response doesn't widen ws.data.
+Arcton().ws('/room', {
+  upgrade: async ({ request }) => {
+    if (!request.headers.has('authorization')) {
+      return new Response('no', { status: 401 })
+    }
+    return { token: 'x' }
+  },
+  message: ws => {
+    ws.data.token satisfies string
+  }
+})
+
+// Without upgrade(), ws.data is undefined.
+Arcton().ws('/room', {
+  message: ws => {
+    ws.data satisfies undefined
+  }
+})
+
+// The type parameter can be given explicitly.
+Arcton().ws<{ room: string }>('/room', {
+  message: ws => {
+    ws.data.room satisfies string
+  }
+})

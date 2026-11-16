@@ -255,6 +255,12 @@ export interface RuntimeWebSocket {
 }
 
 export interface RuntimeWebSocketHandler {
+  /**
+   * Runs on the handshake, before the upgrade is accepted. Returning a
+   * `Response` rejects it and sends that response; any other value accepts
+   * and becomes `ws.data`. Throwing rejects with a 500.
+   */
+  upgrade?(request: Request): unknown
   message(
     ws: RuntimeWebSocket,
     message: string | ArrayBuffer

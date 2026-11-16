@@ -18,6 +18,13 @@ const adapters: { name: string; adapter: RuntimeAdapter }[] = [
   { name: 'node', adapter: nodeAdapter }
 ]
 
+const upgradeHeaders = {
+  connection: 'Upgrade',
+  upgrade: 'websocket',
+  'sec-websocket-version': '13',
+  'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ=='
+}
+
 for (const { name, adapter } of adapters) {
   test(`${name}: serves the fetch handler, exposes a populated url/port`, async () => {
     const server = adapter.serve({
@@ -156,6 +163,107 @@ for (const { name, adapter } of adapters) {
     expect(observedData).toBeUndefined()
 
     ws.close()
+    await server.stop()
+  })
+
+  test(`${name}: upgrade() runs on the handshake and its return value is ws.data`, async () => {
+    let seenAuth = null as string | null
+    let observedData: unknown
+    const server = adapter.serve({
+      port: 0,
+      fetch: () => new Response('not found', { status: 404 }),
+      websocket: [
+        {
+          path: '/chat',
+          handler: {
+            upgrade: request => {
+              seenAuth = request.headers.get('authorization')
+              return { user: 'u1' }
+            },
+            open: ws => {
+              observedData = ws.data
+            },
+            message: () => {}
+          }
+        }
+      ]
+    })
+
+    const wsUrl = new URL('/chat', server.url)
+    wsUrl.protocol = 'ws:'
+    const ws = new WebSocket(wsUrl, {
+      headers: { authorization: 'Bearer t' }
+    } as unknown as string[])
+    await new Promise<void>(resolve =>
+      ws.addEventListener('open', () => resolve())
+    )
+
+    expect(seenAuth).toBe('Bearer t')
+    expect(observedData).toEqual({ user: 'u1' })
+
+    ws.close()
+    await server.stop()
+  })
+
+  test(`${name}: a Response from upgrade() rejects the handshake with that status`, async () => {
+    let opened = false
+    const server = adapter.serve({
+      port: 0,
+      fetch: () => new Response('not found', { status: 404 }),
+      websocket: [
+        {
+          path: '/chat',
+          handler: {
+            upgrade: () =>
+              new Response('no', {
+                status: 401,
+                headers: { 'x-reason': 'auth' }
+              }),
+            open: () => {
+              opened = true
+            },
+            message: () => {}
+          }
+        }
+      ]
+    })
+
+    const res = await fetch(new URL('/chat', server.url), {
+      headers: upgradeHeaders
+    })
+    expect(res.status).toBe(401)
+    expect(res.headers.get('x-reason')).toBe('auth')
+    expect(await res.text()).toBe('no')
+    expect(opened).toBe(false)
+
+    await server.stop()
+  })
+
+  test(`${name}: upgrade() throwing rejects the handshake with a 500`, async () => {
+    const original = console.error
+    console.error = () => {}
+    const server = adapter.serve({
+      port: 0,
+      fetch: () => new Response('not found', { status: 404 }),
+      websocket: [
+        {
+          path: '/chat',
+          handler: {
+            upgrade: () => {
+              throw new Error('boom')
+            },
+            message: () => {}
+          }
+        }
+      ]
+    })
+
+    const res = await fetch(new URL('/chat', server.url), {
+      headers: upgradeHeaders
+    })
+    console.error = original
+    expect(res.status).toBe(500)
+
     await server.stop()
   })
 }

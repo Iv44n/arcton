@@ -15,7 +15,6 @@ import type {
   RouteRecord,
   RuntimeAdapter,
   RuntimeServer,
-  RuntimeWebSocketHandler,
   RuntimeWebSocketRoute,
   StandardSchemaV1
 } from '@arcton/contracts'
@@ -41,11 +40,17 @@ import {
   createShutdownCoordinator,
   DEFAULT_SHUTDOWN_TIMEOUT_MS
 } from './shutdown'
+import { toRuntimeWebSocketHandler, type WebSocketHandler } from './websocket'
 
 // Shared across every listen() call in this process, not per-app — see shutdown.ts.
 const shutdownCoordinator = createShutdownCoordinator()
 
 export { Http, HttpError, ValidationError } from './errors'
+export type {
+  WebSocketConnection,
+  WebSocketContext,
+  WebSocketHandler
+} from './websocket'
 
 // Errors thrown by onError() itself, so finalize() doesn't re-handle them.
 const handlerFailures = new WeakMap<Context, { error: unknown }>()
@@ -164,12 +169,20 @@ export interface ArctonApp<TProvided = {}> {
    */
   all: RouteMethod<TProvided>
   /**
-   * Registers a WebSocket route. Bypasses the HTTP pipeline entirely —
-   * `use()`/`provide()`/validation never run for it, so auth, logging or
-   * rate-limiting registered globally do not apply here; handle it inside
-   * this handler (typically in `open`).
+   * Registers a WebSocket route. Bypasses the HTTP pipeline —
+   * `use()`/`provide()`/validation/`onError()` never run for it. Gate the
+   * connection in `upgrade` instead: it runs on the handshake, before the
+   * socket is accepted. Return a value to accept (it becomes `ws.data`,
+   * typed), or throw an `Http.*` error / return a `Response` to reject with
+   * that status. `origins` rejects a browser handshake from any other
+   * origin with a 403 (a request with no `Origin` header isn't a browser).
+   *
+   * Put `upgrade` first in the object so `ws.data` is inferred from it.
    */
-  ws(path: string, handler: RuntimeWebSocketHandler): ArctonApp<TProvided>
+  ws<Data = undefined>(
+    path: string,
+    handler: WebSocketHandler<Data>
+  ): ArctonApp<TProvided>
   /**
    * Global middleware — composes behavior. Doesn't grow `TProvided`; see
    * `provide()`. With a leading `scope` path (must be static — no `:param`/
@@ -708,8 +721,11 @@ export function Arcton(config: ArctonConfig = {}): ArctonApp<{}> {
     all<Route extends string>(path: Route, ...args: unknown[]) {
       return registerRoute(ALL_METHODS, path, args)
     },
-    ws(path: string, handler: RuntimeWebSocketHandler) {
-      websocketRoutes.push({ path: joinPrefix(prefix, path), handler })
+    ws<Data>(path: string, handler: WebSocketHandler<Data>) {
+      websocketRoutes.push({
+        path: joinPrefix(prefix, path),
+        handler: toRuntimeWebSocketHandler(handler)
+      })
       return app
     },
     use(...args: unknown[]) {

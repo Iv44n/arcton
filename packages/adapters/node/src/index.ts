@@ -1,9 +1,10 @@
 import {
   createServer,
   type IncomingMessage,
+  STATUS_CODES,
   type ServerResponse
 } from 'node:http'
-import { Readable } from 'node:stream'
+import { Readable, type Duplex } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type {
   RuntimeAdapter,
@@ -107,9 +108,33 @@ function toMessage(data: RawData, isBinary: boolean): string | ArrayBuffer {
   ) as ArrayBuffer
 }
 
-function toRuntimeWebSocket(ws: WsWebSocket): RuntimeWebSocket {
+// The 'upgrade' event hands over a raw socket, so a rejection is written as
+// a plain HTTP/1.1 response by hand.
+async function rejectUpgrade(socket: Duplex, response: Response) {
+  try {
+    const body = Buffer.from(await response.arrayBuffer())
+    const reason = response.statusText || STATUS_CODES[response.status] || ''
+    const lines = [`HTTP/1.1 ${response.status} ${reason}`]
+    for (const [key, value] of response.headers) {
+      if (
+        /^(set-cookie|content-length|connection|transfer-encoding)$/i.test(key)
+      )
+        continue
+      lines.push(`${key}: ${value}`)
+    }
+    for (const cookie of response.headers.getSetCookie()) {
+      lines.push(`set-cookie: ${cookie}`)
+    }
+    lines.push(`content-length: ${body.length}`, 'connection: close', '', '')
+    socket.end(Buffer.concat([Buffer.from(lines.join('\r\n')), body]))
+  } catch {
+    socket.destroy()
+  }
+}
+
+function toRuntimeWebSocket(ws: WsWebSocket, data: unknown): RuntimeWebSocket {
   return {
-    data: undefined,
+    data,
     send: message => {
       ws.send(message)
     },
@@ -153,29 +178,54 @@ export const nodeAdapter: RuntimeAdapter = {
       }
     })
 
-    server.on('upgrade', (req, socket, head) => {
-      let pathname: string
+    server.on('upgrade', async (req, socket, head) => {
+      // No listener yet would turn a socket error during the async upgrade()
+      // into an uncaught exception; ws adds its own once it takes over.
+      socket.on('error', () => socket.destroy())
+
+      let request: Request
       try {
-        pathname = toRequestUrl(req, `localhost:${options.port}`).pathname
+        request = toWebRequest(req, `localhost:${options.port}`)
       } catch {
         socket.destroy()
         return
       }
-      const handler = wsRoutes.get(pathname)
+      const handler = wsRoutes.get(new URL(request.url).pathname)
       if (!handler) {
         socket.destroy()
         return
       }
 
+      let data: unknown
+      if (handler.upgrade) {
+        try {
+          data = await handler.upgrade(request)
+        } catch (error) {
+          console.error(error)
+          await rejectUpgrade(
+            socket,
+            new Response('Internal Server Error', { status: 500 })
+          )
+          return
+        }
+        if (data instanceof Response) {
+          await rejectUpgrade(socket, data)
+          return
+        }
+      }
+
       wss.handleUpgrade(req, socket, head, ws => {
-        handler.open?.(toRuntimeWebSocket(ws))
-        ws.on('message', (data, isBinary) =>
-          handler.message(toRuntimeWebSocket(ws), toMessage(data, isBinary))
+        handler.open?.(toRuntimeWebSocket(ws, data))
+        ws.on('message', (message, isBinary) =>
+          handler.message(
+            toRuntimeWebSocket(ws, data),
+            toMessage(message, isBinary)
+          )
         )
         ws.on('close', (code, reason) =>
-          handler.close?.(toRuntimeWebSocket(ws), code, reason.toString())
+          handler.close?.(toRuntimeWebSocket(ws, data), code, reason.toString())
         )
-        ws.on('drain', () => handler.drain?.(toRuntimeWebSocket(ws)))
+        ws.on('drain', () => handler.drain?.(toRuntimeWebSocket(ws, data)))
       })
     })
 

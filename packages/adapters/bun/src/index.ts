@@ -32,6 +32,26 @@ function toArrayBuffer(message: string | Buffer): string | ArrayBuffer {
   ) as ArrayBuffer
 }
 
+async function upgradeWebSocket(
+  request: Request,
+  bunServer: Bun.Server<WsConnectionData>,
+  handler: RuntimeWebSocketHandler
+): Promise<Response | undefined> {
+  let data: unknown
+  if (handler.upgrade) {
+    try {
+      data = await handler.upgrade(request)
+    } catch (error) {
+      console.error(error)
+      return new Response('Internal Server Error', { status: 500 })
+    }
+    if (data instanceof Response) return data
+  }
+  return bunServer.upgrade(request, { data: { handler, data } })
+    ? undefined
+    : new Response('Upgrade failed', { status: 400 })
+}
+
 const bunWebSocketHandler: Bun.WebSocketHandler<WsConnectionData> = {
   message: (ws, message) =>
     ws.data.handler.message(toRuntimeWebSocket(ws), toArrayBuffer(message)),
@@ -80,13 +100,7 @@ export const bunAdapter: RuntimeAdapter = {
       // defensive about it as the router's own URL parsing.
       const pathname = new URL(request.url, 'http://localhost').pathname
       const wsHandler = wsRoutes.get(pathname)
-      if (wsHandler) {
-        return bunServer.upgrade(request, {
-          data: { handler: wsHandler, data: undefined }
-        })
-          ? undefined
-          : new Response('Upgrade failed', { status: 400 })
-      }
+      if (wsHandler) return upgradeWebSocket(request, bunServer, wsHandler)
 
       return options.fetch(request, context)
     }
