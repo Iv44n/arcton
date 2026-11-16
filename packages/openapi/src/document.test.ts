@@ -324,7 +324,12 @@ test('responses use the output schema, requests the input schema', () => {
   // out — the same schema, two shapes.
   const schema = z.object({ a: z.string().default('x'), b: z.string() })
   const document = build([
-    { method: 'POST', path: '/things', body: schema, response: { 200: schema } }
+    {
+      method: 'POST',
+      path: '/things',
+      body: schema,
+      response: { 200: schema }
+    }
   ])
 
   const target = operation(document, '/things', 'post')
@@ -335,7 +340,12 @@ test('responses use the output schema, requests the input schema', () => {
 
 test('a schema with no JSON Schema representation degrades to an empty schema', () => {
   const document = build([
-    { method: 'POST', path: '/things', body: opaque, response: { 200: opaque } }
+    {
+      method: 'POST',
+      path: '/things',
+      body: opaque,
+      response: { 200: opaque }
+    }
   ])
 
   const target = operation(document, '/things', 'post')
@@ -355,7 +365,12 @@ test('a schema that cannot be represented on the way out degrades too', () => {
   // A transform has no output JSON Schema, but its input side is fine.
   const schema = z.object({ n: z.string().transform(Number) })
   const document = build([
-    { method: 'POST', path: '/things', body: schema, response: { 200: schema } }
+    {
+      method: 'POST',
+      path: '/things',
+      body: schema,
+      response: { 200: schema }
+    }
   ])
 
   const target = operation(document, '/things', 'post')

@@ -190,7 +190,10 @@ test('Scalar configuration is passed through, separately from the document', asy
   app.use(
     openapi({
       info,
-      docs: { pageTitle: 'Users Reference', configuration: { theme: 'purple' } }
+      docs: {
+        pageTitle: 'Users Reference',
+        configuration: { theme: 'purple' }
+      }
     })
   )
   app.listen({ adapter })

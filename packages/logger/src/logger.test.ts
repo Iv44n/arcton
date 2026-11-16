@@ -221,7 +221,11 @@ test('an error thrown downstream is logged at error and rethrown unchanged', asy
 
   expect(lines).toHaveLength(1)
   const record = JSON.parse(lines[0] as string)
-  expect(record).toMatchObject({ level: 'error', method: 'GET', path: '/boom' })
+  expect(record).toMatchObject({
+    level: 'error',
+    method: 'GET',
+    path: '/boom'
+  })
   expect(record.err).toMatchObject({
     name: 'Error',
     message: 'downstream boom'
