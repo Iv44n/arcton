@@ -51,7 +51,7 @@
     },
     "packages/adapters/bun": {
       "name": "@arcton/adapter-bun",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "dependencies": {
         "@arcton/contracts": "workspace:*",
       },
@@ -73,7 +73,7 @@
     },
     "packages/adapters/node": {
       "name": "@arcton/adapter-node",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "dependencies": {
         "@arcton/contracts": "workspace:*",
         "ws": "^8.21.3",
@@ -111,7 +111,7 @@
     },
     "packages/contracts": {
       "name": "@arcton/contracts",
-      "version": "0.0.10",
+      "version": "0.0.11",
       "devDependencies": {
         "@types/bun": "latest",
       },
@@ -121,7 +121,7 @@
     },
     "packages/core": {
       "name": "@arcton/core",
-      "version": "0.0.15",
+      "version": "0.0.16",
       "dependencies": {
         "@arcton/adapter-bun": "workspace:*",
         "@arcton/contracts": "workspace:*",
@@ -177,7 +177,7 @@
     },
     "packages/openapi": {
       "name": "@arcton/openapi",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "dependencies": {
         "@arcton/contracts": "workspace:*",
         "@scalar/client-side-rendering": "0.4.0",
