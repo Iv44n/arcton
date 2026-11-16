@@ -328,20 +328,52 @@ app.listen();
 **Firma**
 
 ```ts
-import type { RuntimeWebSocketHandler } from "@arcton/contracts";
-import type { ArctonApp } from "@arcton/core";
+import type { ArctonApp, WebSocketHandler } from "@arcton/core";
 
-declare function ws<TProvided>(
+declare function ws<TProvided, Data = undefined>(
   path: string,
-  handler: RuntimeWebSocketHandler,
+  handler: WebSocketHandler<Data>,
 ): ArctonApp<TProvided>;
 ```
 
-**Parámetros:** `path` — se compara exactamente, sin segmentos `:param`/`*wildcard`. `handler` — un [`RuntimeWebSocketHandler`](./runtime-types.mdx).
+**Parámetros:** `path` — se compara exactamente, sin segmentos `:param`/`*wildcard`. `handler` — un `WebSocketHandler<Data>`; `Data` se infiere de lo que devuelve `upgrade`.
 
 **Tipo de retorno:** `ArctonApp<TProvided>`.
 
-**Comportamiento:** las rutas ws se comparan por path exacto y no pasan por context, middleware ni providers. Ver [WebSockets](../routing/websockets.mdx) para la guía completa.
+**Comportamiento:** las rutas ws se comparan por path exacto y no pasan por middleware, providers ni `onError()`. Controla el acceso en `upgrade`, que corre en el handshake antes de aceptar el socket. Ver [WebSockets](../routing/websockets.mdx) para la guía completa.
+
+**`WebSocketHandler<Data>`**
+
+```ts no-check
+interface WebSocketHandler<Data = undefined> {
+  origins?: readonly string[];
+  upgrade?(ctx: WebSocketContext): Data | Response | Promise<Data | Response>;
+  open?(ws: WebSocketConnection<Data>): void | Promise<void>;
+  message(
+    ws: WebSocketConnection<Data>,
+    message: string | ArrayBuffer,
+  ): void | Promise<void>;
+  close?(
+    ws: WebSocketConnection<Data>,
+    code: number,
+    reason: string,
+  ): void | Promise<void>;
+  drain?(ws: WebSocketConnection<Data>): void | Promise<void>;
+}
+
+interface WebSocketContext {
+  readonly request: Request;
+}
+
+interface WebSocketConnection<Data = undefined> {
+  readonly data: Data;
+  send(message: string | ArrayBuffer | ArrayBufferView): void;
+  close(code?: number, reason?: string): void;
+}
+```
+
+- `origins` — orígenes de navegador que pueden abrir el socket; cualquier otro recibe un `403` antes de que corra `upgrade`. Un handshake sin header `Origin` no se verifica.
+- `upgrade` — el valor devuelto pasa a ser `ws.data`. Lanza un error `Http.*` o devuelve un `Response` para rechazar la conexión con ese status; cualquier otro error lanzado es un `500`.
 
 **Ejemplo**
 

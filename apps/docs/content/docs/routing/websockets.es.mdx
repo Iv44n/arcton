@@ -65,7 +65,9 @@ Cada callback puede ser async.
 
 ## El socket
 
-El valor `ws` que se pasa a cada callback ofrece dos métodos:
+El valor `ws` que se pasa a cada callback lleva el `data` de la conexión (ver
+[Controlar el acceso](#controlar-el-acceso)) y
+ofrece dos métodos:
 
 ```ts
 import { Arcton } from "@arcton/core";
@@ -171,34 +173,56 @@ de socket no corre [middleware](../middleware/overview.mdx),
 [validation](../validation/overview.mdx), y los callbacks reciben el
 socket en vez de un [context](../fundamentals/context.mdx).
 
-Para controlar el acceso a una conexión, verifica adentro de `open` y
-cierra el socket cuando la verificación falle:
+## Controlar el acceso
+
+Controla el acceso en `upgrade`, que corre en el handshake, antes de aceptar el
+socket. Recibe un contexto con el `request` del handshake — headers, cookies,
+URL y query. Lo que devuelve pasa a ser `ws.data`; para rechazar, lanza un
+[error `Http`](../errors/responding-with-errors.mdx) o devuelve un `Response`, y
+el cliente recibe ese status en vez de una conexión:
 
 ```ts
-import { Arcton } from "@arcton/core";
-
-const rooms = new Set(["general", "random"]);
+import { Arcton, Http } from "@arcton/core";
 
 const app = Arcton();
 
 app.ws("/room", {
+  origins: ["https://app.example.com"],
+  upgrade({ request }) {
+    const token = new URL(request.url).searchParams.get("token");
+    const user = token ? findUser(token) : undefined;
+
+    if (!user) throw Http.Unauthorized();
+
+    return { user };
+  },
   open(ws) {
-    ws.send("joined");
+    ws.send(`hello ${ws.data.user.name}`);
   },
   message(ws, message) {
-    const room = String(message);
-
-    if (!rooms.has(room)) {
-      ws.close(1008, "unknown room");
-      return;
-    }
-
-    ws.send(`welcome to ${room}`);
+    ws.send(`${ws.data.user.name}: ${message}`);
   },
 });
 
 app.listen();
+
+declare function findUser(token: string): { name: string } | undefined;
 ```
+
+`ws.data` se tipa a partir de lo que devuelve `upgrade`, así que pon `upgrade`
+primero en el objeto. Sin `upgrade`, `ws.data` es `undefined`. Para nombrar el
+tipo tú mismo, pásalo como argumento de tipo: `app.ws<{ user: User }>(...)`.
+Como el dato vive en la conexión, es el mismo en todos los callbacks.
+
+`origins` lista los orígenes de navegador que pueden abrir el socket; cualquier
+otro recibe un `403` antes de que corra `upgrade`. Los navegadores envían las
+cookies en el handshake de un WebSocket desde cualquier sitio, así que listar
+tus orígenes es lo que evita que otro sitio abra el socket con la sesión de tu
+usuario. Un handshake sin header `Origin` no viene de un navegador y no se
+verifica — autentícalo en `upgrade`.
+
+El pipeline sigue sin correr aquí: `use()`, `provide()` y `onError()` no se
+aplican al handshake, y no hay más `ctx` que `request`.
 
 ## Conectarse desde un cliente
 

@@ -168,6 +168,7 @@ interface RuntimeWebSocket {
 
 ```ts no-check
 interface RuntimeWebSocketHandler {
+  upgrade?(request: Request): unknown;
   message(
     ws: RuntimeWebSocket,
     message: string | ArrayBuffer,
@@ -182,7 +183,7 @@ interface RuntimeWebSocketHandler {
 }
 ```
 
-**Comportamiento** — solo `message` es obligatorio. Ver [WebSockets](../routing/websockets.mdx) para `app.ws()` en sí y ejemplos completos.
+**Comportamiento** — solo `message` es obligatorio. `upgrade` corre en el handshake, antes de aceptar la conexión: devolver un `Response` la rechaza y envía esa respuesta, cualquier otro valor se acepta y pasa a ser `ws.data`, y lanzar un error la rechaza con un `500`. Las apps rara vez lo escriben a mano — `app.ws()` lo construye a partir de un [`WebSocketHandler`](./arcton-app.mdx#ws). Ver [WebSockets](../routing/websockets.mdx) para `app.ws()` en sí y ejemplos completos.
 
 **Ejemplo** — un fragmento que muestra la forma:
 
