@@ -5,9 +5,9 @@
       "dependsOn": ["^build"],
       "outputs": []
     },
-    "docs#build": {
+    "@arcton/docs#build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": [".next/**", "!.next/cache/**"]
     },
     "dev": {
       "cache": false,
