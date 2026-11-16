@@ -45,7 +45,7 @@ bun install
 bun run dev     # every package in parallel
 bun test        # the full suite
 bun run build   # type-check and build all packages
-bun run lint    # bun lint --fix
+bun run lint    # oxlint --fix
 bun run lint:check
 bun run format  # bun fmt
 ```
